@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+import logging
 
 from contextvars import ContextVar, copy_context
 from inspect import iscoroutinefunction
@@ -229,6 +230,8 @@ class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
             error_message.send()
             return
         except Exception:
+            logger = logging.getLogger(__name__)
+            logger.exception("Exception when handling a method call")
             error_message = request_message.create_error_reply(
                 DbusFailedError.dbus_error_name,
                 "",
