@@ -274,7 +274,7 @@ def dbus_method_async(
     result_args_names: Optional[Sequence[str]] = None,
     input_args_names: Optional[Sequence[str]] = None,
     method_name: Optional[str] = None,
-) -> Callable[[T], T]:
+) -> Callable[[Any], DbusMethodAsync]:
 
     assert not isinstance(input_signature, FunctionType), (
         "Passed function to decorator directly. "
