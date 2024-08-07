@@ -18,12 +18,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-import logging
-
 from contextvars import ContextVar, copy_context
 from inspect import iscoroutinefunction
+import logging
 from types import FunctionType
-from typing import TYPE_CHECKING, cast, overload
+from typing import Awaitable, TYPE_CHECKING, List, cast, overload, Callable, Any
 from weakref import ref as weak_ref
 
 from .dbus_common_elements import (
@@ -39,7 +38,7 @@ from .dbus_exceptions import DbusFailedError
 from .sd_bus_internals import DbusNoReplyFlag, SdBusInterface
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Sequence, Type, TypeVar, Union
+    from typing import Optional, Sequence, Type, TypeVar, Union
 
     from .dbus_proxy_async_interface_base import (
         DbusExportHandle,
@@ -57,6 +56,21 @@ CURRENT_MESSAGE: ContextVar[SdBusMessage] = ContextVar('CURRENT_MESSAGE')
 def get_current_message() -> SdBusMessage:
     return CURRENT_MESSAGE.get()
 
+
+AnyAsyncFunc = Callable[..., Awaitable[Any]]
+DbusMethodMiddleware = Callable[[AnyAsyncFunc], Awaitable[Any]]
+
+
+async def call_with_middlewares(func: AnyAsyncFunc, args, kwargs, *, middlewares: List[DbusMethodMiddleware]):
+    if not middlewares:
+        return await func(*args, **kwargs)
+    else:
+        middleware = middlewares.pop(-1)
+
+        async def call_next(*args, **kwargs):
+            return await call_with_middlewares(func, args, kwargs, middlewares=middlewares)
+
+        return await middleware(call_next, *args, **kwargs)
 
 class DbusMethodAsync(DbusMethodCommon, DbusMemberAsync):
 
@@ -123,7 +137,7 @@ class DbusProxyMethodAsync(DbusBoundMethodAsyncBase, DbusProxyMemberAsync):
     async def _no_reply() -> None:
         return None
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    async def _make_dbus_call(self, *args: Any, **kwargs: Any) -> Any:
         bus = self.proxy_meta.attached_bus
         dbus_method = self.dbus_method
 
@@ -152,9 +166,12 @@ class DbusProxyMethodAsync(DbusBoundMethodAsyncBase, DbusProxyMemberAsync):
         if dbus_method.flags & DbusNoReplyFlag:
             new_call_message.expect_reply = False
             new_call_message.send()
-            return self._no_reply()
+            return await self._no_reply()
 
-        return self._dbus_async_call(new_call_message)
+        return await self._dbus_async_call(new_call_message)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return call_with_middlewares(self._make_dbus_call, args, kwargs, middlewares=self.dbus_method.to_dbus_middlewares.copy())
 
 
 class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
@@ -188,6 +205,7 @@ class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
         if local_object is None:
             raise RuntimeError("Local object no longer exists!")
 
+        # no middlewares for local-only calls
         return self.dbus_method.original_method(local_object, *args, **kwargs)
 
     async def _dbus_reply_call_method(
@@ -201,7 +219,8 @@ class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
 
         CURRENT_MESSAGE.set(request_message)
 
-        return await local_method(*request_message.parse_to_tuple())
+        # apply from_dbus middlewares
+        return await call_with_middlewares(local_method, request_message.parse_to_tuple(), {}, middlewares=self.dbus_method.from_dbus_middlewares.copy())
 
     async def _dbus_reply_call(
         self,

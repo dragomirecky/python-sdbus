@@ -182,6 +182,9 @@ class DbusMethodCommon(DbusMemberCommon):
 
         self.flags = flags
 
+        self.to_dbus_middlewares: List[Callable[[Any], Any]] = []
+        self.from_dbus_middlewares: List[Callable[[Any], Any]] = []
+
         self.__doc__ = original_method.__doc__
 
     def _rebuild_args(
