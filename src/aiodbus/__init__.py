@@ -45,17 +45,17 @@ from _sdbus import (
 from aiodbus.interface.common import DbusInterfaceCommonAsync
 from aiodbus.interface.object_manager import DbusObjectManagerInterfaceAsync
 from aiodbus.member.method import (
-    dbus_method_async,
-    dbus_method_async_override,
+    dbus_method,
+    dbus_method_override,
     get_current_message,
 )
-from aiodbus.member.property import dbus_property_async, dbus_property_async_override
-from aiodbus.member.signal import dbus_signal_async
+from aiodbus.member.property import dbus_property, dbus_property_async_override
+from aiodbus.member.signal import dbus_signal
 
 from .dbus_common_funcs import (
     get_default_bus,
     request_default_bus_name,
-    request_default_bus_name_async,
+    request_default_bus_name,
     set_default_bus,
 )
 from .dbus_exceptions import (
@@ -94,7 +94,7 @@ from .dbus_exceptions import (
 
 __all__ = (
     'get_default_bus', 'request_default_bus_name',
-    'request_default_bus_name_async', 'set_default_bus',
+    'request_default_bus_name', 'set_default_bus',
 
     'DbusAccessDeniedError', 'DbusAddressInUseError',
     'DbusAuthFailedError', 'DbusBadAddressError',
@@ -120,14 +120,14 @@ __all__ = (
     'DbusInterfaceCommonAsync',
     'DbusObjectManagerInterfaceAsync',
 
-    'dbus_method_async',
-    'dbus_method_async_override',
+    'dbus_method',
+    'dbus_method_override',
 
-    'dbus_property_async',
+    'dbus_property',
     'dbus_property_async_override',
     'get_current_message',
 
-    'dbus_signal_async',
+    'dbus_signal',
 
     'DbusDeprecatedFlag',
     'DbusHiddenFlag',

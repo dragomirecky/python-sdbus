@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING
 
 from aiodbus import (
     DbusInterfaceCommonAsync,
-    dbus_method_async,
-    dbus_property_async,
-    dbus_signal_async,
+    dbus_method,
+    dbus_property,
+    dbus_signal,
 )
 
 if TYPE_CHECKING:
@@ -40,15 +40,15 @@ class InterfaceTestTyping(
     interface_name="example.com",
 ):
 
-    @dbus_method_async(result_signature="as")
+    @dbus_method(result_signature="as")
     async def get_str_list_method(self) -> List[str]:
         raise NotImplementedError
 
-    @dbus_property_async("as")
+    @dbus_property("as")
     def str_list_property(self) -> List[str]:
         raise NotImplementedError
 
-    @dbus_signal_async("as")
+    @dbus_signal("as")
     def str_list_signal(self) -> List[str]:
         raise NotImplementedError
 
@@ -74,13 +74,13 @@ async def check_async_interface_property_typing(
     for x in should_be_list:
         x.capitalize()
 
-    should_be_list2 = await test_interface.str_list_property.get_async()
+    should_be_list2 = await test_interface.str_list_property.get()
     should_be_list2.append("test")
 
     for x in should_be_list2:
         x.capitalize()
 
-    await test_interface.str_list_property.set_async(["test", "foobar"])
+    await test_interface.str_list_property.set(["test", "foobar"])
 
 
 async def check_async_interface_signal_typing(

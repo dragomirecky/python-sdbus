@@ -20,7 +20,7 @@
 from __future__ import annotations
 from typing import Tuple, Type
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method_async
+from aiodbus import DbusInterfaceCommonAsync, dbus_method
 from aiodbus.unittest import IsolatedDbusTestCase
 
 TEST_SERVICE_NAME = 'org.example.test'
@@ -49,7 +49,7 @@ class TestIntrospection(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.test.intro1",
         ):
-            @dbus_method_async(
+            @dbus_method(
                 input_signature="ss",
                 result_signature="i",
             )
@@ -72,7 +72,7 @@ class TestIntrospection(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.test.intro2",
         ):
-            @dbus_method_async(
+            @dbus_method(
                 input_signature="ss",
                 result_signature="i",
                 result_args_names=("result",)
@@ -96,7 +96,7 @@ class TestIntrospection(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.test.intro3",
         ):
-            @dbus_method_async(
+            @dbus_method(
                 input_signature="ss",
                 input_args_names=("UserName", "PinCode"),
                 result_signature="i",
@@ -121,7 +121,7 @@ class TestIntrospection(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.test.intro4",
         ):
-            @dbus_method_async(
+            @dbus_method(
                 input_signature="ss",
                 result_args_names=(),
             )

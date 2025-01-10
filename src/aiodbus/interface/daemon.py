@@ -23,9 +23,9 @@ from typing import List, Optional, Tuple
 from aiodbus import (
     DbusInterfaceCommonAsync,
     SdBus,
-    dbus_method_async,
-    dbus_property_async,
-    dbus_signal_async,
+    dbus_method,
+    dbus_property,
+    dbus_signal,
 )
 
 
@@ -51,7 +51,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
             bus,
         )
 
-    @dbus_method_async('s', method_name='GetConnectionUnixProcessID')
+    @dbus_method('s', method_name='GetConnectionUnixProcessID')
     async def get_connection_pid(self, service_name: str) -> int:
         """Get process ID that owns a specified name.
 
@@ -61,7 +61,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async('s', method_name='GetConnectionUnixUser')
+    @dbus_method('s', method_name='GetConnectionUnixUser')
     async def get_connection_uid(self, service_name: str) -> int:
         """Get process user ID that owns a specified name.
 
@@ -71,7 +71,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async()
+    @dbus_method()
     async def get_id(self) -> str:
         """Returns machine id where bus is run. (stored in ``/etc/machine-id``)
 
@@ -79,7 +79,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async('s')
+    @dbus_method('s')
     async def get_name_owner(self, service_name: str) -> str:
         """Returns unique bus name (i.e. ``':1.94'``) for given service name.
 
@@ -89,7 +89,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async()
+    @dbus_method()
     async def list_activatable_names(self) -> List[str]:
         """Lists all activatable services names.
 
@@ -97,7 +97,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async()
+    @dbus_method()
     async def list_names(self) -> List[str]:
         """List all services and connections currently of the bus.
 
@@ -105,7 +105,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async('s')
+    @dbus_method('s')
     async def name_has_owner(self, service_name: str) -> bool:
         """
         Return True if someone already owns the name,
@@ -116,7 +116,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method_async('su')
+    @dbus_method('su')
     async def start_service_by_name(
             self,
             service_name: str,
@@ -132,7 +132,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_property_async('as')
+    @dbus_property('as')
     def features(self) -> List[str]:
         """List of D-Bus daemon features.
 
@@ -147,22 +147,22 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_property_async('as')
+    @dbus_property('as')
     def interfaces(self) -> List[str]:
         """Extra D-Bus daemon interfaces"""
         raise NotImplementedError
 
-    @dbus_signal_async('s')
+    @dbus_signal('s')
     def name_acquired(self) -> str:
         """Signal when current process acquires a bus name."""
         raise NotImplementedError
 
-    @dbus_signal_async('s')
+    @dbus_signal('s')
     def name_lost(self) -> str:
         """Signal when current process loses a bus name."""
         raise NotImplementedError
 
-    @dbus_signal_async('sss')
+    @dbus_signal('sss')
     def name_owner_changed(self) -> Tuple[str, str, str]:
         """Signal when some name on a bus changes owner.
 

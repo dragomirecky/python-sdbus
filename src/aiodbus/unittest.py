@@ -34,8 +34,8 @@ from weakref import ref as weak_ref
 from _sdbus import SdBusMessage, sd_bus_open_user
 from _sdbus import SdBus, SdBusSlot
 from aiodbus.dbus_common_funcs import set_default_bus
-from aiodbus.member.signal import DbusBoundSignalAsyncBase, DbusSignalAsync
-from aiodbus.member.signal import DbusLocalSignalAsync, DbusProxySignalAsync
+from aiodbus.member.signal import DbusBoundSignalBase, DbusSignal
+from aiodbus.member.signal import DbusLocalSignal, DbusProxySignal
 
 T = TypeVar('T')
 
@@ -105,7 +105,7 @@ class DbusSignalRecorderRemote(DbusSignalRecorderBase):
         self,
         timeout: Union[int, float],
         bus: SdBus,
-        remote_signal: DbusProxySignalAsync[Any],
+        remote_signal: DbusProxySignal[Any],
     ):
         super().__init__(timeout)
         self._bus = bus
@@ -137,10 +137,10 @@ class DbusSignalRecorderLocal(DbusSignalRecorderBase):
     def __init__(
         self,
         timeout: Union[int, float],
-        local_signal: DbusLocalSignalAsync[Any],
+        local_signal: DbusLocalSignal[Any],
     ):
         super().__init__(timeout)
-        self._local_signal_ref: weak_ref[DbusSignalAsync[Any]] = (
+        self._local_signal_ref: weak_ref[DbusSignal[Any]] = (
             weak_ref(local_signal.dbus_signal)
         )
 
@@ -221,13 +221,13 @@ class IsolatedDbusTestCase(IsolatedAsyncioTestCase):
 
     def assertDbusSignalEmits(
         self,
-        signal: DbusBoundSignalAsyncBase[Any],
+        signal: DbusBoundSignalBase[Any],
         timeout: Union[int, float] = 1,
     ) -> AsyncContextManager[DbusSignalRecorderBase]:
 
-        if isinstance(signal, DbusLocalSignalAsync):
+        if isinstance(signal, DbusLocalSignal):
             return DbusSignalRecorderLocal(timeout, signal)
-        elif isinstance(signal, DbusProxySignalAsync):
+        elif isinstance(signal, DbusProxySignal):
             return DbusSignalRecorderRemote(timeout, self.bus, signal)
         else:
             raise TypeError("Unknown or unsupported signal class.")

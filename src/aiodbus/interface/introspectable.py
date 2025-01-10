@@ -1,16 +1,16 @@
 
 
-from aiodbus.interface.base import DbusInterfaceBaseAsync
-from aiodbus.member.method import dbus_method_async
+from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.member.method import dbus_method
 
 
 class DbusIntrospectableAsync(
-    DbusInterfaceBaseAsync,
+    DbusInterfaceBase,
     interface_name='org.freedesktop.DBus.Introspectable',
     serving_enabled=False,
 ):
 
-    @dbus_method_async(method_name='Introspect')
+    @dbus_method(method_name='Introspect')
     async def dbus_introspect(self) -> str:
         raise NotImplementedError
 

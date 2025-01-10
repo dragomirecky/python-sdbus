@@ -22,8 +22,8 @@ from __future__ import annotations
 from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusObjectManagerInterfaceAsync,
-    dbus_method_async,
-    dbus_property_async,
+    dbus_method,
+    dbus_property,
 )
 from aiodbus.exceptions import DbusUnknownObjectError
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -41,7 +41,7 @@ class ObjectManagerTestInterface(
     DbusObjectManagerInterfaceAsync,
     interface_name='org.test.objectmanager',
 ):
-    @dbus_method_async(
+    @dbus_method(
         result_signature='s',
     )
     async def get_hello_world(self) -> str:
@@ -59,7 +59,7 @@ class ManagedInterface(
     interface_name=MANAGED_INTERFACE_NAME,
 ):
 
-    @dbus_property_async('x')
+    @dbus_property('x')
     def test_int(self) -> int:
         return TEST_NUMBER
 
@@ -135,7 +135,7 @@ class TestObjectManager(IsolatedDbusTestCase):
             interface_name=MANAGED_TWO_INTERFACE_NAME,
         ):
 
-            @dbus_property_async('s')
+            @dbus_property('s')
             def test_str(self) -> str:
                 return 'test'
 

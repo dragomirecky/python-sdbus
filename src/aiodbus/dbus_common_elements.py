@@ -51,11 +51,7 @@ class DbusMemberCommon(ABC):
         ...
 
 
-class DbusMemberAsync(DbusMemberCommon):
-    ...
-
-
-class DbusMemberSync(DbusMemberCommon):
+class DbusMember(DbusMemberCommon):
     ...
 
 
@@ -310,7 +306,7 @@ class DbusBoundMember(ABC):
         ...
 
 
-class DbusLocalMemberAsync(DbusBoundMember):
+class DbusLocalMember(DbusBoundMember):
     @abstractmethod
     def _append_to_interface(
         self,
@@ -320,7 +316,7 @@ class DbusLocalMemberAsync(DbusBoundMember):
         ...
 
 
-class DbusProxyMemberAsync(DbusBoundMember):
+class DbusProxyMember(DbusBoundMember):
     ...
 
 

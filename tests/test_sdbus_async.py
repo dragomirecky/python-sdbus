@@ -29,11 +29,11 @@ from _sdbus import DBUS_ERROR_TO_EXCEPTION, DbusPropertyEmitsChangeFlag
 from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusNoReplyFlag,
-    dbus_method_async,
-    dbus_method_async_override,
-    dbus_property_async,
+    dbus_method,
+    dbus_method_override,
+    dbus_property,
     dbus_property_async_override,
-    dbus_signal_async,
+    dbus_signal,
     get_current_message,
 )
 from aiodbus.exceptions import (
@@ -96,25 +96,25 @@ class SomeTestInterface(
         self.property_private = 100
         self.no_reply_sync = Event()
 
-    @dbus_method_async("s", "s")
+    @dbus_method("s", "s")
     async def upper(self, string: str) -> str:
         """Uppercase the input"""
         return string.upper()
 
-    @dbus_method_async(result_signature='s')
+    @dbus_method(result_signature='s')
     async def get_sender(self) -> str:
         message = get_current_message()
         return message.sender or ''
 
-    @dbus_method_async(result_signature='x')
+    @dbus_method(result_signature='x')
     async def test_int(self) -> int:
         return 1
 
-    @dbus_method_async(result_signature='x', result_args_names=('an_int', ))
+    @dbus_method(result_signature='x', result_args_names=('an_int', ))
     async def int_annotated(self) -> int:
         return 1
 
-    @dbus_property_async(
+    @dbus_property(
         "s",
         flags=DbusPropertyEmitsChangeFlag,
     )
@@ -126,11 +126,11 @@ class SomeTestInterface(
     def test_property_set(self, new_property: str) -> None:
         self.test_string = new_property
 
-    @dbus_property_async("s")
+    @dbus_property("s")
     def test_property_read_only(self) -> str:
         return self.test_string_read
 
-    @dbus_property_async("x")
+    @dbus_property("x")
     def test_property_private(self) -> int:
         return self.property_private
 
@@ -138,7 +138,7 @@ class SomeTestInterface(
     def test_private_setter(self, new_value: int) -> None:
         self.property_private = new_value
 
-    @dbus_method_async("sb", "s")
+    @dbus_method("sb", "s")
     async def kwargs_function(
             self,
             input: str = 'test',
@@ -148,7 +148,7 @@ class SomeTestInterface(
         else:
             return input.lower()
 
-    @dbus_method_async("sb", "s", 0, ('string_result', ))
+    @dbus_method("sb", "s", 0, ('string_result', ))
     async def kwargs_function_annotated(
             self,
             input: str = 'test',
@@ -158,24 +158,24 @@ class SomeTestInterface(
         else:
             return input.lower()
 
-    @dbus_signal_async('ss')
+    @dbus_signal('ss')
     def test_signal(self) -> Tuple[str, str]:
         """Test signal"""
         raise NotImplementedError
 
-    @dbus_method_async()
+    @dbus_method()
     async def raise_base_exception(self) -> None:
         raise DbusFailedError('Test error')
 
-    @dbus_method_async()
+    @dbus_method()
     async def raise_derived_exception(self) -> None:
         raise DbusFileExistsError('Test error 2')
 
-    @dbus_method_async()
+    @dbus_method()
     async def raise_custom_error(self) -> None:
         raise DbusErrorTest('Custom')
 
-    @dbus_method_async()
+    @dbus_method()
     async def raise_and_unmap_error(self) -> None:
         try:
             DBUS_ERROR_TO_EXCEPTION.pop('org.example.Nothing')
@@ -184,39 +184,39 @@ class SomeTestInterface(
 
         raise DbusErrorUnmappedLater('Should be unmapped')
 
-    @dbus_method_async('s', flags=DbusNoReplyFlag)
+    @dbus_method('s', flags=DbusNoReplyFlag)
     async def no_reply_method(self, new_value: str) -> None:
         self.no_reply_sync.set()
 
-    @dbus_property_async("s")
+    @dbus_property("s")
     def test_constant_property(self) -> str:
         return "a"
 
-    @dbus_method_async(
+    @dbus_method(
         result_signature='(ss)'
     )
     async def test_struct_return(self) -> Tuple[str, str]:
         return ('hello', 'world')
 
-    @dbus_method_async(
+    @dbus_method(
         result_signature='(ss)'
     )
     async def test_struct_return_workaround(self) -> Tuple[Tuple[str, str]]:
         return (('hello', 'world'), )
 
-    @dbus_method_async()
+    @dbus_method()
     async def looong_method(self) -> None:
         await sleep(100)
 
-    @dbus_signal_async()
+    @dbus_signal()
     def empty_signal(self) -> None:
         raise NotImplementedError
 
-    @dbus_method_async()
+    @dbus_method()
     async def returns_none_method(self) -> None:
         return
 
-    @dbus_method_async(
+    @dbus_method(
         input_signature="(iiii)",
         result_signature="i",
     )
@@ -227,7 +227,7 @@ class SomeTestInterface(
         a, b, c, d = int_struct
         return a*b*c*d
 
-    @dbus_method_async("s", "x")
+    @dbus_method("s", "x")
     async def return_length(self, input_str: str) -> int:
         return len(input_str)
 
@@ -348,7 +348,7 @@ class TestProxy(IsolatedDbusTestCase):
         test_var = ['asdasd']
 
         class TestInheritence(SomeTestInterface):
-            @dbus_method_async_override()
+            @dbus_method_override()
             async def test_int(self) -> int:
                 return 2
 
@@ -374,7 +374,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertEqual(test_var[0], await test_subclass.test_property)
 
-        await test_subclass.test_property.set_async('12345')
+        await test_subclass.test_property.set('12345')
 
         self.assertEqual(test_var[0], await test_subclass.test_property)
         self.assertEqual('12345', await test_subclass.test_property)
@@ -404,7 +404,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         with self.subTest('Tripple subclass'):
             class TestInheritenceTri(TestInheritence):
-                @dbus_method_async_override()
+                @dbus_method_override()
                 async def test_int(self) -> int:
                     return 3
 
@@ -432,7 +432,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertEqual(
             'test_property',
-            await test_object.test_property.get_async())
+            await test_object.test_property.get())
 
         self.assertEqual(
             'test_property', await test_object.test_property)
@@ -453,7 +453,7 @@ class TestProxy(IsolatedDbusTestCase):
         new_string = 'asdsgrghdthdth'
 
         await wait_for(
-            test_object_connection.test_property.set_async(
+            test_object_connection.test_property.set(
                 new_string),
             0.5)
 
@@ -689,7 +689,7 @@ class TestProxy(IsolatedDbusTestCase):
         t1 = loop.create_task(catch_property_emit_connection())
         t2 = loop.create_task(catch_property_emit_local())
 
-        await test_object_connection.test_property.set_async(test_str)
+        await test_object_connection.test_property.set(test_str)
 
         t1_result = await wait_for(t1, timeout=0.2)
         t2_result = await wait_for(t2, timeout=0.2)
@@ -758,7 +758,7 @@ class TestProxy(IsolatedDbusTestCase):
             interface_name=InterfaceNameEnum.BAR,
         ):
 
-            @dbus_property_async('s')
+            @dbus_property('s')
             def hello_world(self) -> str:
                 return 'Hello World!'
 
@@ -804,7 +804,7 @@ class TestProxy(IsolatedDbusTestCase):
         async with self.assertDbusSignalEmits(
             test_object_connection.properties_changed
         ) as properties_changed_catch:
-            await test_object_connection.test_property.set_async(test_str)
+            await test_object_connection.test_property.set(test_str)
 
         properties_changed_data = properties_changed_catch.output[0]
 
@@ -840,13 +840,13 @@ class TestProxy(IsolatedDbusTestCase):
         )
 
         with self.assertRaises(DbusPropertyReadOnlyError):
-            await test_object_connection.test_property_private.set_async(
+            await test_object_connection.test_property_private.set(
                 new_value)
 
         async with self.assertDbusSignalEmits(
             test_object_connection.properties_changed
         ) as properties_changed_catch:
-            await test_object.test_property_private.set_async(new_value)
+            await test_object.test_property_private.set(new_value)
 
         changed_properties = properties_changed_catch.output[0]
 
@@ -897,9 +897,9 @@ class TestProxy(IsolatedDbusTestCase):
         ).create_task(catch_properties_changed())
 
         with self.assertRaises(DbusPropertyReadOnlyError):
-            await test_object_connection.test_property_private.set_async(10)
+            await test_object_connection.test_property_private.set(10)
 
-        await test_object.test_property_private.set_async(10)
+        await test_object.test_property_private.set(10)
 
         self.assertEqual(
             await test_object_connection.test_property_private,
@@ -921,7 +921,7 @@ class TestProxy(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.example.one",
         ):
-            @dbus_method_async(result_signature="x")
+            @dbus_method(result_signature="x")
             async def one(self) -> int:
                 raise NotImplementedError
 
@@ -929,7 +929,7 @@ class TestProxy(IsolatedDbusTestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.example.two",
         ):
-            @dbus_method_async(result_signature="t")
+            @dbus_method(result_signature="t")
             async def two(self) -> int:
                 return 2
 

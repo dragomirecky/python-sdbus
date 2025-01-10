@@ -27,10 +27,10 @@ from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusPropertyConstFlag,
     DbusPropertyEmitsChangeFlag,
-    dbus_method_async,
-    dbus_method_async_override,
-    dbus_property_async,
-    dbus_signal_async,
+    dbus_method,
+    dbus_method_override,
+    dbus_property,
+    dbus_signal,
 )
 from aiodbus.dbus_common_funcs import PROPERTY_FLAGS_MASK, count_bits
 
@@ -41,7 +41,7 @@ class SomeTestInterface(
     DbusInterfaceCommonAsync,
     interface_name="org.example.good",
 ):
-    @dbus_method_async(result_signature="i")
+    @dbus_method(result_signature="i")
     async def test_int(self) -> int:
         return 1
 
@@ -70,7 +70,7 @@ class TestBadAsyncDbusClass(TestCase):
                 DbusInterfaceCommonAsync,
                 interface_name="org.example",
             ):
-                @dbus_method_async(
+                @dbus_method(
                     result_signature="s",
                     method_name="🤫",
                 )
@@ -86,7 +86,7 @@ class TestBadAsyncDbusClass(TestCase):
                 DbusInterfaceCommonAsync,
                 interface_name="org.example",
             ):
-                @dbus_property_async(
+                @dbus_property(
                     property_signature="s",
                     property_name="🤫",
                 )
@@ -102,7 +102,7 @@ class TestBadAsyncDbusClass(TestCase):
                 DbusInterfaceCommonAsync,
                 interface_name="org.example",
             ):
-                @dbus_signal_async(
+                @dbus_signal(
                     signal_signature="s",
                     signal_name="🤫",
                 )
@@ -139,7 +139,7 @@ class TestBadAsyncDbusClass(TestCase):
             class InvalidPropertiesFlags(
                 DbusInterfaceCommonAsync, interface_name="org.test.invalidprop"
             ):
-                @dbus_property_async(
+                @dbus_property(
                     "s",
                     flags=DbusPropertyConstFlag | DbusPropertyEmitsChangeFlag,
                 )
@@ -151,7 +151,7 @@ class TestBadAsyncDbusClass(TestCase):
             class ValidPropertiesFlags(
                 DbusInterfaceCommonAsync, interface_name="org.test.validprop"
             ):
-                @dbus_property_async(
+                @dbus_property(
                     "s",
                     flags=DbusDeprecatedFlag | DbusPropertyEmitsChangeFlag,
                 )
@@ -168,7 +168,7 @@ class TestBadAsyncDbusClass(TestCase):
         with self.assertRaises(ValueError):
 
             class TestInheritence2(SomeTestInterface):
-                @dbus_method_async_override()
+                @dbus_method_override()
                 async def test_unrelated(self) -> int:
                     return 2
 
@@ -176,7 +176,7 @@ class TestBadAsyncDbusClass(TestCase):
         with self.assertRaisesRegex(TypeError, "without interface name"):
 
             class NoInterfaceName(DbusInterfaceCommonAsync):
-                @dbus_method_async()
+                @dbus_method()
                 async def example(self) -> None:
                     ...
 
@@ -184,7 +184,7 @@ class TestBadAsyncDbusClass(TestCase):
         with self.assertRaisesRegex(TypeError, "without interface name"):
 
             class NoInterfaceName(SomeTestInterface):
-                @dbus_method_async()
+                @dbus_method()
                 async def example(self) -> None:
                     ...
 
@@ -204,7 +204,7 @@ class TestBadAsyncDbusClass(TestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.example.foo",
         ):
-            @dbus_method_async()
+            @dbus_method()
             async def example(self) -> None:
                 ...
 
@@ -212,7 +212,7 @@ class TestBadAsyncDbusClass(TestCase):
             DbusInterfaceCommonAsync,
             interface_name="org.example.bar",
         ):
-            @dbus_method_async()
+            @dbus_method()
             async def example(self) -> None:
                 ...
 

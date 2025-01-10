@@ -19,10 +19,9 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-from asyncio import Future, get_running_loop
+from asyncio import get_running_loop
 from contextvars import ContextVar
-from typing import Any, Dict, Generator, Iterator, Literal, Mapping, Tuple
-from warnings import warn
+from typing import Any, Dict, Iterator, Literal, Mapping, Tuple
 
 from _sdbus import (
     DbusPropertyConstFlag,
@@ -80,7 +79,7 @@ def set_default_bus(new_default: SdBus) -> None:
     DEFAULT_BUS.set(new_default)
 
 
-async def request_default_bus_name_async(
+async def request_default_bus_name(
         new_name: str,
         allow_replacement: bool = False,
         replace_existing: bool = False,
@@ -95,38 +94,6 @@ async def request_default_bus_name_async(
             queue,
         )
     )
-
-
-class _DeprecationAwaitable:
-    def __await__(self) -> Generator[Future[None], None, None]:
-        warn(
-            (
-                'Awaiting on request_default_bus_name'
-                'is deprecated and will be removed.'
-            ),
-            DeprecationWarning,
-        )
-        f: Future[None] = Future()
-        f.set_result(None)
-        yield from f
-
-
-def request_default_bus_name(
-        new_name: str,
-        allow_replacement: bool = False,
-        replace_existing: bool = False,
-        queue: bool = False,
-) -> _DeprecationAwaitable:
-    default_bus = get_default_bus()
-    default_bus.request_name(
-        new_name,
-        _prepare_request_name_flags(
-            allow_replacement,
-            replace_existing,
-            queue,
-        )
-    )
-    return _DeprecationAwaitable()
 
 
 def _method_name_converter(python_name: str) -> Iterator[str]:

@@ -23,9 +23,9 @@ from typing import Any
 
 from aiodbus import (
     DbusInterfaceCommonAsync,
-    dbus_method_async,
-    dbus_property_async,
-    request_default_bus_name_async,
+    dbus_method,
+    dbus_property,
+    request_default_bus_name,
 )
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta
 from aiodbus.exceptions import DbusFailedError
@@ -49,23 +49,23 @@ class InterfaceWithErrors(
     DbusInterfaceCommonAsync,
     interface_name='org.example.errors',
 ):
-    @dbus_property_async('s')
+    @dbus_property('s')
     def indep_err_getter(self) -> str:
         raise IndependentError
 
-    @dbus_property_async('s')
+    @dbus_property('s')
     def derrive_err_getter(self) -> str:
         raise DbusDerivePropertydError
 
-    @dbus_method_async(result_signature='s')
+    @dbus_method(result_signature='s')
     async def hello_error(self) -> str:
         raise AttributeError
 
-    @dbus_method_async(result_signature='s')
+    @dbus_method(result_signature='s')
     async def hello_world(self) -> str:
         return HELLO_WORLD
 
-    @dbus_property_async('s')
+    @dbus_property('s')
     def indep_err_setable(self) -> str:
         return GOOD_STR
 
@@ -73,7 +73,7 @@ class InterfaceWithErrors(
     def indep_err_setter(self, new_value: str) -> None:
         raise IndependentError
 
-    @dbus_property_async('s')
+    @dbus_property('s')
     def derrive_err_settable(self) -> str:
         return GOOD_STR
 
@@ -86,7 +86,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        await request_default_bus_name_async('org.test')
+        await request_default_bus_name('org.test')
         self.test_object = InterfaceWithErrors()
         self.test_object.export_to_dbus('/')
 
@@ -103,7 +103,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
     async def test_property_getter_independent_error(self) -> None:
         with self.assertRaises(DbusFailedError) as cm:
             await wait_for(
-                self.test_object_connection.indep_err_getter.get_async(),
+                self.test_object_connection.indep_err_getter.get(),
                 timeout=1,
             )
 
@@ -115,7 +115,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
     async def test_property_getter_derived_error(self) -> None:
         with self.assertRaises(DbusDerivePropertydError):
             await wait_for(
-                self.test_object_connection.derrive_err_getter.get_async(),
+                self.test_object_connection.derrive_err_getter.get(),
                 timeout=1,
             )
 
@@ -125,7 +125,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
         self.assertEqual(
             await wait_for(
-                self.test_object_connection.indep_err_setable.get_async(),
+                self.test_object_connection.indep_err_setable.get(),
                 timeout=1,
             ),
             GOOD_STR,
@@ -134,7 +134,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         with self.assertRaises(DbusFailedError) as cm:
             await wait_for(
                 self.test_object_connection.
-                indep_err_setable.set_async('Test'),
+                indep_err_setable.set('Test'),
                 timeout=1,
             )
 
@@ -147,7 +147,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
         self.assertEqual(
             await wait_for(
-                self.test_object_connection.derrive_err_settable.get_async(),
+                self.test_object_connection.derrive_err_settable.get(),
                 timeout=1,
             ),
             GOOD_STR,
@@ -156,7 +156,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         with self.assertRaises(DbusDerivePropertydError):
             await wait_for(
                 self.test_object_connection.
-                derrive_err_settable.set_async('Test'),
+                derrive_err_settable.set('Test'),
                 timeout=1,
             )
 

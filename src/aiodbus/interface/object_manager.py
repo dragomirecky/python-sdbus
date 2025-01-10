@@ -22,10 +22,10 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from aiodbus.dbus_common_funcs import get_default_bus
-from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBaseAsync
+from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 from aiodbus.interface.common import DbusInterfaceCommonAsync
-from aiodbus.member.method import dbus_method_async
-from aiodbus.member.signal import dbus_signal_async
+from aiodbus.member.method import dbus_method
+from aiodbus.member.signal import dbus_signal
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -46,18 +46,18 @@ class DbusObjectManagerInterfaceAsync(
     def __init__(self) -> None:
         super().__init__()
         self._object_manager_slot: Optional[SdBusSlot] = None
-        self._managed_object_to_path: Dict[DbusInterfaceBaseAsync, str] = {}
+        self._managed_object_to_path: Dict[DbusInterfaceBase, str] = {}
 
-    @dbus_method_async(result_signature='a{oa{sa{sv}}}')
+    @dbus_method(result_signature='a{oa{sa{sv}}}')
     async def get_managed_objects(
             self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         raise NotImplementedError
 
-    @dbus_signal_async('oa{sa{sv}}')
+    @dbus_signal('oa{sa{sv}}')
     def interfaces_added(self) -> Tuple[str, Dict[str, Dict[str, Any]]]:
         raise NotImplementedError
 
-    @dbus_signal_async('oao')
+    @dbus_signal('oao')
     def interfaces_removed(self) -> Tuple[str, List[str]]:
         raise NotImplementedError
 
@@ -81,7 +81,7 @@ class DbusObjectManagerInterfaceAsync(
     def export_with_manager(
         self,
         object_path: str,
-        object_to_export: DbusInterfaceBaseAsync,
+        object_to_export: DbusInterfaceBase,
         bus: Optional[SdBus] = None,
     ) -> DbusExportHandle:
         if self._object_manager_slot is None:
@@ -105,7 +105,7 @@ class DbusObjectManagerInterfaceAsync(
 
     def remove_managed_object(
             self,
-            managed_object: DbusInterfaceBaseAsync) -> None:
+            managed_object: DbusInterfaceBase) -> None:
         if self._dbus.attached_bus is None:
             raise RuntimeError('Object manager not exported')
 

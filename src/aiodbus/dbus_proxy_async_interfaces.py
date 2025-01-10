@@ -21,9 +21,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from aiodbus.dbus_common_funcs import _parse_properties_vardict
-from aiodbus.interface.base import DbusInterfaceBaseAsync
-from aiodbus.member.method import dbus_method_async
-from aiodbus.member.signal import dbus_signal_async
+from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.member.method import dbus_method
+from aiodbus.member.signal import dbus_signal
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Tuple

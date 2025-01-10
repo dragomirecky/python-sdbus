@@ -43,39 +43,38 @@ from _sdbus import SdBus
 from aiodbus.dbus_common_elements import (
     DbusClassMeta,
     DbusInterfaceMetaCommon,
-    DbusLocalMemberAsync,
+    DbusLocalMember,
     DbusLocalObjectMeta,
-    DbusMemberAsync,
+    DbusMember,
     DbusMemberCommon,
-    DbusMemberSync,
     DbusMethodOverride,
     DbusPropertyOverride,
     DbusRemoteObjectMeta,
 )
 from aiodbus.dbus_common_funcs import get_default_bus
 from aiodbus.handle import DbusExportHandle
-from aiodbus.member.method import DbusMethodAsync
-from aiodbus.member.property import DbusPropertyAsync
+from aiodbus.member.method import DbusMethod
+from aiodbus.member.property import DbusProperty
 
 T = TypeVar('T')
-Self = TypeVar('Self', bound="DbusInterfaceBaseAsync")
+Self = TypeVar('Self', bound="DbusInterfaceBase")
 DbusOverride = Union[DbusMethodOverride[T], DbusPropertyOverride[T]]
 
 
 DBUS_CLASS_TO_META: WeakKeyDictionary[
     type, DbusClassMeta] = WeakKeyDictionary()
 DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[
-    str, DbusInterfaceMetaAsync] = WeakValueDictionary()
+    str, DbusInterfaceMeta] = WeakValueDictionary()
 
 
-class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
+class DbusInterfaceMeta(DbusInterfaceMetaCommon):
 
     @staticmethod
     def _process_dbus_method_override(
         override_attr_name: str,
         override: DbusMethodOverride[T],
-        mro_dbus_elements: Dict[str, DbusMemberAsync],
-    ) -> DbusMethodAsync:
+        mro_dbus_elements: Dict[str, DbusMember],
+    ) -> DbusMethod:
         try:
             original_method = mro_dbus_elements[override_attr_name]
         except KeyError:
@@ -84,9 +83,9 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
                 f"to override."
             )
 
-        if not isinstance(original_method, DbusMethodAsync):
+        if not isinstance(original_method, DbusMethod):
             raise TypeError(
-                f"Expected {DbusMethodAsync!r} got {original_method!r} "
+                f"Expected {DbusMethod!r} got {original_method!r} "
                 f"under name {override_attr_name!r}"
             )
 
@@ -98,8 +97,8 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
     def _process_dbus_property_override(
         override_attr_name: str,
         override: DbusPropertyOverride[T],
-        mro_dbus_elements: Dict[str, DbusMemberAsync],
-    ) -> DbusPropertyAsync[Any]:
+        mro_dbus_elements: Dict[str, DbusMember],
+    ) -> DbusProperty[Any]:
         try:
             original_property = mro_dbus_elements[override_attr_name]
         except KeyError:
@@ -108,15 +107,15 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
                 f"to override."
             )
 
-        if not isinstance(original_property, DbusPropertyAsync):
+        if not isinstance(original_property, DbusProperty):
             raise TypeError(
-                f"Expected {DbusMethodAsync!r} got {original_property!r} "
+                f"Expected {DbusMethod!r} got {original_property!r} "
                 f"under name {override_attr_name!r}"
             )
 
         new_property = copy(original_property)
         new_property.property_getter = cast(
-            Callable[[DbusInterfaceBaseAsync], Any],
+            Callable[[DbusInterfaceBase], Any],
             override.getter_override
         )
         if override.setter_override is not None:
@@ -130,11 +129,11 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
         cls,
         new_class_name: str,
         namespace: Dict[str, Any],
-        mro_dbus_elements: Dict[str, DbusMemberAsync],
+        mro_dbus_elements: Dict[str, DbusMember],
     ) -> None:
 
         possible_collisions = namespace.keys() & mro_dbus_elements.keys()
-        new_overrides: Dict[str, DbusMemberAsync] = {}
+        new_overrides: Dict[str, DbusMember] = {}
 
         for attr_name, attr in namespace.items():
             if isinstance(attr, DbusMethodOverride):
@@ -166,12 +165,12 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
     def _extract_dbus_elements(
         dbus_class: type,
         dbus_meta: DbusClassMeta,
-    ) -> Dict[str, DbusMemberAsync]:
-        dbus_elements_map: Dict[str, DbusMemberAsync] = {}
+    ) -> Dict[str, DbusMember]:
+        dbus_elements_map: Dict[str, DbusMember] = {}
 
         for attr_name in dbus_meta.python_attr_to_dbus_member.keys():
             dbus_element = dbus_class.__dict__.get(attr_name)
-            if not isinstance(dbus_element, DbusMemberAsync):
+            if not isinstance(dbus_element, DbusMember):
                 raise TypeError(
                     f"Expected async D-Bus element, got {dbus_element!r} "
                     f"in class {dbus_class!r}"
@@ -186,8 +185,8 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
         cls,
         new_class_name: str,
         base_classes: Iterable[type],
-    ) -> Dict[str, DbusMemberAsync]:
-        all_python_dbus_map: Dict[str, DbusMemberAsync] = {}
+    ) -> Dict[str, DbusMember]:
+        all_python_dbus_map: Dict[str, DbusMember] = {}
         possible_collisions: Set[str] = set()
 
         for c in base_classes:
@@ -223,16 +222,10 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
         if not isinstance(attr, DbusMemberCommon):
             return
 
-        if isinstance(attr, DbusMemberSync):
-            raise TypeError(
-                "Can't mix blocking methods in "
-                f"async interface: {attr_name!r}"
-            )
-
         if attr.interface_name != interface_name:
             return
 
-        if isinstance(attr, DbusMemberAsync):
+        if isinstance(attr, DbusMember):
             meta.dbus_member_to_python_attr[attr.member_name] = attr_name
             meta.python_attr_to_dbus_member[attr_name] = attr.member_name
         else:
@@ -243,7 +236,7 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
                 namespace: Dict[str, Any],
                 interface_name: Optional[str] = None,
                 serving_enabled: bool = True,
-                ) -> DbusInterfaceMetaAsync:
+                ) -> DbusInterfaceMeta:
 
         if interface_name in DBUS_INTERFACE_NAME_TO_CLASS:
             raise ValueError(
@@ -281,7 +274,7 @@ class DbusInterfaceMetaAsync(DbusInterfaceMetaCommon):
         return new_cls
 
 
-class DbusInterfaceBaseAsync(metaclass=DbusInterfaceMetaAsync):
+class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
 
     def __init__(self) -> None:
         self._dbus: Union[
@@ -331,12 +324,12 @@ class DbusInterfaceBaseAsync(metaclass=DbusInterfaceMetaAsync):
         local_object_meta.attached_bus = bus
         local_object_meta.serving_object_path = object_path
         # TODO: can be optimized with a single loop
-        interface_map: Dict[str, List[DbusLocalMemberAsync]] = {}
+        interface_map: Dict[str, List[DbusLocalMember]] = {}
 
         for key, value in getmembers(self):
-            assert not isinstance(value, DbusMemberAsync)
+            assert not isinstance(value, DbusMember)
 
-            if isinstance(value, DbusLocalMemberAsync) and \
+            if isinstance(value, DbusLocalMember) and \
                     value.member.serving_enabled:
                 interface_name = value.member.interface_name
             else:

@@ -22,7 +22,7 @@ from contextvars import ContextVar, copy_context
 from inspect import iscoroutinefunction
 import logging
 from types import FunctionType
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, cast, overload
+from typing import Any, Awaitable, Callable, List, TYPE_CHECKING, cast, overload
 from typing import Optional, Sequence, Type, TypeVar, Union
 from weakref import ref as weak_ref
 
@@ -30,17 +30,17 @@ from _sdbus import DbusNoReplyFlag, SdBusInterface
 from _sdbus import SdBusMessage
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
-    DbusLocalMemberAsync,
-    DbusMemberAsync,
+    DbusLocalMember,
+    DbusMember,
     DbusMethodCommon,
     DbusMethodOverride,
-    DbusProxyMemberAsync,
+    DbusProxyMember,
     DbusRemoteObjectMeta,
 )
 from aiodbus.dbus_exceptions import DbusFailedError
 
 if TYPE_CHECKING:
-    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBaseAsync
+    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 T = TypeVar('T')
 
@@ -66,55 +66,55 @@ async def call_with_middlewares(func: AnyAsyncFunc, args, kwargs, *, middlewares
 
         return await middleware(call_next, *args, **kwargs)
 
-class DbusMethodAsync(DbusMethodCommon, DbusMemberAsync):
+class DbusMethod(DbusMethodCommon, DbusMember):
 
     @overload
     def __get__(
         self,
         obj: None,
-        obj_class: Type[DbusInterfaceBaseAsync],
-    ) -> DbusMethodAsync:
+        obj_class: Type[DbusInterfaceBase],
+    ) -> DbusMethod:
         ...
 
     @overload
     def __get__(
         self,
-        obj: DbusInterfaceBaseAsync,
-        obj_class: Type[DbusInterfaceBaseAsync],
+        obj: DbusInterfaceBase,
+        obj_class: Type[DbusInterfaceBase],
     ) -> Callable[..., Any]:
         ...
 
     def __get__(
         self,
-        obj: Optional[DbusInterfaceBaseAsync],
-        obj_class: Optional[Type[DbusInterfaceBaseAsync]] = None,
-    ) -> Union[Callable[..., Any], DbusMethodAsync]:
+        obj: Optional[DbusInterfaceBase],
+        obj_class: Optional[Type[DbusInterfaceBase]] = None,
+    ) -> Union[Callable[..., Any], DbusMethod]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return DbusProxyMethodAsync(self, dbus_meta)
+                return DbusProxyMethod(self, dbus_meta)
             else:
-                return DbusLocalMethodAsync(self, obj)
+                return DbusLocalMethod(self, obj)
         else:
             return self
 
 
-class DbusBoundMethodAsyncBase(DbusBoundMember):
-    def __init__(self, dbus_method: DbusMethodAsync) -> None:
+class DbusBoundMethodBase(DbusBoundMember):
+    def __init__(self, dbus_method: DbusMethod) -> None:
         self.dbus_method = dbus_method
 
     @property
-    def member(self) -> DbusMemberAsync:
+    def member(self) -> DbusMember:
         return self.dbus_method
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
 
-class DbusProxyMethodAsync(DbusBoundMethodAsyncBase, DbusProxyMemberAsync):
+class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
     def __init__(
         self,
-        dbus_method: DbusMethodAsync,
+        dbus_method: DbusMethod,
         proxy_meta: DbusRemoteObjectMeta,
     ):
         super().__init__(dbus_method)
@@ -122,7 +122,7 @@ class DbusProxyMethodAsync(DbusBoundMethodAsyncBase, DbusProxyMemberAsync):
 
         self.__doc__ = dbus_method.__doc__
 
-    async def _dbus_async_call(self, call_message: SdBusMessage) -> Any:
+    async def _dbus_call(self, call_message: SdBusMessage) -> Any:
         bus = self.proxy_meta.attached_bus
         reply_message = await bus.call_async(call_message)
         return reply_message.get_contents()
@@ -162,17 +162,17 @@ class DbusProxyMethodAsync(DbusBoundMethodAsyncBase, DbusProxyMemberAsync):
             new_call_message.send()
             return await self._no_reply()
 
-        return await self._dbus_async_call(new_call_message)
+        return await self._dbus_call(new_call_message)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return call_with_middlewares(self._make_dbus_call, args, kwargs, middlewares=self.dbus_method.to_dbus_middlewares.copy())
 
 
-class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
+class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
     def __init__(
         self,
-        dbus_method: DbusMethodAsync,
-        local_object: DbusInterfaceBaseAsync,
+        dbus_method: DbusMethod,
+        local_object: DbusInterfaceBase,
     ):
         super().__init__(dbus_method)
         self.local_object_ref = weak_ref(local_object)
@@ -205,7 +205,7 @@ class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
     async def _dbus_reply_call_method(
         self,
         request_message: SdBusMessage,
-        local_object: DbusInterfaceBaseAsync,
+        local_object: DbusInterfaceBase,
     ) -> Any:
 
         local_method = self.dbus_method.original_method.__get__(
@@ -274,20 +274,15 @@ class DbusLocalMethodAsync(DbusBoundMethodAsyncBase, DbusLocalMemberAsync):
         reply_message.send()
 
 
-# aliases for backwards compatibility
-DbusMethodAsyncBaseBind = DbusBoundMethodAsyncBase
-DbusMethodAsyncLocalBind = DbusLocalMethodAsync
-DbusMethodAsyncProxyBind = DbusProxyMethodAsync
 
-
-def dbus_method_async(
+def dbus_method(
     input_signature: str = "",
     result_signature: str = "",
     flags: int = 0,
     result_args_names: Optional[Sequence[str]] = None,
     input_args_names: Optional[Sequence[str]] = None,
     method_name: Optional[str] = None,
-) -> Callable[[Any], DbusMethodAsync]:
+) -> Callable[[Any], DbusMethod]:
 
     assert not isinstance(input_signature, FunctionType), (
         "Passed function to decorator directly. "
@@ -300,7 +295,7 @@ def dbus_method_async(
             "Expected coroutine function. ",
             "Maybe you forgot 'async' keyword?",
         )
-        new_wrapper = DbusMethodAsync(
+        new_wrapper = DbusMethod(
             original_method=original_method,
             method_name=method_name,
             input_signature=input_signature,
@@ -315,7 +310,7 @@ def dbus_method_async(
     return dbus_method_decorator
 
 
-def dbus_method_async_override() -> Callable[[T], T]:
+def dbus_method_override() -> Callable[[T], T]:
 
     def new_decorator(
             new_function: T) -> T:

@@ -23,7 +23,7 @@ from typing import Optional, Union
 from _sdbus import SdBus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta, DbusRemoteObjectMeta
 from aiodbus.dbus_common_funcs import get_default_bus
-from aiodbus.interface.base import DbusInterfaceBaseAsync
+from aiodbus.interface.base import DbusInterfaceBase
 
 
 
@@ -63,13 +63,13 @@ def _inspect_dbus_path_local(
 
 
 def inspect_dbus_path(
-    obj: DbusInterfaceBaseAsync,
+    obj: DbusInterfaceBase,
     bus: Optional[SdBus] = None,
 ) -> str:
     if bus is None:
         bus = get_default_bus()
 
-    if isinstance(obj, DbusInterfaceBaseAsync):
+    if isinstance(obj, DbusInterfaceBase):
         dbus_meta = obj._dbus
         if isinstance(dbus_meta, DbusRemoteObjectMeta):
             return _inspect_dbus_path_proxy(obj, dbus_meta, bus)

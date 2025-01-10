@@ -36,23 +36,23 @@ from weakref import WeakSet
 from _sdbus import SdBus, SdBusInterface, SdBusMessage, SdBusSlot
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
-    DbusLocalMemberAsync,
+    DbusLocalMember,
     DbusLocalObjectMeta,
-    DbusMemberAsync,
-    DbusProxyMemberAsync,
+    DbusMember,
+    DbusProxyMember,
     DbusRemoteObjectMeta,
     DbusSignalCommon,
 )
 from aiodbus.dbus_common_funcs import get_default_bus
 
 if TYPE_CHECKING:
-    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBaseAsync
+    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 
 T = TypeVar('T')
 
 
-class DbusSignalAsync(DbusMemberAsync, DbusSignalCommon, Generic[T]):
+class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
 
     def __init__(
         self,
@@ -76,29 +76,29 @@ class DbusSignalAsync(DbusMemberAsync, DbusSignalCommon, Generic[T]):
     def __get__(
         self,
         obj: None,
-        obj_class: Type[DbusInterfaceBaseAsync],
-    ) -> DbusSignalAsync[T]:
+        obj_class: Type[DbusInterfaceBase],
+    ) -> DbusSignal[T]:
         ...
 
     @overload
     def __get__(
         self,
-        obj: DbusInterfaceBaseAsync,
-        obj_class: Type[DbusInterfaceBaseAsync],
-    ) -> DbusBoundSignalAsyncBase[T]:
+        obj: DbusInterfaceBase,
+        obj_class: Type[DbusInterfaceBase],
+    ) -> DbusBoundSignalBase[T]:
         ...
 
     def __get__(
         self,
-        obj: Optional[DbusInterfaceBaseAsync],
-        obj_class: Optional[Type[DbusInterfaceBaseAsync]] = None,
-    ) -> Union[DbusBoundSignalAsyncBase[T], DbusSignalAsync[T]]:
+        obj: Optional[DbusInterfaceBase],
+        obj_class: Optional[Type[DbusInterfaceBase]] = None,
+    ) -> Union[DbusBoundSignalBase[T], DbusSignal[T]]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return DbusProxySignalAsync(self, dbus_meta)
+                return DbusProxySignal(self, dbus_meta)
             else:
-                return DbusLocalSignalAsync(self, dbus_meta)
+                return DbusLocalSignal(self, dbus_meta)
         else:
             return self
 
@@ -131,12 +131,12 @@ class DbusSignalAsync(DbusMemberAsync, DbusSignalCommon, Generic[T]):
                 )
 
 
-class DbusBoundSignalAsyncBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
-    def __init__(self, dbus_signal: DbusSignalAsync[T]) -> None:
+class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
+    def __init__(self, dbus_signal: DbusSignal[T]) -> None:
         self.dbus_signal = dbus_signal
 
     @property
-    def member(self) -> DbusMemberAsync:
+    def member(self) -> DbusMember:
         return self.dbus_signal
 
     async def catch(self) -> AsyncIterator[T]:
@@ -157,10 +157,10 @@ class DbusBoundSignalAsyncBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
         raise NotImplementedError
 
 
-class DbusProxySignalAsync(DbusBoundSignalAsyncBase[T], DbusProxyMemberAsync):
+class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
     def __init__(
         self,
-        dbus_signal: DbusSignalAsync[T],
+        dbus_signal: DbusSignal[T],
         proxy_meta: DbusRemoteObjectMeta,
     ):
         super().__init__(dbus_signal)
@@ -231,10 +231,10 @@ class DbusProxySignalAsync(DbusBoundSignalAsyncBase[T], DbusProxyMemberAsync):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
 
 
-class DbusLocalSignalAsync(DbusBoundSignalAsyncBase[T], DbusLocalMemberAsync):
+class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
     def __init__(
         self,
-        dbus_signal: DbusSignalAsync[T],
+        dbus_signal: DbusSignal[T],
         local_meta: DbusLocalObjectMeta,
     ):
         super().__init__(dbus_signal)
@@ -312,14 +312,14 @@ class DbusLocalSignalAsync(DbusBoundSignalAsyncBase[T], DbusLocalMemberAsync):
             callback(args)
 
 
-def dbus_signal_async(
+def dbus_signal(
         signal_signature: str = '',
         signal_args_names: Sequence[str] = (),
         flags: int = 0,
         signal_name: Optional[str] = None,
 ) -> Callable[
     [Callable[[Any], T]],
-    DbusSignalAsync[T]
+    DbusSignal[T]
 ]:
     assert not isinstance(signal_signature, FunctionType), (
         "Passed function to decorator directly. "
@@ -327,10 +327,10 @@ def dbus_signal_async(
     )
 
     def signal_decorator(
-            pseudo_function: Callable[[Any], T]) -> DbusSignalAsync[T]:
+            pseudo_function: Callable[[Any], T]) -> DbusSignal[T]:
 
         assert isinstance(pseudo_function, FunctionType)
-        return DbusSignalAsync(
+        return DbusSignal(
             signal_name,
             signal_signature,
             signal_args_names,

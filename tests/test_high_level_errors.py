@@ -23,8 +23,8 @@ from typing import Any
 
 from aiodbus import (
     DbusInterfaceCommonAsync,
-    dbus_method_async,
-    request_default_bus_name_async,
+    dbus_method,
+    request_default_bus_name,
 )
 from aiodbus.exceptions import DbusFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -48,11 +48,11 @@ class InterfaceWithErrors(
     interface_name='org.example.test',
 ):
 
-    @dbus_method_async(result_signature='s')
+    @dbus_method(result_signature='s')
     async def hello_independent_error(self) -> str:
         raise IndependentError
 
-    @dbus_method_async(result_signature='s')
+    @dbus_method(result_signature='s')
     async def hello_derrived_error(self) -> str:
         raise DbusDeriveMethodError
 
@@ -61,7 +61,7 @@ class TestHighLevelErrors(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        await request_default_bus_name_async('org.test')
+        await request_default_bus_name('org.test')
         self.test_object = InterfaceWithErrors()
         self.test_object.export_to_dbus('/')
 

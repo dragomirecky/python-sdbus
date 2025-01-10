@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Literal, Tuple
 
 from aiodbus.dbus_common_funcs import _parse_properties_vardict
-from aiodbus.interface.base import DbusInterfaceBaseAsync
-from aiodbus.member.method import dbus_method_async
-from aiodbus.member.signal import dbus_signal_async
+from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.member.method import dbus_method
+from aiodbus.member.signal import dbus_signal
 
 DBUS_PROPERTIES_CHANGED_TYPING = (
     Tuple[
@@ -15,16 +15,16 @@ DBUS_PROPERTIES_CHANGED_TYPING = (
 
 
 class DbusPropertiesInterfaceAsync(
-    DbusInterfaceBaseAsync,
+    DbusInterfaceBase,
     interface_name='org.freedesktop.DBus.Properties',
     serving_enabled=False,
 ):
 
-    @dbus_signal_async('sa{sv}as')
+    @dbus_signal('sa{sv}as')
     def properties_changed(self) -> DBUS_PROPERTIES_CHANGED_TYPING:
         raise NotImplementedError
 
-    @dbus_method_async('s', 'a{sv}', method_name='GetAll')
+    @dbus_method('s', 'a{sv}', method_name='GetAll')
     async def _properties_get_all(
             self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
         raise NotImplementedError
