@@ -28,3 +28,4 @@ strace*.txt
 .cache
 wheels
 *.kate-swp
+compile_commands.json
