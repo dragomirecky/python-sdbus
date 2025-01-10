@@ -18,14 +18,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from gc import collect
 from unittest import TestCase
 from unittest import main as unittest_main
 
-from sdbus.dbus_common_funcs import PROPERTY_FLAGS_MASK, count_bits
-
-from sdbus import (
+from aiodbus import (
     DbusDeprecatedFlag,
     DbusInterfaceCommonAsync,
     DbusPropertyConstFlag,
@@ -35,11 +32,12 @@ from sdbus import (
     dbus_property_async,
     dbus_signal_async,
 )
+from aiodbus.dbus_common_funcs import PROPERTY_FLAGS_MASK, count_bits
 
 from .common_test_util import skip_if_no_asserts, skip_if_no_name_validations
 
 
-class TestInterface(
+class SomeTestInterface(
     DbusInterfaceCommonAsync,
     interface_name="org.example.good",
 ):
@@ -163,13 +161,13 @@ class TestBadAsyncDbusClass(TestCase):
     def test_bad_subclass(self) -> None:
         with self.assertRaises(ValueError):
 
-            class TestInheritence(TestInterface):
+            class TestInheritence(SomeTestInterface):
                 async def test_int(self) -> int:
                     return 2
 
         with self.assertRaises(ValueError):
 
-            class TestInheritence2(TestInterface):
+            class TestInheritence2(SomeTestInterface):
                 @dbus_method_async_override()
                 async def test_unrelated(self) -> int:
                     return 2
@@ -185,16 +183,16 @@ class TestBadAsyncDbusClass(TestCase):
     def test_dbus_elements_without_interface_name_subclass(self) -> None:
         with self.assertRaisesRegex(TypeError, "without interface name"):
 
-            class NoInterfaceName(TestInterface):
+            class NoInterfaceName(SomeTestInterface):
                 @dbus_method_async()
                 async def example(self) -> None:
                     ...
 
     def test_shared_parent_class(self) -> None:
-        class One(TestInterface):
+        class One(SomeTestInterface):
             ...
 
-        class Two(TestInterface):
+        class Two(SomeTestInterface):
             ...
 
         class Shared(One, Two):

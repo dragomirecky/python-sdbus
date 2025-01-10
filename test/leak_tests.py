@@ -18,29 +18,17 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
-from asyncio import (
-    FIRST_EXCEPTION,
-    Task,
-    get_running_loop,
-    sleep,
-    wait,
-    wait_for,
-)
+from asyncio import FIRST_EXCEPTION, Task, get_running_loop, sleep, wait, wait_for
 from os import environ
 from resource import RUSAGE_SELF, getrusage
 from typing import Any, List, cast
 from unittest import SkipTest
 
-from sdbus.exceptions import DbusFailedError
-from sdbus.unittest import IsolatedDbusTestCase
+from aiodbus import request_default_bus_name_async
+from aiodbus.exceptions import DbusFailedError
+from aiodbus.unittest import IsolatedDbusTestCase
 
-from sdbus import request_default_bus_name_async
-
-from .test_low_level_errors import (
-    DbusDerivePropertydError,
-    InterfaceWithErrors,
-)
+from .test_low_level_errors import DbusDerivePropertydError, InterfaceWithErrors
 from .test_read_write_dbus_types import TestDbusTypes
 from .test_sdbus_async import TestPing, TestProxy, initialize_object
 

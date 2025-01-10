@@ -18,31 +18,15 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from asyncio import Event, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import sleep, wait_for
 from asyncio.subprocess import create_subprocess_exec
-from typing import TYPE_CHECKING
+from typing import Tuple
 from unittest import SkipTest
 
-from sdbus.exceptions import (
-    DbusFailedError,
-    DbusFileExistsError,
-    DbusNoReplyError,
-    DbusPropertyReadOnlyError,
-    DbusUnknownObjectError,
-    SdBusLibraryError,
-    SdBusUnmappedMessageError,
-)
-from sdbus.sd_bus_internals import (
-    DBUS_ERROR_TO_EXCEPTION,
-    DbusPropertyEmitsChangeFlag,
-)
-from sdbus.unittest import IsolatedDbusTestCase
-from sdbus.utils.parse import parse_properties_changed
-
-from sdbus import (
+from _sdbus import DBUS_ERROR_TO_EXCEPTION, DbusPropertyEmitsChangeFlag
+from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusNoReplyFlag,
     dbus_method_async,
@@ -52,15 +36,17 @@ from sdbus import (
     dbus_signal_async,
     get_current_message,
 )
-
-if TYPE_CHECKING:
-    from typing import Tuple
-
-    from sdbus.dbus_proxy_async_interfaces import (
-        DBUS_PROPERTIES_CHANGED_TYPING,
-    )
-else:
-    DBUS_PROPERTIES_CHANGED_TYPING = None
+from aiodbus.exceptions import (
+    DbusFailedError,
+    DbusFileExistsError,
+    DbusNoReplyError,
+    DbusPropertyReadOnlyError,
+    DbusUnknownObjectError,
+    SdBusLibraryError,
+    SdBusUnmappedMessageError,
+)
+from aiodbus.unittest import IsolatedDbusTestCase
+from aiodbus.utils.parse import parse_properties_changed
 
 
 class TestPing(IsolatedDbusTestCase):
@@ -97,7 +83,7 @@ class TestRequestName(IsolatedDbusTestCase):
 TEST_INTERFACE_NAME = "org.test.test"
 
 
-class TestInterface(
+class SomeTestInterface(
     DbusInterfaceCommonAsync,
     interface_name=TEST_INTERFACE_NAME,
 ):
@@ -257,11 +243,11 @@ class DbusErrorUnmappedLater(DbusFailedError):
 TEST_SERVICE_NAME = 'org.example.test'
 
 
-def initialize_object() -> Tuple[TestInterface, TestInterface]:
-    test_object = TestInterface()
+def initialize_object() -> Tuple[SomeTestInterface, SomeTestInterface]:
+    test_object = SomeTestInterface()
     test_object.export_to_dbus('/')
 
-    test_object_connection = TestInterface.new_proxy(
+    test_object_connection = SomeTestInterface.new_proxy(
         TEST_SERVICE_NAME, '/')
 
     return test_object, test_object_connection
@@ -361,7 +347,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         test_var = ['asdasd']
 
-        class TestInheritence(TestInterface):
+        class TestInheritence(SomeTestInterface):
             @dbus_method_async_override()
             async def test_int(self) -> int:
                 return 2
@@ -398,7 +384,7 @@ class TestProxy(IsolatedDbusTestCase):
                 {
                     interface_name: meta.dbus_member_to_python_attr
                     for interface_name, meta in
-                    TestInterface._dbus_iter_interfaces_meta()
+                    SomeTestInterface._dbus_iter_interfaces_meta()
                 }
             )
             self.assertIn(
@@ -532,7 +518,7 @@ class TestProxy(IsolatedDbusTestCase):
         with self.subTest('Catch anywhere over D-Bus class'):
             async def catch_anywhere_oneshot_from_class(
             ) -> Tuple[str, Tuple[str, str]]:
-                async for x in TestInterface.test_signal.catch_anywhere(
+                async for x in SomeTestInterface.test_signal.catch_anywhere(
                         TEST_SERVICE_NAME, self.bus):
                     return x
 
@@ -823,7 +809,7 @@ class TestProxy(IsolatedDbusTestCase):
         properties_changed_data = properties_changed_catch.output[0]
 
         parsed_dict_from_class = parse_properties_changed(
-            TestInterface, properties_changed_data)
+            SomeTestInterface, properties_changed_data)
         self.assertEqual(
             test_str,
             parsed_dict_from_class['test_property'],
@@ -875,7 +861,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         test_int = 1
 
-        class TestInterfacePrivateSetter(TestInterface):
+        class TestInterfacePrivateSetter(SomeTestInterface):
             @dbus_property_async_override()
             def test_property_private(self) -> int:
                 return test_int
@@ -887,7 +873,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         test_object = TestInterfacePrivateSetter()
         test_object.export_to_dbus('/')
-        test_object_connection = TestInterface.new_proxy(
+        test_object_connection = SomeTestInterface.new_proxy(
             TEST_SERVICE_NAME, '/')
 
         self.assertEqual(
@@ -898,7 +884,7 @@ class TestProxy(IsolatedDbusTestCase):
         async def catch_properties_changed() -> int:
             async for x in test_object_connection.properties_changed:
                 changed_attr = parse_properties_changed(
-                    TestInterface, x)["test_property_private"]
+                    SomeTestInterface, x)["test_property_private"]
 
                 if not isinstance(changed_attr, int):
                     raise TypeError
@@ -972,8 +958,8 @@ class TestProxy(IsolatedDbusTestCase):
             await test_object_connection.returns_none_method()
 
     async def test_export_handle(self) -> None:
-        test_object = TestInterface()
-        test_object_connection = TestInterface.new_proxy(
+        test_object = SomeTestInterface()
+        test_object_connection = SomeTestInterface.new_proxy(
             TEST_SERVICE_NAME, '/',
         )
         with self.assertRaises(DbusUnknownObjectError):
@@ -985,7 +971,7 @@ class TestProxy(IsolatedDbusTestCase):
         with self.assertRaises(DbusUnknownObjectError):
             await test_object_connection.returns_none_method()
 
-        test_object2 = TestInterface()
+        test_object2 = SomeTestInterface()
         handle = test_object2.export_to_dbus("/")
         await test_object_connection.returns_none_method()
         handle.stop()

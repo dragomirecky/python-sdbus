@@ -18,7 +18,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from os import environ
 from subprocess import DEVNULL, PIPE
 from subprocess import run as subprocess_run
@@ -91,13 +90,7 @@ if __name__ == '__main__':
         long_description = f.read()
 
     setup(
-        name='sdbus',
-        description=('Modern Python D-Bus library. '
-                     'Based on sd-bus from libsystemd.'),
-        long_description=long_description,
-        long_description_content_type='text/markdown',
         version='0.13.0',
-        url='https://github.com/igo95862/python-sdbus',
         author='igo95862',
         author_email='igo95862@yandex.ru',
         license='LGPL-2.1-or-later',
@@ -119,39 +112,30 @@ if __name__ == '__main__':
             'Topic :: Software Development :: Libraries :: Python Modules',
         ],
         packages=[
-            'sdbus',
-            'sdbus.utils',
-            'sdbus_async.dbus_daemon',
-            'sdbus_block.dbus_daemon',
+            '_sdbus',
+            'aiodbus',
+            'aiodbus.utils',
         ],
         package_dir={
-            'sdbus': 'src/sdbus',
-            'sdbus_async.dbus_daemon': 'src/sdbus_async/dbus_daemon',
-            'sdbus_block.dbus_daemon': 'src/sdbus_block/dbus_daemon',
+            'aiodbus': 'src/aiodbus',
+            '_sdbus': 'src/_sdbus',
         },
         package_data={
-            'sdbus': [
+            '_sdbus': [
                 'py.typed',
                 'sd_bus_internals.pyi',
                 'sd_bus_internals.h',
             ],
-            'sdbus_async.dbus_daemon': [
-                'py.typed',
-            ],
-            'sdbus_block.dbus_daemon': [
-                'py.typed',
-            ],
         },
-        python_requires='>=3.7',
         ext_modules=[
             Extension(
-                'sdbus.sd_bus_internals',
+                '_sdbus',
                 [
-                    'src/sdbus/sd_bus_internals.c',
-                    'src/sdbus/sd_bus_internals_bus.c',
-                    'src/sdbus/sd_bus_internals_funcs.c',
-                    'src/sdbus/sd_bus_internals_interface.c',
-                    'src/sdbus/sd_bus_internals_message.c',
+                    'src/_sdbus/sd_bus_internals.c',
+                    'src/_sdbus/sd_bus_internals_bus.c',
+                    'src/_sdbus/sd_bus_internals_funcs.c',
+                    'src/_sdbus/sd_bus_internals_interface.c',
+                    'src/_sdbus/sd_bus_internals_message.c',
                 ],
                 extra_compile_args=compile_arguments,
                 extra_link_args=link_arguments,

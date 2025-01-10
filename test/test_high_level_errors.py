@@ -18,18 +18,16 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from asyncio import get_running_loop, wait_for
 from typing import Any
 
-from sdbus.exceptions import DbusFailedError
-from sdbus.unittest import IsolatedDbusTestCase
-
-from sdbus import (
+from aiodbus import (
     DbusInterfaceCommonAsync,
     dbus_method_async,
     request_default_bus_name_async,
 )
+from aiodbus.exceptions import DbusFailedError
+from aiodbus.unittest import IsolatedDbusTestCase
 
 HELLO_WORLD = 'Hello, world!'
 

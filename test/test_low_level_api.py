@@ -18,18 +18,17 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from asyncio import get_running_loop
 from unittest import SkipTest, TestCase, main
 
-from sdbus.sd_bus_internals import (
+from _sdbus import (
     SdBus,
     is_interface_name_valid,
     is_member_name_valid,
     is_object_path_valid,
     is_service_name_valid,
 )
-from sdbus.unittest import IsolatedDbusTestCase
+from aiodbus.unittest import IsolatedDbusTestCase
 
 
 class TestAsyncLowLevel(IsolatedDbusTestCase):

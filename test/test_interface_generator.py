@@ -18,20 +18,19 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from importlib.util import find_spec
 from unittest import SkipTest, TestCase, main
 from unittest.mock import MagicMock, patch
 
-from sdbus.__main__ import generator_main
-from sdbus.interface_generator import (
+from aiodbus.__main__ import generator_main
+from aiodbus.interface_generator import (
     DbusSigToTyping,
     camel_case_to_snake_case,
     generate_py_file,
     interface_name_to_class,
     interfaces_from_str,
 )
-from sdbus.unittest import IsolatedDbusTestCase
+from aiodbus.unittest import IsolatedDbusTestCase
 
 test_xml = """
 <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
@@ -206,7 +205,7 @@ class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
         if find_spec('jinja2') is None:
             raise SkipTest('Jinja2 not installed')
 
-        with patch("sdbus.__main__.stdout") as stdout_mock:
+        with patch("aiodbus.__main__.stdout") as stdout_mock:
             generator_main(
                 [
                     "gen-from-connection",
@@ -237,7 +236,7 @@ class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
         if find_spec('jinja2') is None:
             raise SkipTest('Jinja2 not installed')
 
-        with patch("sdbus.__main__.stdout") as stdout_mock:
+        with patch("aiodbus.__main__.stdout") as stdout_mock:
             generator_main(
                 [
                     "gen-from-connection",

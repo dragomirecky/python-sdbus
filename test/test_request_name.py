@@ -18,26 +18,24 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from asyncio import get_running_loop, sleep, wait_for
 from unittest import main
 
-from sdbus.exceptions import (
+from _sdbus import NameAllowReplacementFlag, NameQueueFlag
+from aiodbus import (
+    request_default_bus_name,
+    request_default_bus_name_async,
+    sd_bus_open_user,
+)
+from aiodbus.exceptions import (
     SdBusLibraryError,
     SdBusRequestNameAlreadyOwnerError,
     SdBusRequestNameError,
     SdBusRequestNameExistsError,
     SdBusRequestNameInQueueError,
 )
-from sdbus.sd_bus_internals import NameAllowReplacementFlag, NameQueueFlag
-from sdbus.unittest import IsolatedDbusTestCase
-from sdbus_async.dbus_daemon import FreedesktopDbus
-
-from sdbus import (
-    request_default_bus_name,
-    request_default_bus_name_async,
-    sd_bus_open_user,
-)
+from aiodbus.interface.daemon import FreedesktopDbus
+from aiodbus.unittest import IsolatedDbusTestCase
 
 TEST_BUS_NAME = 'com.example.test'
 TEST_BUS_NAME_regex_match = TEST_BUS_NAME.replace('.', r'\.')

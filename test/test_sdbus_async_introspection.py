@@ -18,15 +18,10 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+from typing import Tuple, Type
 
-from typing import TYPE_CHECKING
-
-from sdbus.unittest import IsolatedDbusTestCase
-
-from sdbus import DbusInterfaceCommonAsync, dbus_method_async
-
-if TYPE_CHECKING:
-    from typing import Tuple, Type
+from aiodbus import DbusInterfaceCommonAsync, dbus_method_async
+from aiodbus.unittest import IsolatedDbusTestCase
 
 TEST_SERVICE_NAME = 'org.example.test'
 

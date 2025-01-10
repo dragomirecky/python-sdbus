@@ -18,15 +18,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
-from sdbus import (
-    DbusInterfaceCommon,
+from aiodbus import (
     DbusInterfaceCommonAsync,
-    dbus_method,
     dbus_method_async,
-    dbus_property,
     dbus_property_async,
     dbus_signal_async,
 )
@@ -35,48 +31,11 @@ if TYPE_CHECKING:
     from typing import List
 
 
-class TestTypingBlocking(
-    DbusInterfaceCommon,
-    interface_name="example.com",
-):
-
-    @dbus_method(result_signature="as")
-    def get_str_list_method(self) -> List[str]:
-        raise NotImplementedError
-
-    @dbus_property("as")
-    def str_list_property(self) -> List[str]:
-        raise NotImplementedError
-
-
 # These functions are not meant to be executed
 # but exist to be type checked.
 
-def check_blocking_interface_method_typing(
-    test_interface: TestTypingBlocking,
-) -> None:
 
-    should_be_list = test_interface.get_str_list_method()
-    should_be_list.append("test")
-
-    for x in should_be_list:
-        x.capitalize()
-
-
-def check_blocking_interface_property_typing(
-    test_interface: TestTypingBlocking,
-) -> None:
-
-    should_be_list = test_interface.str_list_property
-    should_be_list.append("test")
-
-    for x in should_be_list:
-        x.capitalize()
-
-    test_interface.str_list_property = ["test", "foobar"]
-
-
-class TestTypingAsync(
+class InterfaceTestTyping(
     DbusInterfaceCommonAsync,
     interface_name="example.com",
 ):
@@ -95,7 +54,7 @@ class TestTypingAsync(
 
 
 async def check_async_interface_method_typing(
-    test_interface: TestTypingAsync,
+    test_interface: InterfaceTestTyping,
 ) -> None:
 
     should_be_list = await test_interface.get_str_list_method()
@@ -106,7 +65,7 @@ async def check_async_interface_method_typing(
 
 
 async def check_async_interface_property_typing(
-    test_interface: TestTypingAsync,
+    test_interface: InterfaceTestTyping,
 ) -> None:
 
     should_be_list = await test_interface.str_list_property
@@ -125,7 +84,7 @@ async def check_async_interface_property_typing(
 
 
 async def check_async_interface_signal_typing(
-    test_interface: TestTypingAsync,
+    test_interface: InterfaceTestTyping,
 ) -> None:
 
     async for ls in test_interface.str_list_signal:
@@ -145,7 +104,7 @@ async def check_async_interface_signal_typing(
             x3.capitalize()
 
     async for p2, ls4 in (
-        TestTypingAsync.str_list_signal
+        InterfaceTestTyping.str_list_signal
         .catch_anywhere("org.example")
     ):
         p2.capitalize()
@@ -165,8 +124,8 @@ async def check_async_element_class_access_typing() -> None:
     #     TestTypingAsync.get_str_list_method.method_name
     # )
     test_list.append(
-        TestTypingAsync.str_list_property.property_name
+        InterfaceTestTyping.str_list_property.property_name
     )
     test_list.append(
-        TestTypingAsync.str_list_signal.signal_name
+        InterfaceTestTyping.str_list_signal.signal_name
     )

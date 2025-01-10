@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# Copyright (C) 2020, 2021 igo95862
+# Copyright (C) 2020-2024 igo95862
 
 # This file is part of python-sdbus
 
@@ -18,39 +18,23 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-from unittest import SkipTest, main
+from typing import TYPE_CHECKING
+
+from aiodbus.dbus_common_funcs import _parse_properties_vardict
+from aiodbus.interface.base import DbusInterfaceBaseAsync
+from aiodbus.member.method import dbus_method_async
+from aiodbus.member.signal import dbus_signal_async
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Tuple
+
+    DBUS_PROPERTIES_CHANGED_TYPING = (
+        Tuple[
+            str,
+            Dict[str, Tuple[str, Any]],
+            List[str],
+        ]
+    )
 
 
-def mem_test() -> None:
-    while True:
-        try:
-            main()
-        except SystemExit:
-            ...
 
-
-def mem_test_single(test_class: type, test_name: str) -> None:
-    while True:
-        t = test_class()
-        t.setUp()
-        getattr(t, test_name)()
-
-
-def skip_if_no_asserts() -> None:
-    try:
-        assert False
-    except AssertionError:
-        return
-
-    raise SkipTest("Assertions are not enabled")
-
-
-def skip_if_no_name_validations() -> None:
-    skip_if_no_asserts()
-
-    from _sdbus import is_interface_name_valid
-
-    try:
-        is_interface_name_valid("org.test")
-    except NotImplementedError:
-        raise SkipTest("Validation functions not available")

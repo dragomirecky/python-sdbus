@@ -19,19 +19,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from sdbus.exceptions import DbusUnknownObjectError
-from sdbus.unittest import IsolatedDbusTestCase
-from sdbus.utils import (
-    parse_get_managed_objects,
-    parse_interfaces_added,
-    parse_interfaces_removed,
-)
-
-from sdbus import (
+from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusObjectManagerInterfaceAsync,
     dbus_method_async,
     dbus_property_async,
+)
+from aiodbus.exceptions import DbusUnknownObjectError
+from aiodbus.unittest import IsolatedDbusTestCase
+from aiodbus.utils import (
+    parse_get_managed_objects,
+    parse_interfaces_added,
+    parse_interfaces_removed,
 )
 
 HELLO_WORLD = 'Hello World!'
