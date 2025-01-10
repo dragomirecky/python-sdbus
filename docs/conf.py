@@ -21,14 +21,14 @@
 from os.path import abspath
 from sys import path
 
-project = 'python-sdbus'
-author = 'igo95862'
-source_suffix = '.rst'
-extensions = ['sdbus.autodoc']
+project = "python-sdbus"
+author = "igo95862"
+source_suffix = ".rst"
+extensions = ["sdbus.autodoc"]
 html_theme = "sphinx_rtd_theme"
 
-autoclass_content = 'both'
-autodoc_typehints = 'description'
-autodoc_member_order = 'bysource'
+autoclass_content = "both"
+autodoc_typehints = "description"
+autodoc_member_order = "bysource"
 
-path.insert(0, abspath('../src'))
+path.insert(0, abspath("../src"))

@@ -18,13 +18,13 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import Optional, Union
 
 from _sdbus import SdBus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta, DbusRemoteObjectMeta
 from aiodbus.dbus_common_funcs import get_default_bus
 from aiodbus.interface.base import DbusInterfaceBase
-
 
 
 def _inspect_dbus_path_proxy(
@@ -49,9 +49,7 @@ def _inspect_dbus_path_local(
     attached_bus = dbus_meta.attached_bus
     object_path = dbus_meta.serving_object_path
     if attached_bus is None or object_path is None:
-        raise LookupError(
-            f"Local D-Bus object {obj!r} is not exported to any D-Bus"
-        )
+        raise LookupError(f"Local D-Bus object {obj!r} is not exported to any D-Bus")
 
     if bus != attached_bus:
         raise LookupError(
@@ -79,6 +77,4 @@ def inspect_dbus_path(
         raise TypeError(f"Expected D-Bus object got {obj!r}")
 
 
-__all__ = (
-    "inspect_dbus_path",
-)
+__all__ = ("inspect_dbus_path",)

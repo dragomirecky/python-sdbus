@@ -14,7 +14,7 @@ Regular python functions are always blocking.
 
 Asyncio is a part of python standard library that allows non-blocking io.
 
-`Asyncio documentation <https://docs.python.org/3/library/asyncio.html>`_ 
+`Asyncio documentation <https://docs.python.org/3/library/asyncio.html>`_
 
 Generally blocking IO should only be used for simple scripts and programs that interact
 with existing D-Bus objects.
@@ -50,7 +50,7 @@ D-Bus types conversion
 `D-Bus types reference <https://dbus.freedesktop.org/doc/dbus-specification.html#type-system>`_
 
 .. note:: Python integers are unlimited size but D-Bus integers are not.
-    All integer types raise :py:exc:`OverflowError` 
+    All integer types raise :py:exc:`OverflowError`
     if you try to pass number outside the type size.
 
     Unsigned integers range is ``0 < (2**bit_size)-1``.

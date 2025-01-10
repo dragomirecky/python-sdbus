@@ -24,9 +24,8 @@ from asyncio import run as asyncio_run
 from time import perf_counter
 
 import pyperf  # type: ignore
-from sdbus.unittest import _isolated_dbus
-
 from sdbus import DbusInterfaceCommonAsync
+from sdbus.unittest import _isolated_dbus
 
 
 def bench_async_ping_gather(loops: int) -> float:
@@ -39,9 +38,7 @@ def bench_async_ping_gather(loops: int) -> float:
 
         async def run_ping_gather() -> float:
 
-            gather_ping = gather(
-                *(dbus_interface.dbus_ping() for _ in range(loops))
-            )
+            gather_ping = gather(*(dbus_interface.dbus_ping() for _ in range(loops)))
             start = perf_counter()
 
             await gather_ping
@@ -72,8 +69,8 @@ def bench_async_ping(loops: int) -> float:
 
 def main() -> None:
     runner = pyperf.Runner()
-    runner.bench_time_func('sdbus_async_ping', bench_async_ping)
-    runner.bench_time_func('sdbus_async_ping_gather', bench_async_ping_gather)
+    runner.bench_time_func("sdbus_async_ping", bench_async_ping)
+    runner.bench_time_func("sdbus_async_ping_gather", bench_async_ping_gather)
 
 
 if __name__ == "__main__":

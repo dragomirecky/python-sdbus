@@ -41,13 +41,14 @@ if TYPE_CHECKING:
     DbusDictType = Dict[DbusBasicTypes, DbusBasicTypes]
     DbusVariantType = Tuple[str, DbusStructType]
     DbusListType = List[DbusBasicTypes]
-    DbusCompleteTypes = Union[DbusBasicTypes, DbusStructType,
-                              DbusDictType, DbusVariantType, DbusListType]
+    DbusCompleteTypes = Union[
+        DbusBasicTypes, DbusStructType, DbusDictType, DbusVariantType, DbusListType
+    ]
 
 __STUB_ERROR = (
-    'Typing stub. You should never see this '
-    'error unless the actual module failed to load. '
-    'Check your installation.'
+    "Typing stub. You should never see this "
+    "error unless the actual module failed to load. "
+    "Check your installation."
 )
 
 
@@ -70,10 +71,13 @@ class SdBusInterface:
     def add_method(
         self,
         member_name: str,
-        signature: str, input_args_names: Sequence[str],
-        result_signature: str, result_args_names: Sequence[str],
+        signature: str,
+        input_args_names: Sequence[str],
+        result_signature: str,
+        result_args_names: Sequence[str],
         flags: int,
-        callback: Callable[[SdBusMessage], Coroutine[Any, Any, None]], /
+        callback: Callable[[SdBusMessage], Coroutine[Any, Any, None]],
+        /,
     ) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
@@ -83,7 +87,8 @@ class SdBusInterface:
         property_signature: str,
         get_function: Callable[[SdBusMessage], Any],
         set_function: Optional[Callable[[SdBusMessage], None]],
-        flags: int, /
+        flags: int,
+        /,
     ) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
@@ -92,7 +97,8 @@ class SdBusInterface:
         signal_name: str,
         signal_signature: str,
         signal_args_names: Sequence[str],
-        flags: int, /
+        flags: int,
+        /,
     ) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
@@ -101,15 +107,13 @@ class SdBusMessage:
     def append_data(self, signature: str, *args: DbusCompleteTypes) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
-    def open_container(self, container_type: str,
-                       container_signature: str, /) -> None:
+    def open_container(self, container_type: str, container_signature: str, /) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
     def close_container(self) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
-    def enter_container(self, container_type: str,
-                        container_signature: str, /) -> None:
+    def enter_container(self, container_type: str, container_signature: str, /) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
     def exit_container(self) -> None:
@@ -121,17 +125,13 @@ class SdBusMessage:
     def seal(self) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
-    def get_contents(self
-                     ) -> Tuple[DbusCompleteTypes, ...]:
+    def get_contents(self) -> Tuple[DbusCompleteTypes, ...]:
         raise NotImplementedError(__STUB_ERROR)
 
     def create_reply(self) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
-    def create_error_reply(
-            self,
-            error_name: str,
-            error_message: str, /) -> SdBusMessage:
+    def create_error_reply(self, error_name: str, error_message: str, /) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
     def send(self) -> None:
@@ -152,9 +152,7 @@ class SdBus:
     def call(self, message: SdBusMessage, /) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
-    def call_async(
-            self, message: SdBusMessage,
-            /) -> Future[SdBusMessage]:
+    def call_async(self, message: SdBusMessage, /) -> Future[SdBusMessage]:
         raise NotImplementedError(__STUB_ERROR)
 
     def process(self) -> None:
@@ -164,43 +162,53 @@ class SdBus:
         raise NotImplementedError(__STUB_ERROR)
 
     def new_method_call_message(
-            self,
-            destination_name: str, object_path: str,
-            interface_name: str, member_name: str,
-            /) -> SdBusMessage:
+        self,
+        destination_name: str,
+        object_path: str,
+        interface_name: str,
+        member_name: str,
+        /,
+    ) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
     def new_property_get_message(
-            self,
-            destination_service_name: str, object_path: str,
-            interface_name: str, member_name: str,
-            /) -> SdBusMessage:
+        self,
+        destination_service_name: str,
+        object_path: str,
+        interface_name: str,
+        member_name: str,
+        /,
+    ) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
     def new_property_set_message(
-            self,
-            destination_service_name: str, object_path: str,
-            interface_name: str, member_name: str,
-            /) -> SdBusMessage:
+        self,
+        destination_service_name: str,
+        object_path: str,
+        interface_name: str,
+        member_name: str,
+        /,
+    ) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
     def new_signal_message(
-            self,
-            object_path: str,
-            interface_name: str,
-            member_name: str,
-            /) -> SdBusMessage:
+        self, object_path: str, interface_name: str, member_name: str, /
+    ) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
-    def add_interface(self, new_interface: SdBusInterface,
-                      object_path: str, interface_name: str, /) -> None:
+    def add_interface(
+        self, new_interface: SdBusInterface, object_path: str, interface_name: str, /
+    ) -> None:
         raise NotImplementedError(__STUB_ERROR)
 
     def match_signal_async(
         self,
-        senders_name: Optional[str], object_path: Optional[str],
-        interface_name: Optional[str], member_name: Optional[str],
-        callback: Callable[[SdBusMessage], None], /
+        senders_name: Optional[str],
+        object_path: Optional[str],
+        interface_name: Optional[str],
+        member_name: Optional[str],
+        callback: Callable[[SdBusMessage], None],
+        /,
     ) -> Future[SdBusSlot]:
         raise NotImplementedError(__STUB_ERROR)
 
@@ -261,13 +269,14 @@ def decode_object_path(prefix: str, full_path: str) -> str:
     raise NotImplementedError(__STUB_ERROR)
 
 
-def map_exception_to_dbus_error(exc: Type[Exception],
-                                dbus_error_name: str, /) -> None:
-    ...  # We want to be able to generate docs without module
+def map_exception_to_dbus_error(
+    exc: Type[Exception], dbus_error_name: str, /
+) -> None: ...  # We want to be able to generate docs without module
 
 
-def add_exception_mapping(exc: Exception, /) -> None:
-    ...  # We want to be able to generate docs without module
+def add_exception_mapping(
+    exc: Exception, /
+) -> None: ...  # We want to be able to generate docs without module
 
 
 def is_interface_name_valid(string_to_check: str, /) -> bool:
@@ -286,32 +295,25 @@ def is_object_path_valid(string_to_check: str, /) -> bool:
     raise NotImplementedError(__STUB_ERROR)
 
 
-class SdBusBaseError(Exception):
-    ...
+class SdBusBaseError(Exception): ...
 
 
-class SdBusUnmappedMessageError(SdBusBaseError):
-    ...
+class SdBusUnmappedMessageError(SdBusBaseError): ...
 
 
-class SdBusLibraryError(SdBusBaseError):
-    ...
+class SdBusLibraryError(SdBusBaseError): ...
 
 
-class SdBusRequestNameError(SdBusBaseError):
-    ...
+class SdBusRequestNameError(SdBusBaseError): ...
 
 
-class SdBusRequestNameInQueueError(SdBusRequestNameError):
-    ...
+class SdBusRequestNameInQueueError(SdBusRequestNameError): ...
 
 
-class SdBusRequestNameExistsError(SdBusRequestNameError):
-    ...
+class SdBusRequestNameExistsError(SdBusRequestNameError): ...
 
 
-class SdBusRequestNameAlreadyOwnerError(SdBusRequestNameError):
-    ...
+class SdBusRequestNameAlreadyOwnerError(SdBusRequestNameError): ...
 
 
 DBUS_ERROR_TO_EXCEPTION: Dict[str, Exception] = {}

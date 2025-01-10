@@ -86,6 +86,3 @@ Python-sdbus provides several utilities to enable unit testing.
         self.assertEqual(["test"], signal_record.output)
 
       *New in version 0.12.0.*
-
-
-

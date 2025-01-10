@@ -20,7 +20,7 @@ Classes
 
         Init will create a proxy to a remote object
 
-        :param str service_name: 
+        :param str service_name:
             Remote object D-Bus connection name.
             For example, systemd uses ``org.freedesktop.systemd1``
 

@@ -1,13 +1,10 @@
 from __future__ import annotations
+
 from typing import Any, Protocol
 
 
-
-
 class Closeable(Protocol):
-    def close(self) -> None:
-        ...
-
+    def close(self) -> None: ...
 
 
 class DbusExportHandle:

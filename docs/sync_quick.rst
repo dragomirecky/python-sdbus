@@ -54,7 +54,7 @@ served for other processes to interact with. See :ref:`blocking-vs-async`
 Initiating proxy
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:py:meth:`DbusInterfaceCommon.__init__` method takes service_name 
+:py:meth:`DbusInterfaceCommon.__init__` method takes service_name
 and object_path of the remote object that the object will proxy to.
 
 Example creating a proxy and calling method::
@@ -160,7 +160,7 @@ Example: ::
         def test_method(self, str_array: List[str]) -> None:
             raise NotImplementedError
 
-    
+
     class MultipleInterfaces(TestInterface, ExampleInterface):
         ...
 

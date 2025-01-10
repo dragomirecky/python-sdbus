@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from os import environ
 from subprocess import DEVNULL, PIPE
 from subprocess import run as subprocess_run
@@ -30,7 +31,7 @@ c_macros: List[Tuple[str, Optional[str]]] = []
 
 def get_libsystemd_version() -> int:
     process = subprocess_run(
-        args=('pkg-config', '--modversion', 'libsystemd'),
+        args=("pkg-config", "--modversion", "libsystemd"),
         stderr=DEVNULL,
         stdout=PIPE,
         check=True,
@@ -44,98 +45,104 @@ def get_libsystemd_version() -> int:
     return int(first_component)
 
 
-if not environ.get('PYTHON_SDBUS_USE_IGNORE_SYSTEMD_VERSION'):
+if not environ.get("PYTHON_SDBUS_USE_IGNORE_SYSTEMD_VERSION"):
     systemd_version = get_libsystemd_version()
 
     if systemd_version < 246:
-        c_macros.append(('LIBSYSTEMD_NO_VALIDATION_FUNCS', None))
+        c_macros.append(("LIBSYSTEMD_NO_VALIDATION_FUNCS", None))
 
     if systemd_version < 248:
-        c_macros.append(('LIBSYSTEMD_NO_OPEN_USER_MACHINE', None))
+        c_macros.append(("LIBSYSTEMD_NO_OPEN_USER_MACHINE", None))
 
 
 def get_link_arguments() -> List[str]:
     process = subprocess_run(
-        args=('pkg-config', '--libs-only-l', 'libsystemd'),
+        args=("pkg-config", "--libs-only-l", "libsystemd"),
         stderr=DEVNULL,
         stdout=PIPE,
         check=True,
     )
 
-    result_str = process.stdout.decode('utf-8')
+    result_str = process.stdout.decode("utf-8")
 
-    return result_str.rstrip(' \n').split(' ')
+    return result_str.rstrip(" \n").split(" ")
 
 
 link_arguments: List[str] = get_link_arguments()
 
-if environ.get('PYTHON_SDBUS_USE_STATIC_LINK'):
+if environ.get("PYTHON_SDBUS_USE_STATIC_LINK"):
     # Link statically against libsystemd and libcap
-    link_arguments = ['-Wl,-Bstatic', *link_arguments, '-lcap',
-                      '-Wl,-Bdynamic', '-lrt', '-lpthread']
+    link_arguments = [
+        "-Wl,-Bstatic",
+        *link_arguments,
+        "-lcap",
+        "-Wl,-Bdynamic",
+        "-lrt",
+        "-lpthread",
+    ]
 
-link_arguments.append('-flto')
+link_arguments.append("-flto")
 
-compile_arguments: List[str] = ['-flto']
+compile_arguments: List[str] = ["-flto"]
 
 use_limited_api = False
 
-if environ.get('PYTHON_SDBUS_USE_LIMITED_API'):
-    c_macros.append(('Py_LIMITED_API', '0x03070000'))
+if environ.get("PYTHON_SDBUS_USE_LIMITED_API"):
+    c_macros.append(("Py_LIMITED_API", "0x03070000"))
     use_limited_api = True
 
 
-if __name__ == '__main__':
-    with open('./README.md') as f:
+if __name__ == "__main__":
+    with open("./README.md") as f:
         long_description = f.read()
 
     setup(
-        version='0.13.0',
-        author='igo95862',
-        author_email='igo95862@yandex.ru',
-        license='LGPL-2.1-or-later',
-        keywords='dbus ipc linux freedesktop',
+        version="0.13.0",
+        author="igo95862",
+        author_email="igo95862@yandex.ru",
+        license="LGPL-2.1-or-later",
+        keywords="dbus ipc linux freedesktop",
         project_urls={
-            'Documentation': 'https://python-sdbus.readthedocs.io/en/latest/',
-            'Source': 'https://github.com/igo95862/python-sdbus/',
-            'Tracker': 'https://github.com/igo95862/python-sdbus/issues/',
+            "Documentation": "https://python-sdbus.readthedocs.io/en/latest/",
+            "Source": "https://github.com/igo95862/python-sdbus/",
+            "Tracker": "https://github.com/igo95862/python-sdbus/issues/",
         },
         classifiers=[
-            'Development Status :: 4 - Beta',
-            'Intended Audience :: Developers',
+            "Development Status :: 4 - Beta",
+            "Intended Audience :: Developers",
             (
-                'License :: OSI Approved :: '
-                'GNU Lesser General Public License v2 or later (LGPLv2+)'
+                "License :: OSI Approved :: "
+                "GNU Lesser General Public License v2 or later (LGPLv2+)"
             ),
-            'Operating System :: POSIX :: Linux',
-            'Programming Language :: Python :: 3 :: Only',
-            'Topic :: Software Development :: Libraries :: Python Modules',
+            "Operating System :: POSIX :: Linux",
+            "Programming Language :: Python :: 3 :: Only",
+            "Topic :: Software Development :: Libraries :: Python Modules",
         ],
         packages=[
-            '_sdbus',
-            'aiodbus',
-            'aiodbus.utils',
+            "_sdbus",
+            "aiodbus",
+            "aiodbus.utils",
         ],
         package_dir={
-            'aiodbus': 'src/aiodbus',
-            '_sdbus': 'src/_sdbus',
+            "aiodbus": "src/aiodbus",
+            "_sdbus": "src/_sdbus",
         },
         package_data={
-            '_sdbus': [
-                'py.typed',
-                'sd_bus_internals.pyi',
-                'sd_bus_internals.h',
+            "_sdbus": [
+                "py.typed",
+                "sd_bus_internals.pyi",
+                "sd_bus_internals.h",
             ],
         },
         ext_modules=[
             Extension(
-                '_sdbus',
+                "_sdbus",
                 [
-                    'src/_sdbus/sd_bus_internals.c',
-                    'src/_sdbus/sd_bus_internals_bus.c',
-                    'src/_sdbus/sd_bus_internals_funcs.c',
-                    'src/_sdbus/sd_bus_internals_interface.c',
-                    'src/_sdbus/sd_bus_internals_message.c',
+                    "src/_sdbus/sd_bus_internals.c",
+                    "src/_sdbus/sd_bus_internals_bus.c",
+                    "src/_sdbus/sd_bus_internals_funcs.c",
+                    "src/_sdbus/sd_bus_internals_interface.c",
+                    "src/_sdbus/sd_bus_internals_message.c",
                 ],
                 extra_compile_args=compile_arguments,
                 extra_link_args=link_arguments,

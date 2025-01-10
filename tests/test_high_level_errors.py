@@ -18,41 +18,37 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import get_running_loop, wait_for
 from typing import Any
 
-from aiodbus import (
-    DbusInterfaceCommonAsync,
-    dbus_method,
-    request_default_bus_name,
-)
+from aiodbus import DbusInterfaceCommonAsync, dbus_method, request_default_bus_name
 from aiodbus.exceptions import DbusFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
 
-HELLO_WORLD = 'Hello, world!'
+HELLO_WORLD = "Hello, world!"
 
 
 class DbusDeriveMethodError(DbusFailedError):
-    dbus_error_name = 'org.example.Method.Error'
+    dbus_error_name = "org.example.Method.Error"
 
 
-class IndependentError(Exception):
-    ...
+class IndependentError(Exception): ...
 
 
-GOOD_STR = 'Good'
+GOOD_STR = "Good"
 
 
 class InterfaceWithErrors(
     DbusInterfaceCommonAsync,
-    interface_name='org.example.test',
+    interface_name="org.example.test",
 ):
 
-    @dbus_method(result_signature='s')
+    @dbus_method(result_signature="s")
     async def hello_independent_error(self) -> str:
         raise IndependentError
 
-    @dbus_method(result_signature='s')
+    @dbus_method(result_signature="s")
     async def hello_derrived_error(self) -> str:
         raise DbusDeriveMethodError
 
@@ -61,17 +57,15 @@ class TestHighLevelErrors(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        await request_default_bus_name('org.test')
+        await request_default_bus_name("org.test")
         self.test_object = InterfaceWithErrors()
-        self.test_object.export_to_dbus('/')
+        self.test_object.export_to_dbus("/")
 
-        self.test_object_connection = InterfaceWithErrors.new_proxy(
-            'org.test', '/')
+        self.test_object_connection = InterfaceWithErrors.new_proxy("org.test", "/")
 
         loop = get_running_loop()
 
-        def silence_exceptions(*args: Any, **kwrags: Any) -> None:
-            ...
+        def silence_exceptions(*args: Any, **kwrags: Any) -> None: ...
 
         loop.set_exception_handler(silence_exceptions)
 

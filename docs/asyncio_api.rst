@@ -356,7 +356,7 @@ Decorators
         will be raised.
 
         If ``result_args_names`` has been passed when Python function
-        argument names will be used otherwise input arguments 
+        argument names will be used otherwise input arguments
         will be nameless
 
     :param str method_name: Force specific D-Bus method name
@@ -371,13 +371,13 @@ Decorators
                                interface_name='org.example.test'
                                ):
 
-            # Method that takes a string 
+            # Method that takes a string
             # and returns uppercase of that string
             @dbus_method_async(
                 input_signature='s',
                 result_signature='s',
                 result_args_names=('uppercased', )  # This is optional but
-                                                    # makes arguments have names in 
+                                                    # makes arguments have names in
                                                     # introspection data.
             )
             async def upper(self, str_to_up: str) -> str:
@@ -394,8 +394,8 @@ Decorators
     The property will be read-only or read/write based on if setter was
     declared.
 
-    .. warning:: Properties are supposed 
-        to be lightweight to get or set. 
+    .. warning:: Properties are supposed
+        to be lightweight to get or set.
         Make sure property getter or setter
         does not perform heavy IO or computation
         as that will block other methods or properties.

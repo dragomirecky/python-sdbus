@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from aiodbus.dbus_common_funcs import _parse_properties_vardict
@@ -52,8 +53,8 @@ if TYPE_CHECKING:
         Iterable[InterfacesInputElements],
     ]
     InterfacesToClassMap = Dict[FrozenSet[str], Type[DbusInterfaceBase]]
-    OnUnknownMember = Literal['error', 'ignore', 'reuse']
-    OnUnknownInterface = Literal['error', 'none']
+    OnUnknownMember = Literal["error", "ignore", "reuse"]
+    OnUnknownInterface = Literal["error", "none"]
     ParseGetManaged = Dict[
         str,
         Tuple[Optional[Type[DbusInterfaceBase]], Dict[str, Any]],
@@ -61,18 +62,16 @@ if TYPE_CHECKING:
 
 
 def parse_properties_changed(
-        interface: InterfacesInputElements,
-        properties_changed_data: DBUS_PROPERTIES_CHANGED_TYPING,
-        on_unknown_member: OnUnknownMember = 'error',
+    interface: InterfacesInputElements,
+    properties_changed_data: DBUS_PROPERTIES_CHANGED_TYPING,
+    on_unknown_member: OnUnknownMember = "error",
 ) -> Dict[str, Any]:
-    interface_name, changed_properties, invalidated_properties = (
-        properties_changed_data
-    )
+    interface_name, changed_properties, invalidated_properties = properties_changed_data
 
     meta = DBUS_CLASS_TO_META[DBUS_INTERFACE_NAME_TO_CLASS[interface_name]]
 
     for invalidated_property in invalidated_properties:
-        changed_properties[invalidated_property] = ('0', None)
+        changed_properties[invalidated_property] = ("0", None)
 
     return _parse_properties_vardict(
         meta.dbus_member_to_python_attr,
@@ -81,21 +80,22 @@ def parse_properties_changed(
     )
 
 
-SKIP_INTERFACES = frozenset((
-    'org.freedesktop.DBus.Properties',
-    'org.freedesktop.DBus.Introspectable',
-    'org.freedesktop.DBus.Peer',
-    'org.freedesktop.DBus.ObjectManager',
-))
+SKIP_INTERFACES = frozenset(
+    (
+        "org.freedesktop.DBus.Properties",
+        "org.freedesktop.DBus.Introspectable",
+        "org.freedesktop.DBus.Peer",
+        "org.freedesktop.DBus.ObjectManager",
+    )
+)
 
 
 def _create_interfaces_map(
     interfaces: InterfacesInput,
 ) -> InterfacesToClassMap:
 
-    if isinstance(interfaces,
-                  (DbusInterfaceBase, type)):
-        interfaces_iter = iter((interfaces, ))
+    if isinstance(interfaces, (DbusInterfaceBase, type)):
+        interfaces_iter = iter((interfaces,))
     else:
         interfaces_iter = iter(interfaces)
 
@@ -103,13 +103,12 @@ def _create_interfaces_map(
 
     for interface in interfaces_iter:
         interface_names_set = frozenset(
-            interface_name for interface_name, _ in
-            interface._dbus_iter_interfaces_meta()
+            interface_name
+            for interface_name, _ in interface._dbus_iter_interfaces_meta()
             if interface_name not in SKIP_INTERFACES
         )
         interfaces_to_class_map[interface_names_set] = (
-            interface if isinstance(interface, type)
-            else type(interface)
+            interface if isinstance(interface, type) else type(interface)
         )
 
     return interfaces_to_class_map
@@ -138,8 +137,7 @@ def _get_member_map_from_class(
     else:
         return {
             interface_name: meta.dbus_member_to_python_attr
-            for interface_name, meta in
-            python_class._dbus_iter_interfaces_meta()
+            for interface_name, meta in python_class._dbus_iter_interfaces_meta()
         }
 
 
@@ -151,7 +149,8 @@ def _translate_and_merge_members(
     python_properties: Dict[str, Any] = {}
     for interface_name, properties in properties_data.items():
         interface_member_map = dbus_to_python_map.get(
-            interface_name, {},
+            interface_name,
+            {},
         )
         python_properties.update(
             _parse_properties_vardict(
@@ -167,26 +166,25 @@ def _translate_and_merge_members(
 def parse_interfaces_added(
     interfaces: InterfacesInput,
     interfaces_added_data: Tuple[str, Dict[str, Dict[str, Any]]],
-    on_unknown_interface: OnUnknownInterface = 'error',
-    on_unknown_member: OnUnknownMember = 'error',
+    on_unknown_interface: OnUnknownInterface = "error",
+    on_unknown_member: OnUnknownMember = "error",
 ) -> Tuple[str, Optional[Type[DbusInterfaceBase]], Dict[str, Any]]:
 
     interfaces_to_class_map = _create_interfaces_map(interfaces)
 
     path, properties_data = interfaces_added_data
 
-    python_class = (
-        _get_class_from_interfaces(
-            interfaces_to_class_map,
-            properties_data.keys(),
-            on_unknown_interface == "error",
-        )
+    python_class = _get_class_from_interfaces(
+        interfaces_to_class_map,
+        properties_data.keys(),
+        on_unknown_interface == "error",
     )
     dbus_to_python_member_map = _get_member_map_from_class(python_class)
     python_properties: Dict[str, Any] = {}
     for interface_name, properties in properties_data.items():
         interface_member_map = dbus_to_python_member_map.get(
-            interface_name, {},
+            interface_name,
+            {},
         )
         python_properties.update(
             _parse_properties_vardict(
@@ -210,19 +208,17 @@ def parse_interfaces_added(
 def parse_interfaces_removed(
     interfaces: InterfacesInput,
     interfaces_removed_data: Tuple[str, List[str]],
-    on_unknown_interface: OnUnknownInterface = 'error',
+    on_unknown_interface: OnUnknownInterface = "error",
 ) -> Tuple[str, Optional[Type[DbusInterfaceBase]]]:
 
     interfaces_to_class_map = _create_interfaces_map(interfaces)
 
     path, interfaces_removed = interfaces_removed_data
 
-    python_class = (
-        _get_class_from_interfaces(
-            interfaces_to_class_map,
-            interfaces_removed,
-            on_unknown_interface == "error",
-        )
+    python_class = _get_class_from_interfaces(
+        interfaces_to_class_map,
+        interfaces_removed,
+        on_unknown_interface == "error",
     )
 
     return path, python_class
@@ -231,8 +227,8 @@ def parse_interfaces_removed(
 def parse_get_managed_objects(
     interfaces: InterfacesInput,
     managed_objects_data: Dict[str, Dict[str, Dict[str, Any]]],
-    on_unknown_interface: OnUnknownInterface = 'error',
-    on_unknown_member: OnUnknownMember = 'error',
+    on_unknown_interface: OnUnknownInterface = "error",
+    on_unknown_member: OnUnknownMember = "error",
 ) -> ParseGetManaged:
 
     interfaces_to_class_map = _create_interfaces_map(interfaces)
@@ -240,12 +236,10 @@ def parse_get_managed_objects(
     managed_objects_map: ParseGetManaged = {}
 
     for path, properties_data in managed_objects_data.items():
-        python_class = (
-            _get_class_from_interfaces(
-                interfaces_to_class_map,
-                properties_data.keys(),
-                on_unknown_interface == "error",
-            )
+        python_class = _get_class_from_interfaces(
+            interfaces_to_class_map,
+            properties_data.keys(),
+            on_unknown_interface == "error",
         )
         dbus_to_python_member_map = _get_member_map_from_class(python_class)
 
@@ -262,8 +256,8 @@ def parse_get_managed_objects(
 
 
 __all__ = (
-    'parse_properties_changed',
-    'parse_interfaces_added',
-    'parse_interfaces_removed',
-    'parse_get_managed_objects',
+    "parse_properties_changed",
+    "parse_interfaces_added",
+    "parse_interfaces_removed",
+    "parse_get_managed_objects",
 )

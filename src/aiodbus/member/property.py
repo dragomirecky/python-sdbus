@@ -18,10 +18,23 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from inspect import iscoroutinefunction
 from types import FunctionType
-from typing import Awaitable, Generic, TYPE_CHECKING, TypeVar, cast, overload
-from typing import Any, Callable, Generator, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Generator,
+    Generic,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 from weakref import ref as weak_ref
 
 from _sdbus import SdBusInterface, SdBusMessage
@@ -39,21 +52,17 @@ if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class DbusProperty(DbusMember, DbusPropertyCommon, Generic[T]):
     def __init__(
-            self,
-            property_name: Optional[str],
-            property_signature: str,
-            property_getter: Callable[[DbusInterfaceBase],
-                                      T],
-            property_setter: Optional[
-                Callable[[DbusInterfaceBase, T],
-                         None]],
-            flags: int,
-
+        self,
+        property_name: Optional[str],
+        property_signature: str,
+        property_getter: Callable[[DbusInterfaceBase], T],
+        property_setter: Optional[Callable[[DbusInterfaceBase, T], None]],
+        flags: int,
     ) -> None:
         assert isinstance(property_getter, FunctionType)
         super().__init__(
@@ -62,11 +71,8 @@ class DbusProperty(DbusMember, DbusPropertyCommon, Generic[T]):
             flags,
             property_getter,
         )
-        self.property_getter: Callable[
-            [DbusInterfaceBase], T] = property_getter
-        self.property_setter: Optional[
-            Callable[[DbusInterfaceBase, T],
-                     None]] = property_setter
+        self.property_getter: Callable[[DbusInterfaceBase], T] = property_getter
+        self.property_setter: Optional[Callable[[DbusInterfaceBase, T], None]] = property_setter
         self.property_setter_is_public: bool = True
 
         self.__doc__ = property_getter.__doc__
@@ -76,16 +82,14 @@ class DbusProperty(DbusMember, DbusPropertyCommon, Generic[T]):
         self,
         obj: None,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusProperty[T]:
-        ...
+    ) -> DbusProperty[T]: ...
 
     @overload
     def __get__(
         self,
         obj: DbusInterfaceBase,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusBoundPropertyBase[T]:
-        ...
+    ) -> DbusBoundPropertyBase[T]: ...
 
     def __get__(
         self,
@@ -101,27 +105,20 @@ class DbusProperty(DbusMember, DbusPropertyCommon, Generic[T]):
         else:
             return self
 
-    def setter(self,
-               new_set_function: Callable[
-                   [Any, T],
-                   None],
-               ) -> None:
+    def setter(
+        self,
+        new_set_function: Callable[[Any, T], None],
+    ) -> None:
         assert self.property_setter is None, "Setter already defined"
-        assert not iscoroutinefunction(new_set_function), (
-            "Property setter can't be coroutine",
-        )
+        assert not iscoroutinefunction(new_set_function), ("Property setter can't be coroutine",)
         self.property_setter = new_set_function
 
     def setter_private(
         self,
-        new_set_function: Callable[
-            [Any, T],
-            None],
+        new_set_function: Callable[[Any, T], None],
     ) -> None:
         assert self.property_setter is None, "Setter already defined"
-        assert not iscoroutinefunction(new_set_function), (
-            "Property setter can't be coroutine",
-        )
+        assert not iscoroutinefunction(new_set_function), ("Property setter can't be coroutine",)
         self.property_setter = new_set_function
         self.property_setter_is_public = False
 
@@ -160,13 +157,11 @@ class DbusProxyProperty(
 
     async def get(self) -> T:
         bus = self.proxy_meta.attached_bus
-        new_get_message = (
-            bus.new_property_get_message(
-                self.proxy_meta.service_name,
-                self.proxy_meta.object_path,
-                self.dbus_property.interface_name,
-                self.dbus_property.property_name,
-            )
+        new_get_message = bus.new_property_get_message(
+            self.proxy_meta.service_name,
+            self.proxy_meta.object_path,
+            self.dbus_property.interface_name,
+            self.dbus_property.property_name,
         )
         reply_message = await bus.call_async(new_get_message)
         # Get method returns variant but we only need contents of variant
@@ -174,16 +169,14 @@ class DbusProxyProperty(
 
     async def set(self, complete_object: T) -> None:
         bus = self.proxy_meta.attached_bus
-        new_set_message = (
-            bus.new_property_set_message(
-                self.proxy_meta.service_name,
-                self.proxy_meta.object_path,
-                self.dbus_property.interface_name,
-                self.dbus_property.property_name,
-            )
+        new_set_message = bus.new_property_set_message(
+            self.proxy_meta.service_name,
+            self.proxy_meta.object_path,
+            self.dbus_property.interface_name,
+            self.dbus_property.property_name,
         )
         new_set_message.append_data(
-            'v',
+            "v",
             (self.dbus_property.property_signature, complete_object),
         )
         await bus.call_async(new_set_message)
@@ -211,11 +204,7 @@ class DbusLocalProperty(
         getter = self._dbus_reply_get
         dbus_property = self.dbus_property
 
-        if (
-            dbus_property.property_setter is not None
-            and
-            dbus_property.property_setter_is_public
-        ):
+        if dbus_property.property_setter is not None and dbus_property.property_setter_is_public:
 
             setter = self._dbus_reply_set
         else:
@@ -266,7 +255,7 @@ class DbusLocalProperty(
                             complete_object,
                         ),
                     },
-                    []
+                    [],
                 )
             )
 
@@ -305,31 +294,24 @@ class DbusLocalProperty(
                             data_to_set_to,
                         ),
                     },
-                    []
+                    [],
                 )
             )
 
 
 def dbus_property(
-        property_signature: str = "",
-        flags: int = 0,
-        property_name: Optional[str] = None,
-) -> Callable[
-    [Callable[[Any], T]],
-        DbusProperty[T]]:
+    property_signature: str = "",
+    flags: int = 0,
+    property_name: Optional[str] = None,
+) -> Callable[[Callable[[Any], T]], DbusProperty[T]]:
 
     assert not isinstance(property_signature, FunctionType), (
-        "Passed function to decorator directly. "
-        "Did you forget () round brackets?"
+        "Passed function to decorator directly. " "Did you forget () round brackets?"
     )
 
-    def property_decorator(
-        function: Callable[..., Any]
-    ) -> DbusProperty[T]:
+    def property_decorator(function: Callable[..., Any]) -> DbusProperty[T]:
 
-        assert not iscoroutinefunction(function), (
-            "Property getter can't be coroutine",
-        )
+        assert not iscoroutinefunction(function), ("Property getter can't be coroutine",)
 
         new_wrapper: DbusProperty[T] = DbusProperty(
             property_name,
@@ -344,12 +326,9 @@ def dbus_property(
     return property_decorator
 
 
-def dbus_property_async_override() -> Callable[
-    [Callable[[Any], T]],
-        DbusProperty[T]]:
+def dbus_property_async_override() -> Callable[[Callable[[Any], T]], DbusProperty[T]]:
 
-    def new_decorator(
-            new_property: Callable[[Any], T]) -> DbusProperty[T]:
+    def new_decorator(new_property: Callable[[Any], T]) -> DbusProperty[T]:
         return cast(DbusProperty[T], DbusPropertyOverride(new_property))
 
     return new_decorator

@@ -18,22 +18,22 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import Tuple, Type
 
 from aiodbus import DbusInterfaceCommonAsync, dbus_method
 from aiodbus.unittest import IsolatedDbusTestCase
 
-TEST_SERVICE_NAME = 'org.example.test'
+TEST_SERVICE_NAME = "org.example.test"
 
 
 def initialize_object(
     interface_class: Type[DbusInterfaceCommonAsync],
 ) -> Tuple[DbusInterfaceCommonAsync, DbusInterfaceCommonAsync]:
     test_object = interface_class()
-    test_object.export_to_dbus('/')
+    test_object.export_to_dbus("/")
 
-    test_object_connection = interface_class.new_proxy(
-        TEST_SERVICE_NAME, '/')
+    test_object_connection = interface_class.new_proxy(TEST_SERVICE_NAME, "/")
 
     return test_object, test_object_connection
 
@@ -75,7 +75,7 @@ class TestIntrospection(IsolatedDbusTestCase):
             @dbus_method(
                 input_signature="ss",
                 result_signature="i",
-                result_args_names=("result",)
+                result_args_names=("result",),
             )
             async def login(
                 self,
@@ -100,7 +100,7 @@ class TestIntrospection(IsolatedDbusTestCase):
                 input_signature="ss",
                 input_args_names=("UserName", "PinCode"),
                 result_signature="i",
-                result_args_names=("Result",)
+                result_args_names=("Result",),
             )
             async def login(
                 self,

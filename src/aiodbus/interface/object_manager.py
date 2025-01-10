@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -40,7 +41,7 @@ class CloseableFromCallback:
 
 class DbusObjectManagerInterfaceAsync(
     DbusInterfaceCommonAsync,
-    interface_name='org.freedesktop.DBus.ObjectManager',
+    interface_name="org.freedesktop.DBus.ObjectManager",
     serving_enabled=False,
 ):
     def __init__(self) -> None:
@@ -48,16 +49,15 @@ class DbusObjectManagerInterfaceAsync(
         self._object_manager_slot: Optional[SdBusSlot] = None
         self._managed_object_to_path: Dict[DbusInterfaceBase, str] = {}
 
-    @dbus_method(result_signature='a{oa{sa{sv}}}')
-    async def get_managed_objects(
-            self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    @dbus_method(result_signature="a{oa{sa{sv}}}")
+    async def get_managed_objects(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         raise NotImplementedError
 
-    @dbus_signal('oa{sa{sv}}')
+    @dbus_signal("oa{sa{sv}}")
     def interfaces_added(self) -> Tuple[str, Dict[str, Dict[str, Any]]]:
         raise NotImplementedError
 
-    @dbus_signal('oao')
+    @dbus_signal("oao")
     def interfaces_removed(self) -> Tuple[str, List[str]]:
         raise NotImplementedError
 
@@ -85,7 +85,7 @@ class DbusObjectManagerInterfaceAsync(
         bus: Optional[SdBus] = None,
     ) -> DbusExportHandle:
         if self._object_manager_slot is None:
-            raise RuntimeError('ObjectManager not intitialized')
+            raise RuntimeError("ObjectManager not intitialized")
 
         if bus is None:
             bus = get_default_bus()
@@ -103,11 +103,9 @@ class DbusObjectManagerInterfaceAsync(
         self._managed_object_to_path[object_to_export] = object_path
         return export_handle
 
-    def remove_managed_object(
-            self,
-            managed_object: DbusInterfaceBase) -> None:
+    def remove_managed_object(self, managed_object: DbusInterfaceBase) -> None:
         if self._dbus.attached_bus is None:
-            raise RuntimeError('Object manager not exported')
+            raise RuntimeError("Object manager not exported")
 
         removed_path = self._managed_object_to_path.pop(managed_object)
         self._dbus.attached_bus.emit_object_removed(removed_path)

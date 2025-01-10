@@ -18,6 +18,13 @@ dependencies = []
 dev = [
     "black>=25.1.0",
     "jinja2>=3.1.5",
+    "pyright>=1.1.393",
     "pytest>=8.3.4",
     "setuptools>=75.8.0",
 ]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 100

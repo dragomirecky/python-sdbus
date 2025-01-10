@@ -29,3 +29,4 @@ strace*.txt
 wheels
 *.kate-swp
 compile_commands.json
+*.egg-info

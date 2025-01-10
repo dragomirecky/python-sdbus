@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from importlib.util import find_spec
 from unittest import SkipTest, TestCase, main
 from unittest.mock import MagicMock, patch
@@ -78,132 +79,127 @@ class TestConverter(TestCase):
     def test_camel_to_snake(self) -> None:
         with self.subTest("CamelCase"):
             self.assertEqual(
-                'activate_connection',
-                camel_case_to_snake_case('ActivateConnection'),
+                "activate_connection",
+                camel_case_to_snake_case("ActivateConnection"),
             )
 
         with self.subTest("Already snake case"):
             self.assertEqual(
-                'activate_connection',
-                camel_case_to_snake_case('activate_connection'),
+                "activate_connection",
+                camel_case_to_snake_case("activate_connection"),
             )
 
         with self.subTest("Upper snake case"):
             self.assertEqual(
-                'activate_connection',
-                camel_case_to_snake_case('ACTIVATE_CONNECTION'),
+                "activate_connection",
+                camel_case_to_snake_case("ACTIVATE_CONNECTION"),
             )
 
     def test_interface_name_to_class(self) -> None:
         self.assertEqual(
-            'ComExampleSampleInterface0',
-            interface_name_to_class('com.example.SampleInterface0'),
+            "ComExampleSampleInterface0",
+            interface_name_to_class("com.example.SampleInterface0"),
         )
 
     def test_signature_to_typing(self) -> None:
-        with self.subTest('Parse basic'):
+        with self.subTest("Parse basic"):
+            self.assertEqual("str", DbusSigToTyping.typing_basic("s"))
+
+            self.assertRaises(KeyError, DbusSigToTyping.typing_basic, "v")
+
+        with self.subTest("Parse variant"):
+            self.assertEqual("Tuple[str, Any]", DbusSigToTyping.typing_complete("v"))
+
+        with self.subTest("Splitter test"):
             self.assertEqual(
-                'str', DbusSigToTyping.typing_basic('s')
+                ["v", "as", "(uisa{sx})", "h", "a(ss)", "a{ss}", "ay"],
+                DbusSigToTyping.split_sig("vas(uisa{sx})ha(ss)a{ss}ay"),
             )
 
-            self.assertRaises(
-                KeyError, DbusSigToTyping.typing_basic, 'v')
-
-        with self.subTest('Parse variant'):
+        with self.subTest("Parse struct"):
             self.assertEqual(
-                'Tuple[str, Any]', DbusSigToTyping.typing_complete('v')
+                DbusSigToTyping.typing_complete("(sx)"),
+                "Tuple[str, int]",
             )
 
-        with self.subTest('Splitter test'):
+        with self.subTest("Parse list"):
             self.assertEqual(
-                ['v', 'as', '(uisa{sx})', 'h', 'a(ss)', 'a{ss}', 'ay'],
-                DbusSigToTyping.split_sig('vas(uisa{sx})ha(ss)a{ss}ay')
+                DbusSigToTyping.typing_complete("a(sx)"),
+                "List[Tuple[str, int]]",
             )
 
-        with self.subTest('Parse struct'):
+        with self.subTest("Parse dict"):
             self.assertEqual(
-                DbusSigToTyping.typing_complete('(sx)'),
-                'Tuple[str, int]',
+                DbusSigToTyping.typing_complete("a{s(xh)}"),
+                "Dict[str, Tuple[int, int]]",
             )
 
-        with self.subTest('Parse list'):
+        with self.subTest("Parse signature"):
             self.assertEqual(
-                DbusSigToTyping.typing_complete('a(sx)'),
-                'List[Tuple[str, int]]',
-            )
-
-        with self.subTest('Parse dict'):
-            self.assertEqual(
-                DbusSigToTyping.typing_complete('a{s(xh)}'),
-                'Dict[str, Tuple[int, int]]',
-            )
-
-        with self.subTest('Parse signature'):
-            self.assertEqual(
-                DbusSigToTyping.sig_to_typing('a{s(xh)}'),
-                'Dict[str, Tuple[int, int]]',
+                DbusSigToTyping.sig_to_typing("a{s(xh)}"),
+                "Dict[str, Tuple[int, int]]",
             )
 
             self.assertEqual(
-                DbusSigToTyping.sig_to_typing('a{s(xh)}xs'),
-                'Tuple[Dict[str, Tuple[int, int]], int, str]',
+                DbusSigToTyping.sig_to_typing("a{s(xh)}xs"),
+                "Tuple[Dict[str, Tuple[int, int]], int, str]",
             )
 
             self.assertEqual(
-                DbusSigToTyping.sig_to_typing('a{s(xh)}xs'),
-                'Tuple[Dict[str, Tuple[int, int]], int, str]',
+                DbusSigToTyping.sig_to_typing("a{s(xh)}xs"),
+                "Tuple[Dict[str, Tuple[int, int]], int, str]",
             )
 
             self.assertEqual(
-                DbusSigToTyping.sig_to_typing('as'),
-                'List[str]',
+                DbusSigToTyping.sig_to_typing("as"),
+                "List[str]",
             )
 
             self.assertEqual(
-                DbusSigToTyping.sig_to_typing(''),
-                'None',
+                DbusSigToTyping.sig_to_typing(""),
+                "None",
             )
 
     def test_parsing(self) -> None:
-        if find_spec('jinja2') is None:
-            raise SkipTest('Jinja2 not installed')
+        if find_spec("jinja2") is None:
+            raise SkipTest("Jinja2 not installed")
 
         interfaces_intro = interfaces_from_str(test_xml)
 
-        with self.subTest('Test introspection details'):
+        with self.subTest("Test introspection details"):
             test_interface = interfaces_intro[0]
 
             for test_property in test_interface.properties:
-                if test_property.method_name == 'BoundBy':
+                if test_property.method_name == "BoundBy":
                     self.assertEqual(
                         test_property.emits_changed,
-                        'const',
+                        "const",
                     )
-                elif test_property.method_name == 'Bar':
+                elif test_property.method_name == "Bar":
                     self.assertEqual(
                         test_property.emits_changed,
                         True,
                     )
-                elif test_property.method_name == 'FooInvalidates':
+                elif test_property.method_name == "FooInvalidates":
                     self.assertEqual(
                         test_property.emits_changed,
-                        'invalidates',
+                        "invalidates",
                     )
-                elif test_property.method_name == 'FooFoo':
+                elif test_property.method_name == "FooFoo":
                     self.assertEqual(
                         test_property.emits_changed,
                         False,
                     )
 
         generated = generate_py_file(interfaces_intro)
-        self.assertIn('flags=DbusPropertyEmitsInvalidationFlag', generated)
-        self.assertIn('flags=DbusPropertyConstFlag', generated)
+        self.assertIn("flags=DbusPropertyEmitsInvalidationFlag", generated)
+        self.assertIn("flags=DbusPropertyConstFlag", generated)
 
 
 class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
     def test_generate_from_connection(self) -> None:
-        if find_spec('jinja2') is None:
-            raise SkipTest('Jinja2 not installed')
+        if find_spec("jinja2") is None:
+            raise SkipTest("Jinja2 not installed")
 
         with patch("aiodbus.__main__.stdout") as stdout_mock:
             generator_main(
@@ -233,8 +229,8 @@ class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
         )
 
     def test_generate_from_connection_blocking(self) -> None:
-        if find_spec('jinja2') is None:
-            raise SkipTest('Jinja2 not installed')
+        if find_spec("jinja2") is None:
+            raise SkipTest("Jinja2 not installed")
 
         with patch("aiodbus.__main__.stdout") as stdout_mock:
             generator_main(

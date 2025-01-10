@@ -114,7 +114,7 @@ methods will still work in the local scope.
 This is the call to local object: ::
 
     i = ExampleInterface()
-    
+
     async def test() -> None:
         print(await i.double_int(5))  # Will print 10
 
@@ -150,13 +150,13 @@ Example: ::
         ...
         # Body of some class
 
-        # Method that takes a string 
+        # Method that takes a string
         # and returns uppercase of that string
         @dbus_method_async(
             input_signature='s',
             result_signature='s',
             result_args_names=('uppercased', )  # This is optional but
-                                                # makes arguments have names in 
+                                                # makes arguments have names in
                                                 # introspection data.
         )
         async def upper(self, str_to_up: str) -> str:

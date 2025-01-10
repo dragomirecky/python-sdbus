@@ -18,11 +18,12 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import get_running_loop, sleep, wait_for
 from unittest import main
 
 from _sdbus import NameAllowReplacementFlag, NameQueueFlag
-from aiodbus import request_default_bus_name, request_default_bus_name, sd_bus_open_user
+from aiodbus import request_default_bus_name, sd_bus_open_user
 from aiodbus.exceptions import (
     SdBusLibraryError,
     SdBusRequestNameAlreadyOwnerError,
@@ -33,8 +34,8 @@ from aiodbus.exceptions import (
 from aiodbus.interface.daemon import FreedesktopDbus
 from aiodbus.unittest import IsolatedDbusTestCase
 
-TEST_BUS_NAME = 'com.example.test'
-TEST_BUS_NAME_regex_match = TEST_BUS_NAME.replace('.', r'\.')
+TEST_BUS_NAME = "com.example.test"
+TEST_BUS_NAME_regex_match = TEST_BUS_NAME.replace(".", r"\.")
 
 
 class TestRequestNameLowLevel(IsolatedDbusTestCase):
@@ -203,5 +204,5 @@ class TestRequestNameAsync(IsolatedDbusTestCase):
             await request_default_bus_name(TEST_BUS_NAME)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

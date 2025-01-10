@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import FIRST_EXCEPTION, Task, get_running_loop, sleep, wait, wait_for
 from os import environ
 from resource import RUSAGE_SELF, getrusage
@@ -32,15 +33,13 @@ from .test_low_level_errors import DbusDerivePropertydError, InterfaceWithErrors
 from .test_read_write_dbus_types import TestDbusTypes
 from .test_sdbus_async import TestPing, TestProxy, initialize_object
 
-ENABLE_LEAK_TEST_VAR = 'PYTHON_SDBUS_TEST_LEAKS'
+ENABLE_LEAK_TEST_VAR = "PYTHON_SDBUS_TEST_LEAKS"
 
 
 def leak_test_enabled() -> None:
     if not environ.get(ENABLE_LEAK_TEST_VAR):
         raise SkipTest(
-            'Leak tests not enabled, set '
-            f"{ENABLE_LEAK_TEST_VAR} env variable"
-            'to 1 to enable.'
+            "Leak tests not enabled, set " f"{ENABLE_LEAK_TEST_VAR} env variable" "to 1 to enable."
         )
 
 
@@ -52,7 +51,7 @@ class LeakTests(IsolatedDbusTestCase):
     def check_memory(self) -> None:
         current_usage = getrusage(RUSAGE_SELF).ru_maxrss
         if current_usage > self.start_mem * 2:
-            raise RuntimeError('Leaking memory')
+            raise RuntimeError("Leaking memory")
 
     def test_read_write_dbus_types(self) -> None:
         leak_test_enabled()
@@ -116,17 +115,15 @@ class LeakTests(IsolatedDbusTestCase):
     async def test_low_level_errors(self) -> None:
         leak_test_enabled()
 
-        await request_default_bus_name('org.test')
+        await request_default_bus_name("org.test")
         self.test_object = InterfaceWithErrors()
-        self.test_object.export_to_dbus('/')
+        self.test_object.export_to_dbus("/")
 
-        self.test_object_connection = InterfaceWithErrors.new_proxy(
-            'org.test', '/')
+        self.test_object_connection = InterfaceWithErrors.new_proxy("org.test", "/")
 
         loop = get_running_loop()
 
-        def silence_exceptions(*args: Any, **kwrags: Any) -> None:
-            ...
+        def silence_exceptions(*args: Any, **kwrags: Any) -> None: ...
 
         loop.set_exception_handler(silence_exceptions)
 
@@ -157,19 +154,16 @@ class LeakTests(IsolatedDbusTestCase):
 
         async def the_test() -> None:
             for _ in range(num_of_iterations):
-                self.assertEqual(
-                    'ASD',
-                    await wait_for(test_object_connection.upper('asd'), 0.5))
+                self.assertEqual("ASD", await wait_for(test_object_connection.upper("asd"), 0.5))
 
                 await sleep(0)
                 self.assertEqual(
-                    'test_property',
-                    await wait_for(test_object_connection.test_property, 0.5))
+                    "test_property",
+                    await wait_for(test_object_connection.test_property, 0.5),
+                )
 
                 await sleep(0)
-                await wait_for(
-                    test_object_connection.test_property.set(
-                        'test_property'), 0.5)
+                await wait_for(test_object_connection.test_property.set("test_property"), 0.5)
 
                 await sleep(0)
                 self.check_memory()

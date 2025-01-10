@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from aiodbus.dbus_common_funcs import _parse_properties_vardict
@@ -28,13 +29,8 @@ from aiodbus.member.signal import dbus_signal
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Tuple
 
-    DBUS_PROPERTIES_CHANGED_TYPING = (
-        Tuple[
-            str,
-            Dict[str, Tuple[str, Any]],
-            List[str],
-        ]
-    )
-
-
-
+    DBUS_PROPERTIES_CHANGED_TYPING = Tuple[
+        str,
+        Dict[str, Tuple[str, Any]],
+        List[str],
+    ]

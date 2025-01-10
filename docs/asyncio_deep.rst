@@ -39,4 +39,3 @@ Example of an empty signal::
 
     loop = new_event_loop()
     loop.run_until_complete(emit_empty_signal())
-

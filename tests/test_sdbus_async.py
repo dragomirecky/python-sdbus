@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import Event, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import sleep, wait_for
@@ -54,22 +55,26 @@ class TestPing(IsolatedDbusTestCase):
     async def test_ping_with_busctl(self) -> None:
         try:
             busctl_process = await create_subprocess_exec(
-                '/usr/bin/busctl',
-                '--user',
-                'call',
-                'org.freedesktop.DBus', '/org/freedesktop/DBus',
-                'org.freedesktop.DBus.Peer', 'Ping',
+                "/usr/bin/busctl",
+                "--user",
+                "call",
+                "org.freedesktop.DBus",
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus.Peer",
+                "Ping",
             )
         except FileNotFoundError:
-            raise SkipTest('busctl not installed')
+            raise SkipTest("busctl not installed")
 
         return_code = await busctl_process.wait()
         self.assertEqual(return_code, 0)
 
     async def test_ping(self) -> None:
         m = self.bus.new_method_call_message(
-            'org.freedesktop.DBus', '/org/freedesktop/DBus',
-            'org.freedesktop.DBus.Peer', 'Ping',
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus.Peer",
+            "Ping",
         )
         r = await self.bus.call_async(m)
         self.assertIsNone(r.get_contents())
@@ -90,9 +95,9 @@ class SomeTestInterface(
 
     def __init__(self) -> None:
         super().__init__()
-        self.test_string = 'test_property'
-        self.test_string_read = 'read'
-        self.test_no_reply_string = 'no'
+        self.test_string = "test_property"
+        self.test_string_read = "read"
+        self.test_no_reply_string = "no"
         self.property_private = 100
         self.no_reply_sync = Event()
 
@@ -101,16 +106,16 @@ class SomeTestInterface(
         """Uppercase the input"""
         return string.upper()
 
-    @dbus_method(result_signature='s')
+    @dbus_method(result_signature="s")
     async def get_sender(self) -> str:
         message = get_current_message()
-        return message.sender or ''
+        return message.sender or ""
 
-    @dbus_method(result_signature='x')
+    @dbus_method(result_signature="x")
     async def test_int(self) -> int:
         return 1
 
-    @dbus_method(result_signature='x', result_args_names=('an_int', ))
+    @dbus_method(result_signature="x", result_args_names=("an_int",))
     async def int_annotated(self) -> int:
         return 1
 
@@ -139,52 +144,46 @@ class SomeTestInterface(
         self.property_private = new_value
 
     @dbus_method("sb", "s")
-    async def kwargs_function(
-            self,
-            input: str = 'test',
-            is_upper: bool = True) -> str:
+    async def kwargs_function(self, input: str = "test", is_upper: bool = True) -> str:
         if is_upper:
             return input.upper()
         else:
             return input.lower()
 
-    @dbus_method("sb", "s", 0, ('string_result', ))
-    async def kwargs_function_annotated(
-            self,
-            input: str = 'test',
-            is_upper: bool = True) -> str:
+    @dbus_method("sb", "s", 0, ("string_result",))
+    async def kwargs_function_annotated(self, input: str = "test", is_upper: bool = True) -> str:
         if is_upper:
             return input.upper()
         else:
             return input.lower()
 
-    @dbus_signal('ss')
+    @dbus_signal("ss")
     def test_signal(self) -> Tuple[str, str]:
         """Test signal"""
         raise NotImplementedError
 
     @dbus_method()
     async def raise_base_exception(self) -> None:
-        raise DbusFailedError('Test error')
+        raise DbusFailedError("Test error")
 
     @dbus_method()
     async def raise_derived_exception(self) -> None:
-        raise DbusFileExistsError('Test error 2')
+        raise DbusFileExistsError("Test error 2")
 
     @dbus_method()
     async def raise_custom_error(self) -> None:
-        raise DbusErrorTest('Custom')
+        raise DbusErrorTest("Custom")
 
     @dbus_method()
     async def raise_and_unmap_error(self) -> None:
         try:
-            DBUS_ERROR_TO_EXCEPTION.pop('org.example.Nothing')
+            DBUS_ERROR_TO_EXCEPTION.pop("org.example.Nothing")
         except KeyError:
             ...
 
-        raise DbusErrorUnmappedLater('Should be unmapped')
+        raise DbusErrorUnmappedLater("Should be unmapped")
 
-    @dbus_method('s', flags=DbusNoReplyFlag)
+    @dbus_method("s", flags=DbusNoReplyFlag)
     async def no_reply_method(self, new_value: str) -> None:
         self.no_reply_sync.set()
 
@@ -192,17 +191,13 @@ class SomeTestInterface(
     def test_constant_property(self) -> str:
         return "a"
 
-    @dbus_method(
-        result_signature='(ss)'
-    )
+    @dbus_method(result_signature="(ss)")
     async def test_struct_return(self) -> Tuple[str, str]:
-        return ('hello', 'world')
+        return ("hello", "world")
 
-    @dbus_method(
-        result_signature='(ss)'
-    )
+    @dbus_method(result_signature="(ss)")
     async def test_struct_return_workaround(self) -> Tuple[Tuple[str, str]]:
-        return (('hello', 'world'), )
+        return (("hello", "world"),)
 
     @dbus_method()
     async def looong_method(self) -> None:
@@ -225,7 +220,7 @@ class SomeTestInterface(
         int_struct: Tuple[int, int, int, int],
     ) -> int:
         a, b, c, d = int_struct
-        return a*b*c*d
+        return a * b * c * d
 
     @dbus_method("s", "x")
     async def return_length(self, input_str: str) -> int:
@@ -233,22 +228,21 @@ class SomeTestInterface(
 
 
 class DbusErrorTest(DbusFailedError):
-    dbus_error_name = 'org.example.Error'
+    dbus_error_name = "org.example.Error"
 
 
 class DbusErrorUnmappedLater(DbusFailedError):
-    dbus_error_name = 'org.example.Nothing'
+    dbus_error_name = "org.example.Nothing"
 
 
-TEST_SERVICE_NAME = 'org.example.test'
+TEST_SERVICE_NAME = "org.example.test"
 
 
 def initialize_object() -> Tuple[SomeTestInterface, SomeTestInterface]:
     test_object = SomeTestInterface()
-    test_object.export_to_dbus('/')
+    test_object.export_to_dbus("/")
 
-    test_object_connection = SomeTestInterface.new_proxy(
-        TEST_SERVICE_NAME, '/')
+    test_object_connection = SomeTestInterface.new_proxy(TEST_SERVICE_NAME, "/")
 
     return test_object, test_object_connection
 
@@ -261,52 +255,33 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_method_kwargs(self) -> None:
         test_object, test_object_connection = initialize_object()
 
+        self.assertEqual("TEST", await test_object_connection.kwargs_function("test", True))
+
+        self.assertEqual("TEST", await test_object_connection.kwargs_function())
+
+        self.assertEqual("test", await test_object_connection.kwargs_function(is_upper=False))
+
+        self.assertEqual("ASD", await test_object_connection.kwargs_function("asd"))
+
+        self.assertEqual("ASD", await test_object_connection.kwargs_function(input="asd"))
+
+        self.assertEqual("asd", await test_object_connection.kwargs_function("ASD", is_upper=False))
+
         self.assertEqual(
-            'TEST',
-            await test_object_connection.kwargs_function(
-                'test', True)
+            "asd",
+            await test_object_connection.kwargs_function(input="ASD", is_upper=False),
         )
-
-        self.assertEqual(
-            'TEST',
-            await test_object_connection.kwargs_function())
-
-        self.assertEqual(
-            'test',
-            await test_object_connection.kwargs_function(
-                is_upper=False))
-
-        self.assertEqual(
-            'ASD',
-            await test_object_connection.kwargs_function('asd'))
-
-        self.assertEqual(
-            'ASD',
-            await test_object_connection.kwargs_function(input='asd'))
-
-        self.assertEqual(
-            'asd',
-            await test_object_connection.kwargs_function(
-                'ASD', is_upper=False))
-
-        self.assertEqual(
-            'asd',
-            await test_object_connection.kwargs_function(
-                input='ASD', is_upper=False))
 
     async def test_method(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        test_string = 'asdafsrfgdrtuhrytuj'
+        test_string = "asdafsrfgdrtuhrytuj"
 
-        self.assertEqual(test_string.upper(),
-                         await test_object.upper(test_string))
+        self.assertEqual(test_string.upper(), await test_object.upper(test_string))
 
         self.assertEqual(1, await test_object_connection.test_int())
 
-        self.assertEqual(
-            test_string.upper(),
-            await test_object_connection.upper(test_string))
+        self.assertEqual(test_string.upper(), await test_object_connection.upper(test_string))
 
         self.assertEqual(
             await wait_for(test_object.test_struct_return(), 0.5),
@@ -314,22 +289,18 @@ class TestProxy(IsolatedDbusTestCase):
         )
 
         self.assertEqual(
-            (await wait_for(
-                test_object.test_struct_return_workaround(), 0.5))[0],
-            await wait_for(
-                test_object_connection.test_struct_return_workaround(), 0.5),
+            (await wait_for(test_object.test_struct_return_workaround(), 0.5))[0],
+            await wait_for(test_object_connection.test_struct_return_workaround(), 0.5),
         )
 
         self.assertTrue(await test_object_connection.get_sender())
 
         with self.subTest("Test method that returns None"):
             self.assertIsNone(
-                await test_object
-                .returns_none_method()  # type: ignore[func-returns-value]
+                await test_object.returns_none_method()  # type: ignore[func-returns-value]
             )
             self.assertIsNone(
-                await test_object_connection
-                .returns_none_method()   # type: ignore[func-returns-value]
+                await test_object_connection.returns_none_method()  # type: ignore[func-returns-value]
             )
 
         with self.subTest("Test method that takes a single struct"):
@@ -345,7 +316,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_subclass(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        test_var = ['asdasd']
+        test_var = ["asdasd"]
 
         class TestInheritence(SomeTestInterface):
             @dbus_method_override()
@@ -363,30 +334,28 @@ class TestProxy(IsolatedDbusTestCase):
 
         test_subclass = TestInheritence()
 
-        test_subclass.export_to_dbus('/subclass', self.bus)
+        test_subclass.export_to_dbus("/subclass", self.bus)
 
         self.assertEqual(await test_subclass.test_int(), 2)
 
         test_subclass_connection = TestInheritence.new_proxy(
-            TEST_SERVICE_NAME, '/subclass', self.bus)
+            TEST_SERVICE_NAME, "/subclass", self.bus
+        )
 
         self.assertEqual(await test_subclass_connection.test_int(), 2)
 
         self.assertEqual(test_var[0], await test_subclass.test_property)
 
-        await test_subclass.test_property.set('12345')
+        await test_subclass.test_property.set("12345")
 
         self.assertEqual(test_var[0], await test_subclass.test_property)
-        self.assertEqual('12345', await test_subclass.test_property)
+        self.assertEqual("12345", await test_subclass.test_property)
 
-        with self.subTest('Test dbus to python mapping'):
-            dbus_elements_map = (
-                {
-                    interface_name: meta.dbus_member_to_python_attr
-                    for interface_name, meta in
-                    SomeTestInterface._dbus_iter_interfaces_meta()
-                }
-            )
+        with self.subTest("Test dbus to python mapping"):
+            dbus_elements_map = {
+                interface_name: meta.dbus_member_to_python_attr
+                for interface_name, meta in SomeTestInterface._dbus_iter_interfaces_meta()
+            }
             self.assertIn(
                 "TestInt",
                 dbus_elements_map[TEST_INTERFACE_NAME],
@@ -402,7 +371,8 @@ class TestProxy(IsolatedDbusTestCase):
                 dbus_elements_map[TEST_INTERFACE_NAME],
             )
 
-        with self.subTest('Tripple subclass'):
+        with self.subTest("Tripple subclass"):
+
             class TestInheritenceTri(TestInheritence):
                 @dbus_method_override()
                 async def test_int(self) -> int:
@@ -410,78 +380,65 @@ class TestProxy(IsolatedDbusTestCase):
 
                 @dbus_property_async_override()
                 def test_property(self) -> str:
-                    return 'tri'
+                    return "tri"
 
             test_subclass_tri = TestInheritenceTri()
 
-            test_subclass_tri.export_to_dbus('/subclass/tri', self.bus)
+            test_subclass_tri.export_to_dbus("/subclass/tri", self.bus)
 
             self.assertEqual(await test_subclass_tri.test_int(), 3)
 
             test_subclass_tri_connection = TestInheritenceTri.new_proxy(
-                TEST_SERVICE_NAME, '/subclass/tri', self.bus)
+                TEST_SERVICE_NAME, "/subclass/tri", self.bus
+            )
 
             self.assertEqual(await test_subclass_tri_connection.test_int(), 3)
 
-            self.assertEqual(await test_subclass_tri.test_property, 'tri')
-            self.assertEqual(
-                await test_subclass_tri_connection.test_property, 'tri')
+            self.assertEqual(await test_subclass_tri.test_property, "tri")
+            self.assertEqual(await test_subclass_tri_connection.test_property, "tri")
 
     async def test_properties(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        self.assertEqual(
-            'test_property',
-            await test_object.test_property.get())
+        self.assertEqual("test_property", await test_object.test_property.get())
 
-        self.assertEqual(
-            'test_property', await test_object.test_property)
+        self.assertEqual("test_property", await test_object.test_property)
 
         self.assertEqual(
             await wait_for(test_object_connection.test_property, 0.5),
-            await test_object.test_property)
+            await test_object.test_property,
+        )
 
-        self.assertEqual(
-            'test_property',
-            await wait_for(test_object_connection.test_property, 0.5))
+        self.assertEqual("test_property", await wait_for(test_object_connection.test_property, 0.5))
 
         self.assertEqual(
             await test_object.test_property_read_only,
-            await wait_for(
-                test_object_connection.test_property_read_only, 0.5))
-
-        new_string = 'asdsgrghdthdth'
-
-        await wait_for(
-            test_object_connection.test_property.set(
-                new_string),
-            0.5)
-
-        self.assertEqual(
-            new_string, await test_object.test_property)
-
-        self.assertEqual(
-            new_string,
-            await wait_for(test_object_connection.test_property, 0.5)
+            await wait_for(test_object_connection.test_property_read_only, 0.5),
         )
+
+        new_string = "asdsgrghdthdth"
+
+        await wait_for(test_object_connection.test_property.set(new_string), 0.5)
+
+        self.assertEqual(new_string, await test_object.test_property)
+
+        self.assertEqual(new_string, await wait_for(test_object_connection.test_property, 0.5))
 
     async def test_signal(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        test_tuple = ('sgfsretg', 'asd')
+        test_tuple = ("sgfsretg", "asd")
 
-        async with self.assertDbusSignalEmits(
-                test_object.test_signal
-            ) as local_signals_record, self.assertDbusSignalEmits(
-                test_object_connection.test_signal
-        ) as remote_signals_record:
+        async with (
+            self.assertDbusSignalEmits(test_object.test_signal) as local_signals_record,
+            self.assertDbusSignalEmits(test_object_connection.test_signal) as remote_signals_record,
+        ):
             test_object.test_signal.emit(test_tuple)
 
-        async with self.assertDbusSignalEmits(
-                test_object.test_signal
-            ) as local_signals_record, self.assertDbusSignalEmits(
-                test_object_connection.test_signal
-        ) as remote_signals_record:
+        async with (
+            self.assertDbusSignalEmits(test_object.test_signal) as local_signals_record,
+            self.assertDbusSignalEmits(test_object_connection.test_signal) as remote_signals_record,
+        ):
             test_object.test_signal.emit(test_tuple)
 
         self.assertEqual([test_tuple], local_signals_record.output)
@@ -492,60 +449,57 @@ class TestProxy(IsolatedDbusTestCase):
 
         loop = get_running_loop()
 
-        test_tuple = ('sgfsretg', 'asd')
+        test_tuple = ("sgfsretg", "asd")
 
-        with self.subTest('Catch anywhere over D-Bus object'):
-            async def catch_anywhere_oneshot_dbus(
-            ) -> Tuple[str, Tuple[str, str]]:
-                async for x in test_object_connection.test_signal\
-                        .catch_anywhere():
+        with self.subTest("Catch anywhere over D-Bus object"):
+
+            async def catch_anywhere_oneshot_dbus() -> Tuple[str, Tuple[str, str]]:
+                async for x in test_object_connection.test_signal.catch_anywhere():
                     return x
 
                 raise RuntimeError
 
-            catch_anywhere_over_dbus_task \
-                = loop.create_task(catch_anywhere_oneshot_dbus())
+            catch_anywhere_over_dbus_task = loop.create_task(catch_anywhere_oneshot_dbus())
 
             await sleep(0)
 
             test_object.test_signal.emit(test_tuple)
 
             self.assertEqual(
-                ('/', test_tuple),
+                ("/", test_tuple),
                 await wait_for(catch_anywhere_over_dbus_task, timeout=1),
             )
 
-        with self.subTest('Catch anywhere over D-Bus class'):
-            async def catch_anywhere_oneshot_from_class(
-            ) -> Tuple[str, Tuple[str, str]]:
+        with self.subTest("Catch anywhere over D-Bus class"):
+
+            async def catch_anywhere_oneshot_from_class() -> Tuple[str, Tuple[str, str]]:
                 async for x in SomeTestInterface.test_signal.catch_anywhere(
-                        TEST_SERVICE_NAME, self.bus):
+                    TEST_SERVICE_NAME, self.bus
+                ):
                     return x
 
                 raise RuntimeError
 
-            catch_anywhere_from_class_task \
-                = loop.create_task(catch_anywhere_oneshot_from_class())
+            catch_anywhere_from_class_task = loop.create_task(catch_anywhere_oneshot_from_class())
 
             await sleep(0)
 
             test_object.test_signal.emit(test_tuple)
 
             self.assertEqual(
-                ('/', test_tuple),
+                ("/", test_tuple),
                 await wait_for(catch_anywhere_from_class_task, timeout=1),
             )
 
-        with self.subTest('Catch anywhere over local object'):
-            async def catch_anywhere_oneshot_local(
-            ) -> Tuple[str, Tuple[str, str]]:
+        with self.subTest("Catch anywhere over local object"):
+
+            async def catch_anywhere_oneshot_local() -> Tuple[str, Tuple[str, str]]:
                 async for x in test_object.test_signal.catch_anywhere():
                     return x
 
                 raise RuntimeError
 
-            catch_anywhere_over_local_task \
-                = loop.create_task(catch_anywhere_oneshot_local())
+            catch_anywhere_over_local_task = loop.create_task(catch_anywhere_oneshot_local())
 
             with self.assertRaises(NotImplementedError):
                 await wait_for(
@@ -558,7 +512,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         loop = get_running_loop()
 
-        test_tuple = ('sgfsretg', 'asd')
+        test_tuple = ("sgfsretg", "asd")
 
         async def reader_one() -> Tuple[str, str]:
             async for x in test_object_connection.test_signal.catch():
@@ -603,13 +557,12 @@ class TestProxy(IsolatedDbusTestCase):
 
         def bad_exception_error_name_used() -> None:
             class BadDbusError(DbusFailedError):
-                dbus_error_name = 'org.freedesktop.DBus.Error.NoMemory'
+                dbus_error_name = "org.freedesktop.DBus.Error.NoMemory"
 
         self.assertRaises(ValueError, bad_exception_error_name_used)
 
         def bad_exception_no_error_name() -> None:
-            class BadDbusError(DbusFailedError):
-                ...
+            class BadDbusError(DbusFailedError): ...
 
         self.assertRaises(TypeError, bad_exception_no_error_name)
 
@@ -622,8 +575,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_no_reply_method(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        await wait_for(test_object_connection.no_reply_method('yes'),
-                       timeout=1)
+        await wait_for(test_object_connection.no_reply_method("yes"), timeout=1)
 
         await wait_for(test_object.no_reply_sync.wait(), timeout=1)
 
@@ -637,8 +589,7 @@ class TestProxy(IsolatedDbusTestCase):
         collect()
 
         with self.assertRaises(DbusUnknownObjectError):
-            await wait_for(test_object_connection.dbus_introspect(),
-                           timeout=0.2)
+            await wait_for(test_object_connection.dbus_introspect(), timeout=0.2)
 
     def test_docstring(self) -> None:
         test_object, test_object_connection = initialize_object()
@@ -651,18 +602,16 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertTrue(getdoc(test_object.test_property))
 
-        self.assertTrue(
-            getdoc(test_object_connection.test_property))
+        self.assertTrue(getdoc(test_object_connection.test_property))
 
         self.assertTrue(getdoc(test_object.test_signal))
 
-        self.assertTrue(
-            getdoc(test_object_connection.test_signal))
+        self.assertTrue(getdoc(test_object_connection.test_signal))
 
     async def test_emits_properties_changed(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        test_str = 'should_be_emited'
+        test_str = "should_be_emited"
 
         loop = get_running_loop()
 
@@ -729,12 +678,11 @@ class TestProxy(IsolatedDbusTestCase):
         future = loop.create_future()
 
         slot = await self.bus.match_signal_async(
-            TEST_SERVICE_NAME,
-            None, None, None,
-            future.set_result)
+            TEST_SERVICE_NAME, None, None, None, future.set_result
+        )
 
         try:
-            test_object.test_signal.emit(('test', 'signal'))
+            test_object.test_signal.emit(("test", "signal"))
 
             await wait_for(future, timeout=1)
             message = future.result()
@@ -746,21 +694,21 @@ class TestProxy(IsolatedDbusTestCase):
         from enum import Enum
 
         class InterfaceNameEnum(str, Enum):
-            FOO = 'org.example.foo'
-            BAR = 'org.example.bar'
+            FOO = "org.example.foo"
+            BAR = "org.example.bar"
 
         class ObjectPathEnum(str, Enum):
-            FOO = '/foo'
-            BAR = '/bar'
+            FOO = "/foo"
+            BAR = "/bar"
 
         class EnumedInterfaceAsync(
             DbusInterfaceCommonAsync,
             interface_name=InterfaceNameEnum.BAR,
         ):
 
-            @dbus_property('s')
+            @dbus_property("s")
             def hello_world(self) -> str:
-                return 'Hello World!'
+                return "Hello World!"
 
         test_object = EnumedInterfaceAsync()
         test_object.export_to_dbus(ObjectPathEnum.FOO)
@@ -768,29 +716,27 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_properties_get_all_dict(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        dbus_dict = await test_object_connection._properties_get_all(
-            TEST_INTERFACE_NAME)
+        dbus_dict = await test_object_connection._properties_get_all(TEST_INTERFACE_NAME)
 
         self.assertEqual(
             await test_object.test_property,
-            dbus_dict['TestProperty'][1],
+            dbus_dict["TestProperty"][1],
         )
 
         self.assertEqual(
             await test_object.test_property,
-            (
-                await test_object_connection.properties_get_all_dict()
-            )['test_property'],
+            (await test_object_connection.properties_get_all_dict())["test_property"],
         )
 
     async def test_empty_signal(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        async with self.assertDbusSignalEmits(
-                test_object.empty_signal
-            ) as local_signals_record, self.assertDbusSignalEmits(
+        async with (
+            self.assertDbusSignalEmits(test_object.empty_signal) as local_signals_record,
+            self.assertDbusSignalEmits(
                 test_object_connection.empty_signal
-        ) as remote_signals_record:
+            ) as remote_signals_record,
+        ):
             test_object.empty_signal.emit(None)
 
         self.assertEqual([None], local_signals_record.output)
@@ -799,7 +745,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_properties_changed(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        test_str = 'should_be_emited'
+        test_str = "should_be_emited"
 
         async with self.assertDbusSignalEmits(
             test_object_connection.properties_changed
@@ -809,39 +755,37 @@ class TestProxy(IsolatedDbusTestCase):
         properties_changed_data = properties_changed_catch.output[0]
 
         parsed_dict_from_class = parse_properties_changed(
-            SomeTestInterface, properties_changed_data)
+            SomeTestInterface, properties_changed_data
+        )
         self.assertEqual(
             test_str,
-            parsed_dict_from_class['test_property'],
+            parsed_dict_from_class["test_property"],
         )
 
         parsed_dict_from_object = parse_properties_changed(
-            test_object_connection, properties_changed_data)
+            test_object_connection, properties_changed_data
+        )
         self.assertEqual(
             test_str,
-            parsed_dict_from_object['test_property'],
+            parsed_dict_from_object["test_property"],
         )
 
-        properties_changed_data[2].append('invalidated_property')
+        properties_changed_data[2].append("invalidated_property")
         parsed_dict_with_invalidation = parse_properties_changed(
-            test_object, properties_changed_data,
-            on_unknown_member='reuse',
+            test_object,
+            properties_changed_data,
+            on_unknown_member="reuse",
         )
-        self.assertIsNone(
-            parsed_dict_with_invalidation['invalidated_property'])
+        self.assertIsNone(parsed_dict_with_invalidation["invalidated_property"])
 
     async def test_property_private_setter(self) -> None:
         test_object, test_object_connection = initialize_object()
 
         new_value = 200
-        self.assertNotEqual(
-            await test_object_connection.test_property_private,
-            new_value
-        )
+        self.assertNotEqual(await test_object_connection.test_property_private, new_value)
 
         with self.assertRaises(DbusPropertyReadOnlyError):
-            await test_object_connection.test_property_private.set(
-                new_value)
+            await test_object_connection.test_property_private.set(new_value)
 
         async with self.assertDbusSignalEmits(
             test_object_connection.properties_changed
@@ -850,12 +794,9 @@ class TestProxy(IsolatedDbusTestCase):
 
         changed_properties = properties_changed_catch.output[0]
 
-        self.assertEqual(
-            await test_object_connection.test_property_private,
-            new_value
-        )
+        self.assertEqual(await test_object_connection.test_property_private, new_value)
 
-        self.assertIn('TestPropertyPrivate', changed_properties[1])
+        self.assertIn("TestPropertyPrivate", changed_properties[1])
 
     async def test_property_override_setter_private(self) -> None:
 
@@ -872,9 +813,8 @@ class TestProxy(IsolatedDbusTestCase):
                 test_int = new_value
 
         test_object = TestInterfacePrivateSetter()
-        test_object.export_to_dbus('/')
-        test_object_connection = SomeTestInterface.new_proxy(
-            TEST_SERVICE_NAME, '/')
+        test_object.export_to_dbus("/")
+        test_object_connection = SomeTestInterface.new_proxy(TEST_SERVICE_NAME, "/")
 
         self.assertEqual(
             await test_object_connection.test_property_private,
@@ -883,8 +823,9 @@ class TestProxy(IsolatedDbusTestCase):
 
         async def catch_properties_changed() -> int:
             async for x in test_object_connection.properties_changed:
-                changed_attr = parse_properties_changed(
-                    SomeTestInterface, x)["test_property_private"]
+                changed_attr = parse_properties_changed(SomeTestInterface, x)[
+                    "test_property_private"
+                ]
 
                 if not isinstance(changed_attr, int):
                     raise TypeError
@@ -893,8 +834,7 @@ class TestProxy(IsolatedDbusTestCase):
 
             raise RuntimeError
 
-        catch_changed_task = get_running_loop(
-        ).create_task(catch_properties_changed())
+        catch_changed_task = get_running_loop().create_task(catch_properties_changed())
 
         with self.assertRaises(DbusPropertyReadOnlyError):
             await test_object_connection.test_property_private.set(10)
@@ -933,8 +873,7 @@ class TestProxy(IsolatedDbusTestCase):
             async def two(self) -> int:
                 return 2
 
-        class CombinedInterface(OneInterface, TwoInterface):
-            ...
+        class CombinedInterface(OneInterface, TwoInterface): ...
 
     async def test_extremely_large_string(self) -> None:
         test_object, test_object_connection = initialize_object()
@@ -942,9 +881,7 @@ class TestProxy(IsolatedDbusTestCase):
         extremely_large_string = "a" * 8423681
 
         remote_len = await wait_for(
-            test_object_connection.return_length(
-                extremely_large_string
-            ),
+            test_object_connection.return_length(extremely_large_string),
             timeout=10,
         )
 
@@ -960,7 +897,8 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_export_handle(self) -> None:
         test_object = SomeTestInterface()
         test_object_connection = SomeTestInterface.new_proxy(
-            TEST_SERVICE_NAME, '/',
+            TEST_SERVICE_NAME,
+            "/",
         )
         with self.assertRaises(DbusUnknownObjectError):
             await test_object_connection.returns_none_method()

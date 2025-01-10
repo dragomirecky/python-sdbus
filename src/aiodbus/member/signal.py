@@ -18,19 +18,26 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import Queue
 from contextlib import closing
 from types import FunctionType
 from typing import (
+    TYPE_CHECKING,
+    Any,
     AsyncIterable,
     AsyncIterator,
+    Callable,
     Generic,
-    TYPE_CHECKING,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
-from typing import Any, Callable, Optional, Sequence, Tuple, Type, Union
 from weakref import WeakSet
 
 from _sdbus import SdBus, SdBusInterface, SdBusMessage, SdBusSlot
@@ -49,7 +56,7 @@ if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
@@ -60,7 +67,7 @@ class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
         signal_signature: str,
         args_names: Sequence[str],
         flags: int,
-        original_method: FunctionType
+        original_method: FunctionType,
     ):
         super().__init__(
             signal_name,
@@ -77,16 +84,14 @@ class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
         self,
         obj: None,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusSignal[T]:
-        ...
+    ) -> DbusSignal[T]: ...
 
     @overload
     def __get__(
         self,
         obj: DbusInterfaceBase,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusBoundSignalBase[T]:
-        ...
+    ) -> DbusBoundSignalBase[T]: ...
 
     def __get__(
         self,
@@ -125,10 +130,7 @@ class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
                 next_signal_message = await message_queue.get()
                 signal_path = next_signal_message.path
                 assert signal_path is not None
-                yield (
-                    signal_path,
-                    cast(T, next_signal_message.get_contents())
-                )
+                yield (signal_path, cast(T, next_signal_message.get_contents()))
 
 
 class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
@@ -146,9 +148,9 @@ class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
     __aiter__ = catch
 
     async def catch_anywhere(
-            self,
-            service_name: Optional[str] = None,
-            bus: Optional[SdBus] = None,
+        self,
+        service_name: Optional[str] = None,
+        bus: Optional[SdBus] = None,
     ) -> AsyncIterable[Tuple[str, T]]:
         raise NotImplementedError
         yield "", cast(T, None)
@@ -197,9 +199,9 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
     __aiter__ = catch
 
     async def catch_anywhere(
-            self,
-            service_name: Optional[str] = None,
-            bus: Optional[SdBus] = None,
+        self,
+        service_name: Optional[str] = None,
+        bus: Optional[SdBus] = None,
     ) -> AsyncIterable[Tuple[str, T]]:
         if bus is None:
             bus = self.proxy_meta.attached_bus
@@ -222,10 +224,7 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
                 next_signal_message = await message_queue.get()
                 signal_path = next_signal_message.path
                 assert signal_path is not None
-                yield (
-                    signal_path,
-                    cast(T, next_signal_message.get_contents())
-                )
+                yield (signal_path, cast(T, next_signal_message.get_contents()))
 
     def emit(self, args: T) -> None:
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
@@ -292,16 +291,12 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
             self.dbus_signal.signal_name,
         )
 
-        if ((not self.dbus_signal.signal_signature.startswith('('))
-            and
-                isinstance(args, tuple)):
-            signal_message.append_data(
-                self.dbus_signal.signal_signature, *args)
-        elif self.dbus_signal.signal_signature == '' and args is None:
+        if (not self.dbus_signal.signal_signature.startswith("(")) and isinstance(args, tuple):
+            signal_message.append_data(self.dbus_signal.signal_signature, *args)
+        elif self.dbus_signal.signal_signature == "" and args is None:
             ...
         else:
-            signal_message.append_data(
-                self.dbus_signal.signal_signature, args)
+            signal_message.append_data(self.dbus_signal.signal_signature, args)
 
         signal_message.send()
 
@@ -313,21 +308,16 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
 
 
 def dbus_signal(
-        signal_signature: str = '',
-        signal_args_names: Sequence[str] = (),
-        flags: int = 0,
-        signal_name: Optional[str] = None,
-) -> Callable[
-    [Callable[[Any], T]],
-    DbusSignal[T]
-]:
+    signal_signature: str = "",
+    signal_args_names: Sequence[str] = (),
+    flags: int = 0,
+    signal_name: Optional[str] = None,
+) -> Callable[[Callable[[Any], T]], DbusSignal[T]]:
     assert not isinstance(signal_signature, FunctionType), (
-        "Passed function to decorator directly. "
-        "Did you forget () round brackets?"
+        "Passed function to decorator directly. " "Did you forget () round brackets?"
     )
 
-    def signal_decorator(
-            pseudo_function: Callable[[Any], T]) -> DbusSignal[T]:
+    def signal_decorator(pseudo_function: Callable[[Any], T]) -> DbusSignal[T]:
 
         assert isinstance(pseudo_function, FunctionType)
         return DbusSignal(

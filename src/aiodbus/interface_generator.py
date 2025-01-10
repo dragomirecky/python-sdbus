@@ -25,16 +25,7 @@ from xml.etree.ElementTree import fromstring as etree_from_str
 from xml.etree.ElementTree import parse as etree_from_file
 
 if TYPE_CHECKING:
-    from typing import (
-        Dict,
-        Iterable,
-        Iterator,
-        List,
-        Literal,
-        Optional,
-        Tuple,
-        Union,
-    )
+    from typing import Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
     from xml.etree.ElementTree import Element
 
 
@@ -45,7 +36,7 @@ def _camel_case_to_snake_case_generator(camel: str) -> Iterator[str]:
     try:
         first_char = next(i)
     except StopIteration:
-        raise ValueError('Name too short')
+        raise ValueError("Name too short")
 
     yield first_char.lower()
 
@@ -63,7 +54,7 @@ def _camel_case_to_snake_case_generator(camel: str) -> Iterator[str]:
 
         if c.isupper():
             if not last_character.isupper() and not last_character == "_":
-                yield '_'
+                yield "_"
 
             yield c.lower()
         else:
@@ -73,7 +64,7 @@ def _camel_case_to_snake_case_generator(camel: str) -> Iterator[str]:
 
 
 def camel_case_to_snake_case(camel: str) -> str:
-    return ''.join(_camel_case_to_snake_case_generator(camel))
+    return "".join(_camel_case_to_snake_case_generator(camel))
 
 
 def _iterface_name_to_class_generator(interface_name: str) -> Iterator[str]:
@@ -82,7 +73,7 @@ def _iterface_name_to_class_generator(interface_name: str) -> Iterator[str]:
     try:
         first_char = next(i)
     except StopIteration:
-        raise ValueError('Interface name too short')
+        raise ValueError("Interface name too short")
 
     yield first_char.upper()
 
@@ -94,7 +85,7 @@ def _iterface_name_to_class_generator(interface_name: str) -> Iterator[str]:
         except StopIteration:
             return
 
-        if c == '.':
+        if c == ".":
             up_next_char = True
         else:
             if up_next_char:
@@ -106,13 +97,13 @@ def _iterface_name_to_class_generator(interface_name: str) -> Iterator[str]:
 
 
 def interface_name_to_class(interface_name: str) -> str:
-    return ''.join(_iterface_name_to_class_generator(interface_name))
+    return "".join(_iterface_name_to_class_generator(interface_name))
 
 
 def parse_str_bool(annotation_value: str) -> bool:
-    if annotation_value == 'true':
+    if annotation_value == "true":
         return True
-    elif annotation_value == 'false':
+    elif annotation_value == "false":
         return False
     else:
         raise ValueError(f"Unknown bool value: {annotation_value}")
@@ -121,19 +112,19 @@ def parse_str_bool(annotation_value: str) -> bool:
 class DbusSigToTyping:
 
     _DBUS_BASIC_SIG_TO_TYPING = {
-        'y': 'int',
-        'b': 'bool',
-        'n': 'int',
-        'q': 'int',
-        'i': 'int',
-        'u': 'int',
-        'x': 'int',
-        't': 'int',
-        'd': 'float',
-        's': 'str',
-        'o': 'str',
-        'g': 'str',
-        'h': 'int',
+        "y": "int",
+        "b": "bool",
+        "n": "int",
+        "q": "int",
+        "i": "int",
+        "u": "int",
+        "x": "int",
+        "t": "int",
+        "d": "float",
+        "s": "str",
+        "o": "str",
+        "g": "str",
+        "h": "int",
     }
 
     @classmethod
@@ -150,10 +141,10 @@ class DbusSigToTyping:
         round_braces_count = 0
         curly_braces_count = 0
 
-        if peek_str == '(':
+        if peek_str == "(":
             round_braces_count += 1
 
-        if peek_str == '{':
+        if peek_str == "{":
             curly_braces_count += 1
 
         while True:
@@ -162,28 +153,28 @@ class DbusSigToTyping:
             except StopIteration:
                 break
 
-            if char == ')':
+            if char == ")":
                 round_braces_count -= 1
 
-            if char == '}':
+            if char == "}":
                 curly_braces_count -= 1
 
-            if char == '(':
+            if char == "(":
                 round_braces_count += 1
 
-            if char == '{':
+            if char == "{":
                 curly_braces_count += 1
 
             accumulator.append(char)
 
-            if char == 'a':
+            if char == "a":
 
                 continue
 
             if round_braces_count == 0 and curly_braces_count == 0:
                 break
 
-        return ''.join(accumulator)
+        return "".join(accumulator)
 
     @classmethod
     def split_sig(cls, sig: str) -> List[str]:
@@ -197,10 +188,10 @@ class DbusSigToTyping:
             except StopIteration:
                 break
 
-            if next_char == '(':
-                next_complete = cls.slice_container(sig_iter, '(')
-            elif next_char == 'a':
-                next_complete = cls.slice_container(sig_iter, 'a')
+            if next_char == "(":
+                next_complete = cls.slice_container(sig_iter, "(")
+            elif next_char == "a":
+                next_complete = cls.slice_container(sig_iter, "a")
             else:
                 next_complete = next_char
 
@@ -211,12 +202,12 @@ class DbusSigToTyping:
     @classmethod
     def typing_complete(cls, complete_sig: str) -> str:
 
-        if complete_sig == 'v':
-            return cls.typing_into_tuple(('str', 'Any'))
-        elif complete_sig == 'ay':
-            return 'bytes'
-        elif complete_sig.startswith('a{'):
-            if complete_sig[-1] != '}':
+        if complete_sig == "v":
+            return cls.typing_into_tuple(("str", "Any"))
+        elif complete_sig == "ay":
+            return "bytes"
+        elif complete_sig.startswith("a{"):
+            if complete_sig[-1] != "}":
                 raise ValueError(f"Malformed dict {complete_sig}")
 
             dict_key_sig = complete_sig[2]
@@ -227,18 +218,17 @@ class DbusSigToTyping:
 
             return f"Dict[{dict_key_typing}, {dict_value_typing}]"
 
-        elif complete_sig.startswith('a'):
+        elif complete_sig.startswith("a"):
             array_completes = cls.split_sig(complete_sig[1:])
 
             if len(array_completes) != 1:
-                raise ValueError("Array does not have only "
-                                 "one complete type: {array_completes}")
+                raise ValueError("Array does not have only " "one complete type: {array_completes}")
 
             array_single_complete = array_completes[0]
 
             return f"List[{cls.typing_complete(array_single_complete)}]"
-        elif complete_sig.startswith('('):
-            if complete_sig[-1] != ')':
+        elif complete_sig.startswith("("):
+            if complete_sig[-1] != ")":
                 raise ValueError(f"Malformed struct {complete_sig}")
 
             struct_completes = cls.split_sig(complete_sig[1:-1])
@@ -253,13 +243,11 @@ class DbusSigToTyping:
         result_len = len(result_args)
 
         if result_len == 0:
-            return 'None'
+            return "None"
         elif result_len == 1:
             return cls.typing_complete(result_args[0])
         else:
-            return cls.typing_into_tuple(
-                (cls.typing_complete(x) for x in result_args)
-            )
+            return cls.typing_into_tuple((cls.typing_complete(x) for x in result_args))
 
     @classmethod
     def sig_to_typing(cls, signature: str) -> str:
@@ -269,7 +257,7 @@ class DbusSigToTyping:
 class DbusMemberAbstract:
 
     def __init__(self, element: Element):
-        self.method_name = element.attrib['name']
+        self.method_name = element.attrib["name"]
         self.python_name = camel_case_to_snake_case(self.method_name)
 
         self.is_deprecated = False
@@ -282,85 +270,80 @@ class DbusMemberAbstract:
 
     def _flags_iter(self) -> Iterator[str]:
         if self.is_deprecated:
-            yield 'DbusDeprecatedFlag'
+            yield "DbusDeprecatedFlag"
 
         if not self.is_priveledged and self._can_use_unpivileged():
-            yield 'DbusUnprivilegedFlag'
+            yield "DbusUnprivilegedFlag"
 
     @property
     def flags_str(self) -> str:
-        return ' | '.join(self._flags_iter())
+        return " | ".join(self._flags_iter())
 
     def _parse_arg(self, arg: Element) -> None:
-        raise NotImplementedError('Member does not have arguments')
+        raise NotImplementedError("Member does not have arguments")
 
-    def _parse_annotation_data(self,
-                               annotation_name: str,
-                               annotation_value: str) -> None:
+    def _parse_annotation_data(self, annotation_name: str, annotation_value: str) -> None:
 
-        if annotation_name == 'org.freedesktop.DBus.Deprecated':
+        if annotation_name == "org.freedesktop.DBus.Deprecated":
             self.is_deprecated = parse_str_bool(annotation_value)
-        elif annotation_name == 'org.freedesktop.systemd1.Privileged':
+        elif annotation_name == "org.freedesktop.systemd1.Privileged":
             self.is_priveledged = parse_str_bool(annotation_value)
         else:
             ...
 
     def _parse_annotation(self, annotation: Element) -> None:
-        if annotation.tag != 'annotation':
-            raise ValueError('Uknown element of member: ', annotation.tag)
+        if annotation.tag != "annotation":
+            raise ValueError("Uknown element of member: ", annotation.tag)
 
-        annotation_name = annotation.attrib['name']
-        annotation_value = annotation.attrib['value']
+        annotation_name = annotation.attrib["name"]
+        annotation_value = annotation.attrib["value"]
 
         self._parse_annotation_data(annotation_name, annotation_value)
 
     def iter_sub_elements(self, element: Element) -> None:
         for sub_element in element:
             tag = sub_element.tag
-            if tag == 'annotation':
+            if tag == "annotation":
                 self._parse_annotation(sub_element)
-            elif tag == 'arg':
+            elif tag == "arg":
                 self._parse_arg(sub_element)
             else:
-                raise ValueError(
-                    'Uknown member annotation tag: ', tag)
+                raise ValueError("Uknown member annotation tag: ", tag)
 
 
 class DbusArgsIntrospection:
     def __init__(self, element: Element):
-        if element.tag != 'arg':
+        if element.tag != "arg":
             raise ValueError(f"Expected arg tag, got {element.tag}")
 
         try:
-            self.name: Optional[str] = element.attrib['name']
+            self.name: Optional[str] = element.attrib["name"]
         except KeyError:
             self.name = None
 
-        self.dbus_type = element.attrib['type']
+        self.dbus_type = element.attrib["type"]
 
-        direction = element.attrib.get('direction')
-        if direction == 'in':
+        direction = element.attrib.get("direction")
+        if direction == "in":
             self.is_input: Optional[bool] = True
-        elif direction == 'out':
+        elif direction == "out":
             self.is_input = False
         elif direction is None:
             self.is_input = None
         else:
-            raise ValueError(f'Unknown arg direction {direction}')
+            raise ValueError(f"Unknown arg direction {direction}")
 
     @property
     def typing(self) -> str:
         return DbusSigToTyping.typing_complete(self.dbus_type)
 
     def __repr__(self) -> str:
-        return (f"D-Bus Arg: {self.name}, "
-                f"type: {self.dbus_type}, "
-                f"is input: {self.is_input}")
+        return f"D-Bus Arg: {self.name}, " f"type: {self.dbus_type}, " f"is input: {self.is_input}"
 
 
 class DbusMethodInrospection(DbusMemberAbstract):
     def __init__(self, element: Element):
-        if element.tag != 'method':
+        if element.tag != "method":
             raise ValueError(f"Expected method tag, got {element.tag}")
 
         self.is_no_reply = False
@@ -372,7 +355,7 @@ class DbusMethodInrospection(DbusMemberAbstract):
 
     def _flags_iter(self) -> Iterator[str]:
         if self.is_no_reply:
-            yield 'DbusNoReplyFlag'
+            yield "DbusNoReplyFlag"
 
         yield from super()._flags_iter()
 
@@ -383,20 +366,15 @@ class DbusMethodInrospection(DbusMemberAbstract):
         elif not new_arg.is_input:
             self.result_args.append(new_arg)
         else:
-            raise ValueError('Malformed arg direction')
+            raise ValueError("Malformed arg direction")
 
     @property
     def dbus_input_signature(self) -> str:
-        return ''.join(
-            (x.dbus_type for x in self.input_args)
-        )
+        return "".join((x.dbus_type for x in self.input_args))
 
     @property
     def dbus_result_signature(self) -> str:
-        return ''.join(
-            (x.dbus_type if not x.is_input else ''
-             for x in self.result_args)
-        )
+        return "".join((x.dbus_type if not x.is_input else "" for x in self.result_args))
 
     @property
     def args_names_and_typing(self) -> List[Tuple[str, str]]:
@@ -414,8 +392,7 @@ class DbusMethodInrospection(DbusMemberAbstract):
 
     @property
     def result_typing(self) -> str:
-        return DbusSigToTyping.result_typing(
-            [x.dbus_type for x in self.result_args])
+        return DbusSigToTyping.result_typing([x.dbus_type for x in self.result_args])
 
     @property
     def is_results_args_valid_names(self) -> bool:
@@ -426,33 +403,33 @@ class DbusMethodInrospection(DbusMemberAbstract):
         return repr(tuple(r.name for r in self.result_args))
 
     def __repr__(self) -> str:
-        return (f"D-Bus Method: {self.method_name}, "
-                f"args: {self.args_names_and_typing}, "
-                f"result: {self.dbus_result_signature}")
+        return (
+            f"D-Bus Method: {self.method_name}, "
+            f"args: {self.args_names_and_typing}, "
+            f"result: {self.dbus_result_signature}"
+        )
 
 
 class DbusPropertyIntrospection(DbusMemberAbstract):
-    _EMITS_CHANGED_MAP: Dict[
-        Union[bool, Literal['const', 'invalidates']], str
-    ] = {
-        True: 'DbusPropertyEmitsChangeFlag',
-        'invalidates': 'DbusPropertyEmitsInvalidationFlag',
-        'const': 'DbusPropertyConstFlag',
+    _EMITS_CHANGED_MAP: Dict[Union[bool, Literal["const", "invalidates"]], str] = {
+        True: "DbusPropertyEmitsChangeFlag",
+        "invalidates": "DbusPropertyEmitsInvalidationFlag",
+        "const": "DbusPropertyConstFlag",
     }
 
     def __init__(self, element: Element):
-        if element.tag != 'property':
+        if element.tag != "property":
             raise ValueError(f"Expected property tag, got {element.tag}")
 
-        self.dbus_signature = element.attrib['type']
+        self.dbus_signature = element.attrib["type"]
 
-        self.emits_changed: Union[bool, Literal['const', 'invalidates']] = True
+        self.emits_changed: Union[bool, Literal["const", "invalidates"]] = True
         self.is_explicit = False
 
-        access_type = element.attrib['access']
-        if access_type == 'readwrite' or access_type == 'write':
+        access_type = element.attrib["access"]
+        if access_type == "readwrite" or access_type == "write":
             self.is_read_only = False
-        elif access_type == 'read':
+        elif access_type == "read":
             self.is_read_only = True
         else:
             raise ValueError(f"Unknown property access {access_type}")
@@ -472,24 +449,20 @@ class DbusPropertyIntrospection(DbusMemberAbstract):
 
         yield from super()._flags_iter()
 
-    def _parse_annotation_data(self,
-                               annotation_name: str,
-                               annotation_value: str) -> None:
+    def _parse_annotation_data(self, annotation_name: str, annotation_value: str) -> None:
 
-        if annotation_name == ('org.freedesktop.DBus.Property'
-                               '.EmitsChangedSignal'):
-            if annotation_value == 'true':
+        if annotation_name == ("org.freedesktop.DBus.Property" ".EmitsChangedSignal"):
+            if annotation_value == "true":
                 self.emits_changed = True
-            elif annotation_value == 'false':
+            elif annotation_value == "false":
                 self.emits_changed = False
-            elif annotation_value == 'const':
-                self.emits_changed = 'const'
-            elif annotation_value == 'invalidates':
-                self.emits_changed = 'invalidates'
+            elif annotation_value == "const":
+                self.emits_changed = "const"
+            elif annotation_value == "invalidates":
+                self.emits_changed = "invalidates"
             else:
-                raise ValueError('Unknown EmitsChanged value',
-                                 annotation_value)
-        elif annotation_name == 'org.freedesktop.systemd1.Explicit':
+                raise ValueError("Unknown EmitsChanged value", annotation_value)
+        elif annotation_name == "org.freedesktop.systemd1.Explicit":
             self.is_explicit = parse_str_bool(annotation_value)
 
         super()._parse_annotation_data(annotation_name, annotation_value)
@@ -501,7 +474,7 @@ class DbusPropertyIntrospection(DbusMemberAbstract):
 
 class DbusSignalIntrospection(DbusMemberAbstract):
     def __init__(self, element: Element):
-        if element.tag != 'signal':
+        if element.tag != "signal":
             raise ValueError(f"Expected signal tag, got {element.tag}")
 
         self.args: List[DbusArgsIntrospection] = []
@@ -514,18 +487,17 @@ class DbusSignalIntrospection(DbusMemberAbstract):
         new_arg = DbusArgsIntrospection(arg)
 
         if new_arg.is_input:
-            raise ValueError('Signal argument cannot be in', new_arg)
+            raise ValueError("Signal argument cannot be in", new_arg)
 
         self.args.append(new_arg)
 
     @property
     def dbus_signature(self) -> str:
-        return ''.join((x.dbus_type for x in self.args))
+        return "".join((x.dbus_type for x in self.args))
 
     @property
     def typing(self) -> str:
-        return DbusSigToTyping.result_typing(
-            [x.dbus_type for x in self.args])
+        return DbusSigToTyping.result_typing([x.dbus_type for x in self.args])
 
     @property
     def is_args_valid_names(self) -> bool:
@@ -538,12 +510,11 @@ class DbusSignalIntrospection(DbusMemberAbstract):
 
 class DbusInterfaceIntrospection:
     def __init__(self, element: Element):
-        if element.tag != 'interface':
+        if element.tag != "interface":
             raise ValueError(f"Expected interface tag, got {element.tag}")
 
-        self.interface_name = element.attrib['name']
-        self.python_name = interface_name_to_class(
-            self.interface_name) + 'Interface'
+        self.interface_name = element.attrib["name"]
+        self.python_name = interface_name_to_class(self.interface_name) + "Interface"
 
         self.is_deprecated = False
         self.c_name: Optional[str] = None
@@ -552,24 +523,24 @@ class DbusInterfaceIntrospection:
         self.properties: List[DbusPropertyIntrospection] = []
         self.signals: List[DbusSignalIntrospection] = []
         for dbus_member in element:
-            if dbus_member.tag == 'method':
+            if dbus_member.tag == "method":
                 self.methods.append(DbusMethodInrospection(dbus_member))
-            elif dbus_member.tag == 'property':
+            elif dbus_member.tag == "property":
                 self.properties.append(DbusPropertyIntrospection(dbus_member))
-            elif dbus_member.tag == 'signal':
+            elif dbus_member.tag == "signal":
                 self.signals.append(DbusSignalIntrospection(dbus_member))
-            elif dbus_member.tag == 'annotation':
-                annotation_name = dbus_member.attrib['name']
-                annotation_value = dbus_member.attrib['value']
+            elif dbus_member.tag == "annotation":
+                annotation_name = dbus_member.attrib["name"]
+                annotation_value = dbus_member.attrib["value"]
 
-                if annotation_name == 'org.freedesktop.DBus.Deprecated':
+                if annotation_name == "org.freedesktop.DBus.Deprecated":
                     self.is_deprecated = parse_str_bool(annotation_value)
-                elif annotation_name == 'org.freedesktop.DBus.GLib.CSymbol':
+                elif annotation_name == "org.freedesktop.DBus.GLib.CSymbol":
                     self.c_name = annotation_value
                 else:
                     ...
             else:
-                raise ValueError(f'Unknown D-Bus member {dbus_member}')
+                raise ValueError(f"Unknown D-Bus member {dbus_member}")
 
     @property
     def has_members(self) -> bool:
@@ -577,10 +548,10 @@ class DbusInterfaceIntrospection:
 
 
 SKIP_INTERFACES = {
-    'org.freedesktop.DBus.Properties',
-    'org.freedesktop.DBus.Introspectable',
-    'org.freedesktop.DBus.Peer',
-    'org.freedesktop.DBus.ObjectManager',
+    "org.freedesktop.DBus.Properties",
+    "org.freedesktop.DBus.Introspectable",
+    "org.freedesktop.DBus.Peer",
+    "org.freedesktop.DBus.ObjectManager",
 }
 
 
@@ -808,29 +779,26 @@ def {{ a_property.python_name }}(self) -> {{ a_property.typing }}:
 }
 
 
-def xml_to_interfaces_introspection(
-        root: Element) -> List[DbusInterfaceIntrospection]:
+def xml_to_interfaces_introspection(root: Element) -> List[DbusInterfaceIntrospection]:
 
     list_of_interface_introspection: List[DbusInterfaceIntrospection] = []
 
-    if root.tag != 'node':
+    if root.tag != "node":
         raise ValueError(f"Expected node tag got {root.tag}")
 
     for interface in root:
-        if interface.tag == 'node':
+        if interface.tag == "node":
             continue
 
-        if interface.attrib['name'] in SKIP_INTERFACES:
+        if interface.attrib["name"] in SKIP_INTERFACES:
             continue
 
-        list_of_interface_introspection.append(
-            DbusInterfaceIntrospection(interface))
+        list_of_interface_introspection.append(DbusInterfaceIntrospection(interface))
 
     return list_of_interface_introspection
 
 
-def interfaces_from_file(filename_or_path: Union[str, Path]
-                         ) -> List[DbusInterfaceIntrospection]:
+def interfaces_from_file(filename_or_path: Union[str, Path]) -> List[DbusInterfaceIntrospection]:
 
     etree = etree_from_file(filename_or_path)
 

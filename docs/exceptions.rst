@@ -73,7 +73,7 @@ Other exceptions
     Message error that is unmapped.
 
     The exceptions argument is a tuple of
-    error name and error message. 
+    error name and error message.
 
 .. py:exception:: SdBusLibraryError
 

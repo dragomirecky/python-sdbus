@@ -1,4 +1,3 @@
-
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Copyright (C) 2020-2023 igo95862
@@ -19,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import get_running_loop
 from contextvars import ContextVar
 from typing import Any, Dict, Iterator, Literal, Mapping, Tuple
@@ -31,38 +31,38 @@ from _sdbus import (
     NameAllowReplacementFlag,
     NameQueueFlag,
     NameReplaceExistingFlag,
+    SdBus,
     sd_bus_open,
 )
-from _sdbus import SdBus
 
-DEFAULT_BUS: ContextVar[SdBus] = ContextVar('DEFAULT_BUS')
+DEFAULT_BUS: ContextVar[SdBus] = ContextVar("DEFAULT_BUS")
 
 PROPERTY_FLAGS_MASK = (
-    DbusPropertyConstFlag | DbusPropertyEmitsChangeFlag |
-    DbusPropertyEmitsInvalidationFlag | DbusPropertyExplicitFlag
+    DbusPropertyConstFlag
+    | DbusPropertyEmitsChangeFlag
+    | DbusPropertyEmitsInvalidationFlag
+    | DbusPropertyExplicitFlag
 )
 
 
 def count_bits(i: int) -> int:
-    return bin(i).count('1')
+    return bin(i).count("1")
 
 
 def _is_property_flags_correct(flags: int) -> bool:
     num_of_flag_bits = count_bits(PROPERTY_FLAGS_MASK & flags)
-    return (0 <= num_of_flag_bits <= 1)
+    return 0 <= num_of_flag_bits <= 1
 
 
 def _prepare_request_name_flags(
-        allow_replacement: bool,
-        replace_existing: bool,
-        queue: bool,
+    allow_replacement: bool,
+    replace_existing: bool,
+    queue: bool,
 ) -> int:
     return (
         (NameAllowReplacementFlag if allow_replacement else 0)
-        +
-        (NameReplaceExistingFlag if replace_existing else 0)
-        +
-        (NameQueueFlag if queue else 0)
+        + (NameReplaceExistingFlag if replace_existing else 0)
+        + (NameQueueFlag if queue else 0)
     )
 
 
@@ -80,10 +80,10 @@ def set_default_bus(new_default: SdBus) -> None:
 
 
 async def request_default_bus_name(
-        new_name: str,
-        allow_replacement: bool = False,
-        replace_existing: bool = False,
-        queue: bool = False,
+    new_name: str,
+    allow_replacement: bool = False,
+    replace_existing: bool = False,
+    queue: bool = False,
 ) -> None:
     default_bus = get_default_bus()
     await default_bus.request_name_async(
@@ -92,7 +92,7 @@ async def request_default_bus_name(
             allow_replacement,
             replace_existing,
             queue,
-        )
+        ),
     )
 
 
@@ -109,7 +109,7 @@ def _method_name_converter(python_name: str) -> Iterator[str]:
     upper_next_one = False
     for c in char_iter:
         # Every under score remove and uppercase next one
-        if c != '_':
+        if c != "_":
             if upper_next_one:
                 yield c.upper()
                 upper_next_one = False
@@ -128,9 +128,9 @@ def _check_sync_in_async_env() -> bool:
 
 
 def _parse_properties_vardict(
-        properties_name_map: Mapping[str, str],
-        properties_vardict: Dict[str, Tuple[str, Any]],
-        on_unknown_member: Literal['error', 'ignore', 'reuse'],
+    properties_name_map: Mapping[str, str],
+    properties_vardict: Dict[str, Tuple[str, Any]],
+    on_unknown_member: Literal["error", "ignore", "reuse"],
 ) -> Dict[str, Any]:
 
     properties_translated: Dict[str, Any] = {}
@@ -139,11 +139,11 @@ def _parse_properties_vardict(
         try:
             python_name = properties_name_map[member_name]
         except KeyError:
-            if on_unknown_member == 'error':
+            if on_unknown_member == "error":
                 raise
-            elif on_unknown_member == 'ignore':
+            elif on_unknown_member == "ignore":
                 continue
-            elif on_unknown_member == 'reuse':
+            elif on_unknown_member == "reuse":
                 python_name = member_name
             else:
                 raise ValueError

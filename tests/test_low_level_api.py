@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import get_running_loop
 from unittest import SkipTest, TestCase, main
 
@@ -52,43 +53,24 @@ class TestAsyncLowLevel(IsolatedDbusTestCase):
 class TestLowLeveApi(TestCase):
     def test_validation_funcs(self) -> None:
         try:
-            self.assertTrue(
-                is_interface_name_valid('org.example.test')
-            )
+            self.assertTrue(is_interface_name_valid("org.example.test"))
 
-            self.assertFalse(
-                is_interface_name_valid('Not very valid 😀')
-            )
+            self.assertFalse(is_interface_name_valid("Not very valid 😀"))
 
-            self.assertTrue(
-                is_service_name_valid('org.example.test')
-            )
+            self.assertTrue(is_service_name_valid("org.example.test"))
 
-            self.assertFalse(
-                is_service_name_valid('Not very valid 😀')
-            )
+            self.assertFalse(is_service_name_valid("Not very valid 😀"))
 
-            self.assertTrue(
-                is_member_name_valid('GetSomething')
-            )
+            self.assertTrue(is_member_name_valid("GetSomething"))
 
-            self.assertFalse(
-                is_member_name_valid('no.dots.in.member.names')
-            )
+            self.assertFalse(is_member_name_valid("no.dots.in.member.names"))
 
-            self.assertTrue(
-                is_object_path_valid('/test')
-            )
+            self.assertTrue(is_object_path_valid("/test"))
 
-            self.assertFalse(
-                is_object_path_valid('no.dots.in.object.paths')
-            )
+            self.assertFalse(is_object_path_valid("no.dots.in.object.paths"))
         except NotImplementedError:
             raise SkipTest(
-                (
-                    "Validation funcs not implemented. "
-                    "Probably too old libsystemd. (< 246)"
-                )
+                ("Validation funcs not implemented. " "Probably too old libsystemd. (< 246)")
             )
 
     def test_bus_method_call_timeout(self) -> None:

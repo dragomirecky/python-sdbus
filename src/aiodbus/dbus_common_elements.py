@@ -18,14 +18,24 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from inspect import getfullargspec
 from types import FunctionType
-from typing import Generic, TypeVar
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
-from _sdbus import is_interface_name_valid, is_member_name_valid
-from _sdbus import SdBus, SdBusInterface
+from _sdbus import SdBus, SdBusInterface, is_interface_name_valid, is_member_name_valid
 from aiodbus.handle import DbusExportHandle
 
 from .dbus_common_funcs import (
@@ -34,11 +44,10 @@ from .dbus_common_funcs import (
     get_default_bus,
 )
 
-SelfMeta = TypeVar('SelfMeta', bound="DbusInterfaceMetaCommon")
+SelfMeta = TypeVar("SelfMeta", bound="DbusInterfaceMetaCommon")
 
 
-
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class DbusMemberCommon(ABC):
@@ -47,30 +56,30 @@ class DbusMemberCommon(ABC):
 
     @property
     @abstractmethod
-    def member_name(self) -> str:
-        ...
+    def member_name(self) -> str: ...
 
 
-class DbusMember(DbusMemberCommon):
-    ...
+class DbusMember(DbusMemberCommon): ...
 
 
 class DbusInterfaceMetaCommon(type):
-    def __new__(cls: Type[SelfMeta], name: str,
-                bases: Tuple[type, ...],
-                namespace: Dict[str, Any],
-                interface_name: Optional[str] = None,
-                serving_enabled: bool = True,
-                ) -> SelfMeta:
+    def __new__(
+        cls: Type[SelfMeta],
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        interface_name: Optional[str] = None,
+        serving_enabled: bool = True,
+    ) -> SelfMeta:
         if interface_name is not None:
             try:
                 assert is_interface_name_valid(interface_name), (
-                    f"Invalid interface name: \"{interface_name}\"; "
-                    'Interface names must be composed of 2 or more elements '
-                    'separated by a dot \'.\' character. All elements must '
-                    'contain at least one character, consist of ASCII '
-                    'characters, first character must not be digit and '
-                    'length must not exceed 255 characters.'
+                    f'Invalid interface name: "{interface_name}"; '
+                    "Interface names must be composed of 2 or more elements "
+                    "separated by a dot '.' character. All elements must "
+                    "contain at least one character, consist of ASCII "
+                    "characters, first character must not be digit and "
+                    "length must not exceed 255 characters."
                 )
             except NotImplementedError:
                 ...
@@ -98,38 +107,38 @@ class DbusInterfaceMetaCommon(type):
 
 
 MEMBER_NAME_REQUIREMENTS = (
-    'Member name must only contain ASCII characters, '
-    'cannot start with digit, '
-    'must not contain dot \'.\' and be between 1 '
-    'and 255 characters in length.'
+    "Member name must only contain ASCII characters, "
+    "cannot start with digit, "
+    "must not contain dot '.' and be between 1 "
+    "and 255 characters in length."
 )
 
 
 class DbusMethodCommon(DbusMemberCommon):
 
     def __init__(
-            self,
-            original_method: FunctionType,
-            method_name: Optional[str],
-            input_signature: str,
-            input_args_names: Optional[Sequence[str]],
-            result_signature: str,
-            result_args_names: Optional[Sequence[str]],
-            flags: int):
+        self,
+        original_method: FunctionType,
+        method_name: Optional[str],
+        input_signature: str,
+        input_args_names: Optional[Sequence[str]],
+        result_signature: str,
+        result_args_names: Optional[Sequence[str]],
+        flags: int,
+    ):
 
         assert not isinstance(input_args_names, str), (
             "Passed a string as input args"
             " names. Did you forget to put"
-            " it in to a tuple ('string', ) ?")
+            " it in to a tuple ('string', ) ?"
+        )
 
         if method_name is None:
-            method_name = ''.join(
-                _method_name_converter(original_method.__name__))
+            method_name = "".join(_method_name_converter(original_method.__name__))
 
         try:
             assert is_member_name_valid(method_name), (
-                f"Invalid method name: \"{method_name}\"; "
-                f"{MEMBER_NAME_REQUIREMENTS}"
+                f'Invalid method name: "{method_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
             )
         except NotImplementedError:
             ...
@@ -139,19 +148,16 @@ class DbusMethodCommon(DbusMemberCommon):
         self.args_spec = getfullargspec(original_method)
         self.args_names = self.args_spec.args[1:]  # 1: because of self
         self.num_of_args = len(self.args_names)
-        self.args_defaults = (
-            self.args_spec.defaults
-            if self.args_spec.defaults is not None
-            else ())
+        self.args_defaults = self.args_spec.defaults if self.args_spec.defaults is not None else ()
         self.default_args_start_at = self.num_of_args - len(self.args_defaults)
 
         self.method_name = method_name
         self.input_signature = input_signature
         self.input_args_names: Sequence[str] = ()
         if input_args_names is not None:
-            assert not any(' ' in x for x in input_args_names), (
-                "Can't have spaces in argument input names"
-                f"Args: {input_args_names}")
+            assert not any(" " in x for x in input_args_names), (
+                "Can't have spaces in argument input names" f"Args: {input_args_names}"
+            )
 
             self.input_args_names = input_args_names
         elif result_args_names is not None:
@@ -160,9 +166,9 @@ class DbusMethodCommon(DbusMemberCommon):
         self.result_signature = result_signature
         self.result_args_names: Sequence[str] = ()
         if result_args_names is not None:
-            assert not any(' ' in x for x in result_args_names), (
-                "Can't have spaces in argument result names."
-                f"Args: {result_args_names}")
+            assert not any(" " in x for x in result_args_names), (
+                "Can't have spaces in argument result names." f"Args: {result_args_names}"
+            )
 
             self.result_args_names = result_args_names
 
@@ -174,10 +180,8 @@ class DbusMethodCommon(DbusMemberCommon):
         self.__doc__ = original_method.__doc__
 
     def _rebuild_args(
-            self,
-            function: FunctionType,
-            *args: Any,
-            **kwargs: Dict[str, Any]) -> List[Any]:
+        self, function: FunctionType, *args: Any, **kwargs: Dict[str, Any]
+    ) -> List[Any]:
         # 3 types of arguments
         # *args - should be passed directly
         # **kwargs - should be put in a proper order
@@ -222,7 +226,7 @@ class DbusMethodCommon(DbusMemberCommon):
             elif next_default_arg is not None:
                 new_args_list.append(next_default_arg)
             else:
-                raise TypeError('Could not flatten the args')
+                raise TypeError("Could not flatten the args")
 
         return new_args_list
 
@@ -232,28 +236,28 @@ class DbusMethodCommon(DbusMemberCommon):
 
 
 class DbusPropertyCommon(DbusMemberCommon):
-    def __init__(self,
-                 property_name: Optional[str],
-                 property_signature: str,
-                 flags: int,
-                 original_method: FunctionType):
+    def __init__(
+        self,
+        property_name: Optional[str],
+        property_signature: str,
+        flags: int,
+        original_method: FunctionType,
+    ):
         if property_name is None:
-            property_name = ''.join(
-                _method_name_converter(original_method.__name__))
+            property_name = "".join(_method_name_converter(original_method.__name__))
 
         try:
             assert is_member_name_valid(property_name), (
-                f"Invalid property name: \"{property_name}\"; "
-                f"{MEMBER_NAME_REQUIREMENTS}"
+                f'Invalid property name: "{property_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
             )
         except NotImplementedError:
             ...
 
         assert _is_property_flags_correct(flags), (
-            'Incorrect number of Property flags. '
-            'Only one of DbusPropertyConstFlag, DbusPropertyEmitsChangeFlag, '
-            'DbusPropertyEmitsInvalidationFlag or DbusPropertyExplicitFlag '
-            'is allowed.'
+            "Incorrect number of Property flags. "
+            "Only one of DbusPropertyConstFlag, DbusPropertyEmitsChangeFlag, "
+            "DbusPropertyEmitsInvalidationFlag or DbusPropertyExplicitFlag "
+            "is allowed."
         )
 
         super().__init__()
@@ -267,20 +271,20 @@ class DbusPropertyCommon(DbusMemberCommon):
 
 
 class DbusSignalCommon(DbusMemberCommon):
-    def __init__(self,
-                 signal_name: Optional[str],
-                 signal_signature: str,
-                 args_names: Sequence[str],
-                 flags: int,
-                 original_method: FunctionType):
+    def __init__(
+        self,
+        signal_name: Optional[str],
+        signal_signature: str,
+        args_names: Sequence[str],
+        flags: int,
+        original_method: FunctionType,
+    ):
         if signal_name is None:
-            signal_name = ''.join(
-                _method_name_converter(original_method.__name__))
+            signal_name = "".join(_method_name_converter(original_method.__name__))
 
         try:
             assert is_member_name_valid(signal_name), (
-                f"Invalid signal name: \"{signal_name}\"; "
-                f"{MEMBER_NAME_REQUIREMENTS}"
+                f'Invalid signal name: "{signal_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
             )
         except NotImplementedError:
             ...
@@ -302,8 +306,7 @@ class DbusSignalCommon(DbusMemberCommon):
 class DbusBoundMember(ABC):
     @property
     @abstractmethod
-    def member(self) -> DbusMemberCommon:
-        ...
+    def member(self) -> DbusMemberCommon: ...
 
 
 class DbusLocalMember(DbusBoundMember):
@@ -312,12 +315,10 @@ class DbusLocalMember(DbusBoundMember):
         self,
         interface: SdBusInterface,
         handle: DbusExportHandle,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
-class DbusProxyMember(DbusBoundMember):
-    ...
+class DbusProxyMember(DbusBoundMember): ...
 
 
 class DbusMethodOverride(Generic[T]):
@@ -351,10 +352,7 @@ class DbusRemoteObjectMeta:
     ):
         self.service_name = service_name
         self.object_path = object_path
-        self.attached_bus = (
-            bus if bus is not None
-            else get_default_bus()
-        )
+        self.attached_bus = bus if bus is not None else get_default_bus()
 
 
 class DbusLocalObjectMeta:

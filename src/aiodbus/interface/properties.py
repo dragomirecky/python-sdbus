@@ -5,33 +5,30 @@ from aiodbus.interface.base import DbusInterfaceBase
 from aiodbus.member.method import dbus_method
 from aiodbus.member.signal import dbus_signal
 
-DBUS_PROPERTIES_CHANGED_TYPING = (
-    Tuple[
-        str,
-        Dict[str, Tuple[str, Any]],
-        List[str],
-    ]
-)
+DBUS_PROPERTIES_CHANGED_TYPING = Tuple[
+    str,
+    Dict[str, Tuple[str, Any]],
+    List[str],
+]
 
 
 class DbusPropertiesInterfaceAsync(
     DbusInterfaceBase,
-    interface_name='org.freedesktop.DBus.Properties',
+    interface_name="org.freedesktop.DBus.Properties",
     serving_enabled=False,
 ):
 
-    @dbus_signal('sa{sv}as')
+    @dbus_signal("sa{sv}as")
     def properties_changed(self) -> DBUS_PROPERTIES_CHANGED_TYPING:
         raise NotImplementedError
 
-    @dbus_method('s', 'a{sv}', method_name='GetAll')
-    async def _properties_get_all(
-            self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
+    @dbus_method("s", "a{sv}", method_name="GetAll")
+    async def _properties_get_all(self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
         raise NotImplementedError
 
     async def properties_get_all_dict(
-            self,
-            on_unknown_member: Literal['error', 'ignore', 'reuse'] = 'error',
+        self,
+        on_unknown_member: Literal["error", "ignore", "reuse"] = "error",
     ) -> Dict[str, Any]:
 
         properties: Dict[str, Any] = {}
@@ -40,8 +37,7 @@ class DbusPropertiesInterfaceAsync(
             if not meta.serving_enabled:
                 continue
 
-            dbus_properties_data = await self._properties_get_all(
-                interface_name)
+            dbus_properties_data = await self._properties_get_all(interface_name)
 
             properties.update(
                 _parse_properties_vardict(
@@ -52,4 +48,3 @@ class DbusPropertiesInterfaceAsync(
             )
 
         return properties
-

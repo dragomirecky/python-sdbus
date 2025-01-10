@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import Event, TimeoutError, wait_for
 from contextlib import ExitStack, contextmanager
 from operator import setitem
@@ -31,16 +32,19 @@ from typing import Any, AsyncContextManager, Iterator, List, Optional, TypeVar, 
 from unittest import IsolatedAsyncioTestCase
 from weakref import ref as weak_ref
 
-from _sdbus import SdBusMessage, sd_bus_open_user
-from _sdbus import SdBus, SdBusSlot
+from _sdbus import SdBus, SdBusMessage, SdBusSlot, sd_bus_open_user
 from aiodbus.dbus_common_funcs import set_default_bus
-from aiodbus.member.signal import DbusBoundSignalBase, DbusSignal
-from aiodbus.member.signal import DbusLocalSignal, DbusProxySignal
+from aiodbus.member.signal import (
+    DbusBoundSignalBase,
+    DbusLocalSignal,
+    DbusProxySignal,
+    DbusSignal,
+)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
-dbus_config = '''
+dbus_config = """
 <busconfig>
   <type>session</type>
   <pidfile>{pidfile_path}</pidfile>
@@ -52,7 +56,7 @@ dbus_config = '''
     <allow own="*"/>
   </policy>
 </busconfig>
-'''
+"""
 
 
 class DbusSignalRecorderBase:
@@ -140,9 +144,7 @@ class DbusSignalRecorderLocal(DbusSignalRecorderBase):
         local_signal: DbusLocalSignal[Any],
     ):
         super().__init__(timeout)
-        self._local_signal_ref: weak_ref[DbusSignal[Any]] = (
-            weak_ref(local_signal.dbus_signal)
-        )
+        self._local_signal_ref: weak_ref[DbusSignal[Any]] = weak_ref(local_signal.dbus_signal)
 
     async def __aenter__(self) -> DbusSignalRecorderBase:
         local_signal = self._local_signal_ref()
@@ -159,27 +161,21 @@ def _isolated_dbus(
     dbus_executable_name: str = "dbus-daemon",
 ) -> Iterator[SdBus]:
     with ExitStack() as exit_stack:
-        temp_dir_path = Path(
-            exit_stack.enter_context(
-                TemporaryDirectory(prefix="python-sdbus-")
-            )
-        )
+        temp_dir_path = Path(exit_stack.enter_context(TemporaryDirectory(prefix="python-sdbus-")))
 
         dbus_socket_path = temp_dir_path / "test_dbus.socket"
         pid_path = temp_dir_path / "dbus.pid"
         dbus_config_file = temp_dir_path / "dbus.config"
         dbus_config_file.write_text(
-            dbus_config.format(
-                socket_path=dbus_socket_path,
-                pidfile_path=pid_path
-            )
+            dbus_config.format(socket_path=dbus_socket_path, pidfile_path=pid_path)
         )
 
         subprocess_run(
             args=(
                 dbus_executable_name,
-                '--config-file', dbus_config_file,
-                '--fork',
+                "--config-file",
+                dbus_config_file,
+                "--fork",
             ),
             stdin=DEVNULL,
             check=True,

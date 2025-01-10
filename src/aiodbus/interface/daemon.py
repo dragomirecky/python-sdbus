@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import List, Optional, Tuple
 
 from aiodbus import (
@@ -29,8 +30,7 @@ from aiodbus import (
 )
 
 
-class FreedesktopDbus(DbusInterfaceCommonAsync,
-                      interface_name='org.freedesktop.DBus'):
+class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.DBus"):
     """D-Bus daemon."""
 
     def __init__(self, bus: Optional[SdBus] = None):
@@ -46,12 +46,12 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         super().__init__()
         self._proxify(
-            'org.freedesktop.DBus',
-            '/org/freedesktop/DBus',
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
             bus,
         )
 
-    @dbus_method('s', method_name='GetConnectionUnixProcessID')
+    @dbus_method("s", method_name="GetConnectionUnixProcessID")
     async def get_connection_pid(self, service_name: str) -> int:
         """Get process ID that owns a specified name.
 
@@ -61,7 +61,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method('s', method_name='GetConnectionUnixUser')
+    @dbus_method("s", method_name="GetConnectionUnixUser")
     async def get_connection_uid(self, service_name: str) -> int:
         """Get process user ID that owns a specified name.
 
@@ -79,7 +79,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method('s')
+    @dbus_method("s")
     async def get_name_owner(self, service_name: str) -> str:
         """Returns unique bus name (i.e. ``':1.94'``) for given service name.
 
@@ -105,7 +105,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method('s')
+    @dbus_method("s")
     async def name_has_owner(self, service_name: str) -> bool:
         """
         Return True if someone already owns the name,
@@ -116,11 +116,8 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_method('su')
-    async def start_service_by_name(
-            self,
-            service_name: str,
-            flags: int = 0) -> int:
+    @dbus_method("su")
+    async def start_service_by_name(self, service_name: str, flags: int = 0) -> int:
         """Starts a specified service.
 
         Flags parameter is not used currently and should be
@@ -132,7 +129,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_property('as')
+    @dbus_property("as")
     def features(self) -> List[str]:
         """List of D-Bus daemon features.
 
@@ -147,22 +144,22 @@ class FreedesktopDbus(DbusInterfaceCommonAsync,
         """
         raise NotImplementedError
 
-    @dbus_property('as')
+    @dbus_property("as")
     def interfaces(self) -> List[str]:
         """Extra D-Bus daemon interfaces"""
         raise NotImplementedError
 
-    @dbus_signal('s')
+    @dbus_signal("s")
     def name_acquired(self) -> str:
         """Signal when current process acquires a bus name."""
         raise NotImplementedError
 
-    @dbus_signal('s')
+    @dbus_signal("s")
     def name_lost(self) -> str:
         """Signal when current process loses a bus name."""
         raise NotImplementedError
 
-    @dbus_signal('sss')
+    @dbus_signal("sss")
     def name_owner_changed(self) -> Tuple[str, str, str]:
         """Signal when some name on a bus changes owner.
 

@@ -18,16 +18,28 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
+import logging
 from contextvars import ContextVar, copy_context
 from inspect import iscoroutinefunction
-import logging
 from types import FunctionType
-from typing import Any, Awaitable, Callable, List, TYPE_CHECKING, cast, overload
-from typing import Optional, Sequence, Type, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 from weakref import ref as weak_ref
 
-from _sdbus import DbusNoReplyFlag, SdBusInterface
-from _sdbus import SdBusMessage
+from _sdbus import DbusNoReplyFlag, SdBusInterface, SdBusMessage
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
@@ -42,9 +54,9 @@ from aiodbus.dbus_exceptions import DbusFailedError
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
-T = TypeVar('T')
+T = TypeVar("T")
 
-CURRENT_MESSAGE: ContextVar[SdBusMessage] = ContextVar('CURRENT_MESSAGE')
+CURRENT_MESSAGE: ContextVar[SdBusMessage] = ContextVar("CURRENT_MESSAGE")
 
 
 def get_current_message() -> SdBusMessage:
@@ -55,7 +67,9 @@ AnyAsyncFunc = Callable[..., Awaitable[Any]]
 DbusMethodMiddleware = Callable[[AnyAsyncFunc], Awaitable[Any]]
 
 
-async def call_with_middlewares(func: AnyAsyncFunc, args, kwargs, *, middlewares: List[DbusMethodMiddleware]):
+async def call_with_middlewares(
+    func: AnyAsyncFunc, args, kwargs, *, middlewares: List[DbusMethodMiddleware]
+):
     if not middlewares:
         return await func(*args, **kwargs)
     else:
@@ -66,6 +80,7 @@ async def call_with_middlewares(func: AnyAsyncFunc, args, kwargs, *, middlewares
 
         return await middleware(call_next, *args, **kwargs)
 
+
 class DbusMethod(DbusMethodCommon, DbusMember):
 
     @overload
@@ -73,16 +88,14 @@ class DbusMethod(DbusMethodCommon, DbusMember):
         self,
         obj: None,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusMethod:
-        ...
+    ) -> DbusMethod: ...
 
     @overload
     def __get__(
         self,
         obj: DbusInterfaceBase,
         obj_class: Type[DbusInterfaceBase],
-    ) -> Callable[..., Any]:
-        ...
+    ) -> Callable[..., Any]: ...
 
     def __get__(
         self,
@@ -143,19 +156,13 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
         )
 
         if len(args) == dbus_method.num_of_args:
-            assert not kwargs, (
-                "Passed more arguments than method supports"
-                f"Extra args: {kwargs}")
+            assert not kwargs, "Passed more arguments than method supports" f"Extra args: {kwargs}"
             rebuilt_args: Sequence[Any] = args
         else:
-            rebuilt_args = dbus_method._rebuild_args(
-                dbus_method.original_method,
-                *args,
-                **kwargs)
+            rebuilt_args = dbus_method._rebuild_args(dbus_method.original_method, *args, **kwargs)
 
         if rebuilt_args:
-            new_call_message.append_data(
-                dbus_method.input_signature, *rebuilt_args)
+            new_call_message.append_data(dbus_method.input_signature, *rebuilt_args)
 
         if dbus_method.flags & DbusNoReplyFlag:
             new_call_message.expect_reply = False
@@ -165,7 +172,12 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
         return await self._dbus_call(new_call_message)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return call_with_middlewares(self._make_dbus_call, args, kwargs, middlewares=self.dbus_method.to_dbus_middlewares.copy())
+        return call_with_middlewares(
+            self._make_dbus_call,
+            args,
+            kwargs,
+            middlewares=self.dbus_method.to_dbus_middlewares.copy(),
+        )
 
 
 class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
@@ -208,18 +220,19 @@ class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
         local_object: DbusInterfaceBase,
     ) -> Any:
 
-        local_method = self.dbus_method.original_method.__get__(
-            local_object, None)
+        local_method = self.dbus_method.original_method.__get__(local_object, None)
 
         CURRENT_MESSAGE.set(request_message)
 
         # apply from_dbus middlewares
-        return await call_with_middlewares(local_method, request_message.parse_to_tuple(), {}, middlewares=self.dbus_method.from_dbus_middlewares.copy())
+        return await call_with_middlewares(
+            local_method,
+            request_message.parse_to_tuple(),
+            {},
+            middlewares=self.dbus_method.from_dbus_middlewares.copy(),
+        )
 
-    async def _dbus_reply_call(
-        self,
-        request_message: SdBusMessage
-    ) -> None:
+    async def _dbus_reply_call(self, request_message: SdBusMessage) -> None:
         local_object = self.local_object_ref()
         if local_object is None:
             raise RuntimeError("Local object no longer exists!")
@@ -259,20 +272,16 @@ class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
 
         if isinstance(reply_data, tuple):
             try:
-                reply_message.append_data(
-                    self.dbus_method.result_signature, *reply_data)
+                reply_message.append_data(self.dbus_method.result_signature, *reply_data)
             except TypeError:
                 # In case of single struct result type
                 # We can't figure out if return is multiple values
                 # or a tuple
-                reply_message.append_data(
-                    self.dbus_method.result_signature, reply_data)
+                reply_message.append_data(self.dbus_method.result_signature, reply_data)
         elif reply_data is not None:
-            reply_message.append_data(
-                self.dbus_method.result_signature, reply_data)
+            reply_message.append_data(self.dbus_method.result_signature, reply_data)
 
         reply_message.send()
-
 
 
 def dbus_method(
@@ -285,8 +294,7 @@ def dbus_method(
 ) -> Callable[[Any], DbusMethod]:
 
     assert not isinstance(input_signature, FunctionType), (
-        "Passed function to decorator directly. "
-        "Did you forget () round brackets?"
+        "Passed function to decorator directly. " "Did you forget () round brackets?"
     )
 
     def dbus_method_decorator(original_method: T) -> T:
@@ -312,8 +320,7 @@ def dbus_method(
 
 def dbus_method_override() -> Callable[[T], T]:
 
-    def new_decorator(
-            new_function: T) -> T:
+    def new_decorator(new_function: T) -> T:
         return cast(T, DbusMethodOverride(new_function))
 
     return new_decorator

@@ -18,14 +18,10 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
-from aiodbus import (
-    DbusInterfaceCommonAsync,
-    dbus_method,
-    dbus_property,
-    dbus_signal,
-)
+from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property, dbus_signal
 
 if TYPE_CHECKING:
     from typing import List
@@ -103,10 +99,7 @@ async def check_async_interface_signal_typing(
         for x3 in ls3:
             x3.capitalize()
 
-    async for p2, ls4 in (
-        InterfaceTestTyping.str_list_signal
-        .catch_anywhere("org.example")
-    ):
+    async for p2, ls4 in InterfaceTestTyping.str_list_signal.catch_anywhere("org.example"):
         p2.capitalize()
         ls4.append("test")
         for x4 in ls4:
@@ -123,9 +116,5 @@ async def check_async_element_class_access_typing() -> None:
     # test_list.append(
     #     TestTypingAsync.get_str_list_method.method_name
     # )
-    test_list.append(
-        InterfaceTestTyping.str_list_property.property_name
-    )
-    test_list.append(
-        InterfaceTestTyping.str_list_signal.signal_name
-    )
+    test_list.append(InterfaceTestTyping.str_list_property.property_name)
+    test_list.append(InterfaceTestTyping.str_list_signal.signal_name)

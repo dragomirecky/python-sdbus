@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from typing import Dict, List
 from unittest import main
 
@@ -28,10 +29,11 @@ from aiodbus.unittest import IsolatedDbusTestCase
 
 def create_message(bus: SdBus) -> SdBusMessage:
     return bus.new_method_call_message(
-        'org.freedesktop.systemd1',
-        '/org/freedesktop/systemd1',
-        'org.freedesktop.systemd1.Manager',
-        'GetUnit')
+        "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager",
+        "GetUnit",
+    )
 
 
 class TestDbusTypes(IsolatedDbusTestCase):
@@ -42,29 +44,21 @@ class TestDbusTypes(IsolatedDbusTestCase):
         message = create_message(self.bus)
 
         int_t_max = 2**64
-        unsigned_integers = ((2**8)-1, (2**16)-1, (2**32)-1, int_t_max-1)
+        unsigned_integers = ((2**8) - 1, (2**16) - 1, (2**32) - 1, int_t_max - 1)
         message.append_data("yqut", *unsigned_integers)
         # Test overflows
-        self.assertRaises(
-            OverflowError, message.append_data, "y", 2**8)
+        self.assertRaises(OverflowError, message.append_data, "y", 2**8)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "q", 2**16)
+        self.assertRaises(OverflowError, message.append_data, "q", 2**16)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "u", 2**32)
+        self.assertRaises(OverflowError, message.append_data, "u", 2**32)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "t", 2**64)
+        self.assertRaises(OverflowError, message.append_data, "t", 2**64)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "y", -1)
-        self.assertRaises(
-            OverflowError, message.append_data, "q", -1)
-        self.assertRaises(
-            OverflowError, message.append_data, "u", -1)
-        self.assertRaises(
-            OverflowError, message.append_data, "t", -1)
+        self.assertRaises(OverflowError, message.append_data, "y", -1)
+        self.assertRaises(OverflowError, message.append_data, "q", -1)
+        self.assertRaises(OverflowError, message.append_data, "u", -1)
+        self.assertRaises(OverflowError, message.append_data, "t", -1)
 
         message.seal()
         return_integers = message.get_contents()
@@ -73,41 +67,34 @@ class TestDbusTypes(IsolatedDbusTestCase):
     def test_signed(self) -> None:
         message = create_message(self.bus)
 
-        int_n_max = (2**(16-1))-1
-        int_i_max = (2**(32-1))-1
-        int_x_max = (2**(64-1))-1
+        int_n_max = (2 ** (16 - 1)) - 1
+        int_i_max = (2 ** (32 - 1)) - 1
+        int_x_max = (2 ** (64 - 1)) - 1
         signed_integers_positive = (int_n_max, int_i_max, int_x_max)
         message.append_data("nix", *signed_integers_positive)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "n", int_n_max + 1)
+        self.assertRaises(OverflowError, message.append_data, "n", int_n_max + 1)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "i", int_i_max + 1)
+        self.assertRaises(OverflowError, message.append_data, "i", int_i_max + 1)
 
-        self.assertRaises(
-            OverflowError, message.append_data, "x", int_x_max + 1)
+        self.assertRaises(OverflowError, message.append_data, "x", int_x_max + 1)
 
-        int_n_min = -(2**(16-1))
-        int_i_min = -(2**(32-1))
-        int_x_min = -(2**(64-1))
+        int_n_min = -(2 ** (16 - 1))
+        int_i_min = -(2 ** (32 - 1))
+        int_x_min = -(2 ** (64 - 1))
         signed_integers_negative = (int_n_min, int_i_min, int_x_min)
         message.append_data("n", int_n_min)
-        self.assertRaises(
-            OverflowError, message.append_data, "n", int_n_min - 1)
+        self.assertRaises(OverflowError, message.append_data, "n", int_n_min - 1)
 
         message.append_data("i", int_i_min)
-        self.assertRaises(
-            OverflowError, message.append_data, "i", int_i_min - 1)
+        self.assertRaises(OverflowError, message.append_data, "i", int_i_min - 1)
 
         message.append_data("x", int_x_min)
-        self.assertRaises(
-            OverflowError, message.append_data, "x", int_x_min - 1)
+        self.assertRaises(OverflowError, message.append_data, "x", int_x_min - 1)
 
         message.seal()
         return_integers = message.get_contents()
-        self.assertEqual(signed_integers_positive +
-                         signed_integers_negative, return_integers)
+        self.assertEqual(signed_integers_positive + signed_integers_negative, return_integers)
 
     def test_strings(self) -> None:
         message = create_message(self.bus)
@@ -119,8 +106,7 @@ class TestDbusTypes(IsolatedDbusTestCase):
         message.append_data("sog", test_string, test_path, test_signature)
 
         message.seal()
-        self.assertEqual(message.get_contents(),
-                         (test_string, test_path, test_signature))
+        self.assertEqual(message.get_contents(), (test_string, test_path, test_signature))
 
     def test_double(self) -> None:
         message = create_message(self.bus)
@@ -138,7 +124,7 @@ class TestDbusTypes(IsolatedDbusTestCase):
 
         message.append_data("bbbbb", *test_booleans)
 
-        self.assertRaises(TypeError, message.append_data, 'b', 'asdasad')
+        self.assertRaises(TypeError, message.append_data, "b", "asdasad")
 
         message.seal()
         self.assertEqual(message.get_contents(), test_booleans)
@@ -157,14 +143,14 @@ class TestDbusTypes(IsolatedDbusTestCase):
 
         message.append_data("ax", [])
 
-        self.assertRaises(TypeError, message.append_data,
-                          "a", test_int_list)
+        self.assertRaises(TypeError, message.append_data, "a", test_int_list)
 
         message.seal()
 
         self.assertEqual(
             message.get_contents(),
-            (test_string_array, test_bytes_array, test_int_list, []))
+            (test_string_array, test_bytes_array, test_int_list, []),
+        )
 
     def test_empty_array(self) -> None:
         message = create_message(self.bus)
@@ -174,9 +160,7 @@ class TestDbusTypes(IsolatedDbusTestCase):
 
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_array)
+        self.assertEqual(message.get_contents(), test_array)
 
     def test_array_compound(self) -> None:
         message = create_message(self.bus)
@@ -185,13 +169,13 @@ class TestDbusTypes(IsolatedDbusTestCase):
         test_bytes_array = b"asdasrddjkmlh\ngnmflkdtgh\0oer27852y4785823"
         test_int_list = [1234, 123123, 764523]
 
-        message.append_data(
-            "asayai", test_string_array, test_bytes_array, test_int_list)
+        message.append_data("asayai", test_string_array, test_bytes_array, test_int_list)
 
         message.seal()
 
-        self.assertEqual(message.get_contents(),
-                         (test_string_array, test_bytes_array, test_int_list))
+        self.assertEqual(
+            message.get_contents(), (test_string_array, test_bytes_array, test_int_list)
+        )
 
     def test_nested_array(self) -> None:
         message = create_message(self.bus)
@@ -199,13 +183,11 @@ class TestDbusTypes(IsolatedDbusTestCase):
         test_string_array_one = ["Ttest", "serawer", "asdadcxzc"]
         test_string_array_two = ["asdaf", "seragdsfrgdswer", "sdfsdgg"]
 
-        message.append_data(
-            "aas", [test_string_array_one, test_string_array_two])
+        message.append_data("aas", [test_string_array_one, test_string_array_two])
 
         message.seal()
 
-        self.assertEqual(message.get_contents(),
-                         [test_string_array_one, test_string_array_two])
+        self.assertEqual(message.get_contents(), [test_string_array_one, test_string_array_two])
 
     def test_struct(self) -> None:
         message = create_message(self.bus)
@@ -220,11 +202,10 @@ class TestDbusTypes(IsolatedDbusTestCase):
     def test_dict(self) -> None:
         message = create_message(self.bus)
 
-        test_dict = {'test': 'a', 'asdaefd': 'cvbcfg'}
+        test_dict = {"test": "a", "asdaefd": "cvbcfg"}
         message.append_data("a{ss}", test_dict)
 
-        self.assertRaises(
-            TypeError, message.append_data, "{ss}", test_dict)
+        self.assertRaises(TypeError, message.append_data, "{ss}", test_dict)
 
         message.seal()
         self.assertEqual(message.get_contents(), test_dict)
@@ -242,9 +223,8 @@ class TestDbusTypes(IsolatedDbusTestCase):
         message = create_message(self.bus)
 
         test_array_one = [12, 1234234, 5, 2345, 24, 5623, 46, 2546, 68798]
-        test_array_two = [124, 5, 356, 3, 57, 35,
-                          67, 356, 2, 647, 36, 5784, 8, 809]
-        test_dict = {'test': test_array_one, 'asdaefd': test_array_two}
+        test_array_two = [124, 5, 356, 3, 57, 35, 67, 356, 2, 647, 36, 5784, 8, 809]
+        test_dict = {"test": test_array_one, "asdaefd": test_array_two}
         message.append_data("a{sax}", test_dict)
 
         message.seal()
@@ -261,15 +241,14 @@ class TestDbusTypes(IsolatedDbusTestCase):
 
         message.seal()
 
-        self.assertEqual(message.get_contents(),
-                         (test_signature, test_int))
+        self.assertEqual(message.get_contents(), (test_signature, test_int))
 
     def test_array_of_variant(self) -> None:
         message = create_message(self.bus)
 
         test_signature_one = "(ssx)"
-        test_str_1 = 'asdasdasd'
-        test_str_2 = 'asdasdaddasdasdzc'
+        test_str_1 = "asdasdasd"
+        test_str_2 = "asdasdaddasdasdzc"
         test_int = 1241354
 
         test_signature_two = "ai"
@@ -279,8 +258,8 @@ class TestDbusTypes(IsolatedDbusTestCase):
             "av",
             [
                 (test_signature_one, (test_str_1, test_str_2, test_int)),
-                (test_signature_two, test_array)
-            ]
+                (test_signature_two, test_array),
+            ],
         )
 
         message.seal()
@@ -289,129 +268,101 @@ class TestDbusTypes(IsolatedDbusTestCase):
             message.get_contents(),
             [
                 (test_signature_one, (test_str_1, test_str_2, test_int)),
-                (test_signature_two, test_array)
-            ]
+                (test_signature_two, test_array),
+            ],
         )
 
     def test_array_of_dict(self) -> None:
         message = create_message(self.bus)
 
         test_data = [
-            {'asdasd': 'asdasd'},
-            {'asdasdsg': 'asdasfdaf'},
+            {"asdasd": "asdasd"},
+            {"asdasdsg": "asdasfdaf"},
             {},
         ]
 
         message.append_data("aa{ss}", test_data)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_data)
+        self.assertEqual(message.get_contents(), test_data)
 
     def test_array_of_struct(self) -> None:
         message = create_message(self.bus)
 
         test_data = [
-            ('asdasd', 34636),
-            ('asdasdads', -5425),
+            ("asdasd", 34636),
+            ("asdasdads", -5425),
         ]
 
         message.append_data("a(si)", test_data)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_data)
+        self.assertEqual(message.get_contents(), test_data)
 
     def test_dict_of_struct(self) -> None:
         message = create_message(self.bus)
 
         test_dict = {
-            1: ('asdasd', 'xcvghtrh'),
-            2: ('rjhtyjdg', 'gbdtsret'),
-            3: ('gvsgdthgdeth', 'gsgderfgd'),
+            1: ("asdasd", "xcvghtrh"),
+            2: ("rjhtyjdg", "gbdtsret"),
+            3: ("gvsgdthgdeth", "gsgderfgd"),
         }
 
         message.append_data("a{n(ss)}", test_dict)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_dict)
+        self.assertEqual(message.get_contents(), test_dict)
 
     def test_struct_with_dict(self) -> None:
         message = create_message(self.bus)
 
-        test_struct = (
-            'asdasdag',
-            {
-                'asdasd': 25,
-                'dfasf': 63
-            },
-            542524,
-            True
-        )
+        test_struct = ("asdasdag", {"asdasd": 25, "dfasf": 63}, 542524, True)
 
         message.append_data("(sa{sq}ib)", test_struct)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_struct
-        )
+        self.assertEqual(message.get_contents(), test_struct)
 
     def test_dict_of_array(self) -> None:
         message = create_message(self.bus)
 
         test_dict = {
-            '/': [341, 134, 764, 8986],
-            '/test': [-245, -245, -1, 25],
+            "/": [341, 134, 764, 8986],
+            "/test": [-245, -245, -1, 25],
         }
 
         message.append_data("a{oai}", test_dict)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_dict
-        )
+        self.assertEqual(message.get_contents(), test_dict)
 
     def test_array_of_array(self) -> None:
         message = create_message(self.bus)
 
         test_array = [
-            ['asda', 'afgrfyhgdr', 'adffgvfdrfg'],
-            ['afhryfjh', 'sgffgddrhg'],
-            []
+            ["asda", "afgrfyhgdr", "adffgvfdrfg"],
+            ["afhryfjh", "sgffgddrhg"],
+            [],
         ]
         message.append_data("aas", test_array)
         message.seal()
 
-        self.assertEqual(
-            message.get_contents(),
-            test_array
-        )
+        self.assertEqual(message.get_contents(), test_array)
 
     def test_sealed_message_append(self) -> None:
         message = create_message(self.bus)
 
-        message.append_data('s', 'test')
+        message.append_data("s", "test")
         message.seal()
-        self.assertRaises(SdBusLibraryError,
-                          message.append_data, 's', 'error')
+        self.assertRaises(SdBusLibraryError, message.append_data, "s", "error")
 
     def test_message_properties(self) -> None:
         message = create_message(self.bus)
 
-        self.assertEqual(message.destination,
-                         'org.freedesktop.systemd1')
-        self.assertEqual(message.path,
-                         '/org/freedesktop/systemd1')
-        self.assertEqual(message.interface,
-                         'org.freedesktop.systemd1.Manager')
-        self.assertEqual(message.member,
-                         'GetUnit')
+        self.assertEqual(message.destination, "org.freedesktop.systemd1")
+        self.assertEqual(message.path, "/org/freedesktop/systemd1")
+        self.assertEqual(message.interface, "org.freedesktop.systemd1.Manager")
+        self.assertEqual(message.member, "GetUnit")
 
         self.assertIsNone(message.sender)
 
@@ -419,17 +370,17 @@ class TestDbusTypes(IsolatedDbusTestCase):
         from enum import Enum
 
         class TestEnum(str, Enum):
-            SOMETHING = 'test'
+            SOMETHING = "test"
 
         message = create_message(self.bus)
-        message.append_data('s', TestEnum.SOMETHING)
+        message.append_data("s", TestEnum.SOMETHING)
         message.seal()
 
         self.assertEqual(message.get_contents(), TestEnum.SOMETHING)
 
     def test_reading_multiple_times(self) -> None:
         message = create_message(self.bus)
-        message.append_data('s', 'test')
+        message.append_data("s", "test")
         message.seal()
 
         for _ in range(5):

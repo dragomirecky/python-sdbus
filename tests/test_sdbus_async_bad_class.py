@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from gc import collect
 from unittest import TestCase
 from unittest import main as unittest_main
@@ -58,8 +59,7 @@ class TestBadAsyncDbusClass(TestCase):
             class BadInterfaceName(
                 DbusInterfaceCommonAsync,
                 interface_name="0.test",
-            ):
-                ...
+            ): ...
 
         with self.assertRaisesRegex(
             AssertionError,
@@ -113,26 +113,22 @@ class TestBadAsyncDbusClass(TestCase):
         self.assertEqual(0, PROPERTY_FLAGS_MASK & DbusDeprecatedFlag)
         self.assertEqual(
             1,
-            count_bits(
-                PROPERTY_FLAGS_MASK
-                & (DbusDeprecatedFlag | DbusPropertyEmitsChangeFlag)
-            ),
+            count_bits(PROPERTY_FLAGS_MASK & (DbusDeprecatedFlag | DbusPropertyEmitsChangeFlag)),
         )
         self.assertEqual(
             2,
             count_bits(
                 PROPERTY_FLAGS_MASK
-                & (
-                    DbusDeprecatedFlag
-                    | DbusPropertyConstFlag
-                    | DbusPropertyEmitsChangeFlag
-                )
+                & (DbusDeprecatedFlag | DbusPropertyConstFlag | DbusPropertyEmitsChangeFlag)
             ),
         )
 
-        with self.subTest("Test incorrect flags"), self.assertRaisesRegex(
-            AssertionError,
-            "^Incorrect number of Property flags",
+        with (
+            self.subTest("Test incorrect flags"),
+            self.assertRaisesRegex(
+                AssertionError,
+                "^Incorrect number of Property flags",
+            ),
         ):
             skip_if_no_asserts()
 
@@ -177,26 +173,21 @@ class TestBadAsyncDbusClass(TestCase):
 
             class NoInterfaceName(DbusInterfaceCommonAsync):
                 @dbus_method()
-                async def example(self) -> None:
-                    ...
+                async def example(self) -> None: ...
 
     def test_dbus_elements_without_interface_name_subclass(self) -> None:
         with self.assertRaisesRegex(TypeError, "without interface name"):
 
             class NoInterfaceName(SomeTestInterface):
                 @dbus_method()
-                async def example(self) -> None:
-                    ...
+                async def example(self) -> None: ...
 
     def test_shared_parent_class(self) -> None:
-        class One(SomeTestInterface):
-            ...
+        class One(SomeTestInterface): ...
 
-        class Two(SomeTestInterface):
-            ...
+        class Two(SomeTestInterface): ...
 
-        class Shared(One, Two):
-            ...
+        class Shared(One, Two): ...
 
     def test_combined_collision(self) -> None:
 
@@ -205,34 +196,31 @@ class TestBadAsyncDbusClass(TestCase):
             interface_name="org.example.foo",
         ):
             @dbus_method()
-            async def example(self) -> None:
-                ...
+            async def example(self) -> None: ...
 
         class Two(
             DbusInterfaceCommonAsync,
             interface_name="org.example.bar",
         ):
             @dbus_method()
-            async def example(self) -> None:
-                ...
+            async def example(self) -> None: ...
 
         with self.assertRaisesRegex(ValueError, "collision"):
-            class Combined(One, Two):
-                ...
+
+            class Combined(One, Two): ...
 
     def test_class_cleanup(self) -> None:
         class One(
             DbusInterfaceCommonAsync,
             interface_name="org.example.foo1",
-        ):
-            ...
+        ): ...
 
         with self.assertRaises(ValueError):
+
             class Two(
                 DbusInterfaceCommonAsync,
                 interface_name="org.example.foo1",
-            ):
-                ...
+            ): ...
 
         del One
         collect()  # Let weak refs be processed
@@ -240,8 +228,7 @@ class TestBadAsyncDbusClass(TestCase):
         class After(
             DbusInterfaceCommonAsync,
             interface_name="org.example.foo1",
-        ):
-            ...
+        ): ...
 
 
 if __name__ == "__main__":

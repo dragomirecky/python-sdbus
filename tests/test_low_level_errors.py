@@ -18,6 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from asyncio import get_running_loop, wait_for
 from typing import Any
 
@@ -31,41 +32,40 @@ from aiodbus.dbus_common_elements import DbusLocalObjectMeta
 from aiodbus.exceptions import DbusFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
 
-HELLO_WORLD = 'Hello, world!'
+HELLO_WORLD = "Hello, world!"
 
 
 class DbusDerivePropertydError(DbusFailedError):
-    dbus_error_name = 'org.example.PropertyError'
+    dbus_error_name = "org.example.PropertyError"
 
 
-class IndependentError(Exception):
-    ...
+class IndependentError(Exception): ...
 
 
-GOOD_STR = 'Good'
+GOOD_STR = "Good"
 
 
 class InterfaceWithErrors(
     DbusInterfaceCommonAsync,
-    interface_name='org.example.errors',
+    interface_name="org.example.errors",
 ):
-    @dbus_property('s')
+    @dbus_property("s")
     def indep_err_getter(self) -> str:
         raise IndependentError
 
-    @dbus_property('s')
+    @dbus_property("s")
     def derrive_err_getter(self) -> str:
         raise DbusDerivePropertydError
 
-    @dbus_method(result_signature='s')
+    @dbus_method(result_signature="s")
     async def hello_error(self) -> str:
         raise AttributeError
 
-    @dbus_method(result_signature='s')
+    @dbus_method(result_signature="s")
     async def hello_world(self) -> str:
         return HELLO_WORLD
 
-    @dbus_property('s')
+    @dbus_property("s")
     def indep_err_setable(self) -> str:
         return GOOD_STR
 
@@ -73,7 +73,7 @@ class InterfaceWithErrors(
     def indep_err_setter(self, new_value: str) -> None:
         raise IndependentError
 
-    @dbus_property('s')
+    @dbus_property("s")
     def derrive_err_settable(self) -> str:
         return GOOD_STR
 
@@ -86,17 +86,15 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        await request_default_bus_name('org.test')
+        await request_default_bus_name("org.test")
         self.test_object = InterfaceWithErrors()
-        self.test_object.export_to_dbus('/')
+        self.test_object.export_to_dbus("/")
 
-        self.test_object_connection = InterfaceWithErrors.new_proxy(
-            'org.test', '/')
+        self.test_object_connection = InterfaceWithErrors.new_proxy("org.test", "/")
 
         loop = get_running_loop()
 
-        def silence_exceptions(*args: Any, **kwrags: Any) -> None:
-            ...
+        def silence_exceptions(*args: Any, **kwrags: Any) -> None: ...
 
         loop.set_exception_handler(silence_exceptions)
 
@@ -133,8 +131,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
         with self.assertRaises(DbusFailedError) as cm:
             await wait_for(
-                self.test_object_connection.
-                indep_err_setable.set('Test'),
+                self.test_object_connection.indep_err_setable.set("Test"),
                 timeout=1,
             )
 
@@ -155,8 +152,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
         with self.assertRaises(DbusDerivePropertydError):
             await wait_for(
-                self.test_object_connection.
-                derrive_err_settable.set('Test'),
+                self.test_object_connection.derrive_err_settable.set("Test"),
                 timeout=1,
             )
 
@@ -167,7 +163,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         if not isinstance(dbus_local_meta, DbusLocalObjectMeta):
             raise TypeError
         interface = dbus_local_meta.activated_interfaces[0]
-        interface.property_get_dict.pop(b'DerriveErrSettable')
+        interface.property_get_dict.pop(b"DerriveErrSettable")
 
         with self.assertRaises(DbusFailedError):
             await wait_for(
@@ -176,7 +172,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
             )
 
     async def test_method_callback_error(self) -> None:
-        TEST_KEY = b'HelloWorld'
+        TEST_KEY = b"HelloWorld"
         dbus_local_meta = self.test_object._dbus
         if not isinstance(dbus_local_meta, DbusLocalObjectMeta):
             raise TypeError

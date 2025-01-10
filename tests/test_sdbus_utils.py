@@ -41,7 +41,8 @@ class TestSdbusUtilsInspect(IsolatedDbusTestCase):
         local_obj = DbusInterfaceCommonAsync()
 
         with self.assertRaisesRegex(
-            LookupError, "is not exported to any D-Bus",
+            LookupError,
+            "is not exported to any D-Bus",
         ):
             inspect_dbus_path(local_obj)
 

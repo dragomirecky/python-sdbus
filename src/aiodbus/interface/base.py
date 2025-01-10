@@ -18,12 +18,14 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from copy import copy
 from inspect import getmembers
 from itertools import chain
 from types import MethodType
-from typing import Any, Callable, cast
 from typing import (
+    Any,
+    Callable,
     Dict,
     Iterable,
     Iterator,
@@ -34,12 +36,12 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 from warnings import warn
 from weakref import WeakKeyDictionary, WeakValueDictionary
 
-from _sdbus import SdBusInterface
-from _sdbus import SdBus
+from _sdbus import SdBus, SdBusInterface
 from aiodbus.dbus_common_elements import (
     DbusClassMeta,
     DbusInterfaceMetaCommon,
@@ -56,15 +58,13 @@ from aiodbus.handle import DbusExportHandle
 from aiodbus.member.method import DbusMethod
 from aiodbus.member.property import DbusProperty
 
-T = TypeVar('T')
-Self = TypeVar('Self', bound="DbusInterfaceBase")
+T = TypeVar("T")
+Self = TypeVar("Self", bound="DbusInterfaceBase")
 DbusOverride = Union[DbusMethodOverride[T], DbusPropertyOverride[T]]
 
 
-DBUS_CLASS_TO_META: WeakKeyDictionary[
-    type, DbusClassMeta] = WeakKeyDictionary()
-DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[
-    str, DbusInterfaceMeta] = WeakValueDictionary()
+DBUS_CLASS_TO_META: WeakKeyDictionary[type, DbusClassMeta] = WeakKeyDictionary()
+DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[str, DbusInterfaceMeta] = WeakValueDictionary()
 
 
 class DbusInterfaceMeta(DbusInterfaceMetaCommon):
@@ -78,10 +78,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         try:
             original_method = mro_dbus_elements[override_attr_name]
         except KeyError:
-            raise ValueError(
-                f"No D-Bus method {override_attr_name!r} found "
-                f"to override."
-            )
+            raise ValueError(f"No D-Bus method {override_attr_name!r} found " f"to override.")
 
         if not isinstance(original_method, DbusMethod):
             raise TypeError(
@@ -102,10 +99,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         try:
             original_property = mro_dbus_elements[override_attr_name]
         except KeyError:
-            raise ValueError(
-                f"No D-Bus property {override_attr_name!r} found "
-                f"to override."
-            )
+            raise ValueError(f"No D-Bus property {override_attr_name!r} found " f"to override.")
 
         if not isinstance(original_property, DbusProperty):
             raise TypeError(
@@ -115,8 +109,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
 
         new_property = copy(original_property)
         new_property.property_getter = cast(
-            Callable[[DbusInterfaceBase], Any],
-            override.getter_override
+            Callable[[DbusInterfaceBase], Any], override.getter_override
         )
         if override.setter_override is not None:
             new_property.property_setter = override.setter_override
@@ -196,13 +189,9 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
 
             base_dbus_elements = cls._extract_dbus_elements(c, dbus_meta)
 
-            possible_collisions.update(
-                base_dbus_elements.keys() & all_python_dbus_map.keys()
-            )
+            possible_collisions.update(base_dbus_elements.keys() & all_python_dbus_map.keys())
 
-            all_python_dbus_map.update(
-                base_dbus_elements
-            )
+            all_python_dbus_map.update(base_dbus_elements)
 
         if possible_collisions:
             raise ValueError(
@@ -231,29 +220,32 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         else:
             raise TypeError(f"Unknown D-Bus element: {attr!r}")
 
-    def __new__(cls, name: str,
-                bases: Tuple[type, ...],
-                namespace: Dict[str, Any],
-                interface_name: Optional[str] = None,
-                serving_enabled: bool = True,
-                ) -> DbusInterfaceMeta:
+    def __new__(
+        cls,
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        interface_name: Optional[str] = None,
+        serving_enabled: bool = True,
+    ) -> DbusInterfaceMeta:
 
         if interface_name in DBUS_INTERFACE_NAME_TO_CLASS:
             raise ValueError(
-                f"D-Bus interface of the name {interface_name!r} was "
-                "already created."
+                f"D-Bus interface of the name {interface_name!r} was " "already created."
             )
 
-        all_mro_bases: Set[Type[Any]] = set(
-            chain.from_iterable((c.__mro__ for c in bases))
-        )
+        all_mro_bases: Set[Type[Any]] = set(chain.from_iterable((c.__mro__ for c in bases)))
         reserved_dbus_map = cls._map_mro_dbus_elements(
-            name, all_mro_bases,
+            name,
+            all_mro_bases,
         )
         cls._check_collisions(name, namespace, reserved_dbus_map)
 
         new_cls = super().__new__(
-            cls, name, bases, namespace,
+            cls,
+            name,
+            bases,
+            namespace,
             interface_name,
             serving_enabled,
         )
@@ -277,8 +269,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
 class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
 
     def __init__(self) -> None:
-        self._dbus: Union[
-            DbusRemoteObjectMeta, DbusLocalObjectMeta] = DbusLocalObjectMeta()
+        self._dbus: Union[DbusRemoteObjectMeta, DbusLocalObjectMeta] = DbusLocalObjectMeta()
 
     @classmethod
     def _dbus_iter_interfaces_meta(
@@ -292,13 +283,13 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
 
             yield meta.interface_name, meta
 
-    async def start_serving(self,
-                            object_path: str,
-                            bus: Optional[SdBus] = None,
-                            ) -> None:
+    async def start_serving(
+        self,
+        object_path: str,
+        bus: Optional[SdBus] = None,
+    ) -> None:
 
-        warn("start_serving is deprecated in favor of export_to_dbus",
-             DeprecationWarning)
+        warn("start_serving is deprecated in favor of export_to_dbus", DeprecationWarning)
         self.export_to_dbus(object_path, bus)
 
     def export_to_dbus(
@@ -314,8 +305,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         # TODO: Being able to serve multiple buses and object
         if local_object_meta.attached_bus is not None:
             raise RuntimeError(
-                "Object already exported. "
-                "This limitation should be fixed in future version."
+                "Object already exported. " "This limitation should be fixed in future version."
             )
 
         if bus is None:
@@ -329,8 +319,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         for key, value in getmembers(self):
             assert not isinstance(value, DbusMember)
 
-            if isinstance(value, DbusLocalMember) and \
-                    value.member.serving_enabled:
+            if isinstance(value, DbusLocalMember) and value.member.serving_enabled:
                 interface_name = value.member.interface_name
             else:
                 continue
@@ -348,10 +337,8 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         for interface_name, member_list in interface_map.items():
             new_interface = SdBusInterface()
             for dbus_something in member_list:
-                dbus_something._append_to_interface(new_interface,
-                                                    export_handle)
-            bus.add_interface(new_interface, object_path,
-                              interface_name)
+                dbus_something._append_to_interface(new_interface, export_handle)
+            bus.add_interface(new_interface, object_path, interface_name)
             local_object_meta.activated_interfaces.append(new_interface)
 
             assert new_interface.slot is not None
@@ -392,8 +379,10 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         bus: Optional[SdBus] = None,
     ) -> Self:
         warn(
-            ("new_connect is deprecated in favor of equivalent new_proxy."
-             "Will be removed in version 1.0.0"),
+            (
+                "new_connect is deprecated in favor of equivalent new_proxy."
+                "Will be removed in version 1.0.0"
+            ),
             DeprecationWarning,
         )
         new_object = cls.__new__(cls)
@@ -411,5 +400,3 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         new_object = cls.__new__(cls)
         new_object._proxify(service_name, object_path, bus)
         return new_object
-
-

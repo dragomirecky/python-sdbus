@@ -15,7 +15,6 @@ src/_sdbus/sd_bus_internals_interface.c
 src/_sdbus/sd_bus_internals_message.c
 src/aiodbus/__init__.py
 src/aiodbus/__main__.py
-src/aiodbus/autodoc.py
 src/aiodbus/dbus_common_elements.py
 src/aiodbus/dbus_common_funcs.py
 src/aiodbus/dbus_exceptions.py
