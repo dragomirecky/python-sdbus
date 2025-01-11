@@ -29,6 +29,13 @@ repos:
         pass_filenames: false
         'types_or': [python, pyi]
         language: system
+    -   id: clang-format
+        name: clang-format
+        description: This hook automatically checks and reformats changed files using clang-format formatter.
+        entry: uv run clang-format
+        language: system
+        files: \.(h\+\+|h|hh|hxx|hpp|cuh|c|cc|cpp|cu|c\+\+|cxx|tpp|txx)$
+        args: ['-i', '-style=file']
 exclude: |
     (?x)(
         .*egg-info/.*
