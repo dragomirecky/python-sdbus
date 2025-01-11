@@ -913,7 +913,7 @@ class TestProxy(IsolatedDbusTestCase):
         test_object2 = SomeTestInterface()
         handle = test_object2.export_to_dbus("/")
         await test_object_connection.returns_none_method()
-        handle.stop()
+        handle.close()
 
         with self.assertRaises(DbusUnknownObjectError):
             await test_object_connection.returns_none_method()

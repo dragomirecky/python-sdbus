@@ -18,8 +18,6 @@ class DbusExportHandle:
         while self._items:
             self._items.pop().close()
 
-    stop = close  # for backwards compatibility
-
     async def __aenter__(self) -> DbusExportHandle:
         return self
 

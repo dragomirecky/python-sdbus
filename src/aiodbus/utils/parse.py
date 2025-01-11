@@ -42,7 +42,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from ..dbus_proxy_async_interfaces import DBUS_PROPERTIES_CHANGED_TYPING
+    from aiodbus.interface.properties import DBUS_PROPERTIES_CHANGED_TYPING
 
     InterfacesInputElements = Union[
         DbusInterfaceBase,
