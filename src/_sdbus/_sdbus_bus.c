@@ -527,45 +527,6 @@ static PyObject * SdBus_request_name_async(SdBusObject * self, PyObject * args) 
 }
 
 #ifndef Py_LIMITED_API
-static PyObject * SdBus_request_name(SdBusObject * self, PyObject * const * args, Py_ssize_t nargs) {
-    SD_BUS_PY_CHECK_ARGS_NUMBER(2);
-    SD_BUS_PY_CHECK_ARG_CHECK_FUNC(0, PyUnicode_Check);
-    SD_BUS_PY_CHECK_ARG_CHECK_FUNC(1, PyLong_Check);
-
-    const char * service_name_char_ptr = SD_BUS_PY_UNICODE_AS_CHAR_PTR(args[0]);
-    uint64_t flags = PyLong_AsUnsignedLongLong(args[1]);
-    if (PyErr_Occurred()) {
-        return NULL;
-    }
-#else
-static PyObject * SdBus_request_name(SdBusObject * self, PyObject * args) {
-    const char * service_name_char_ptr = NULL;
-    unsigned long long flags_long_long = 0;
-    CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "sK", &service_name_char_ptr, &flags_long_long, NULL));
-    uint64_t flags = (uint64_t)flags_long_long;
-#endif
-    int request_name_return_code = sd_bus_request_name(self->sd_bus_ref, service_name_char_ptr, flags);
-    switch (request_name_return_code) {
-    case -EEXIST:
-        return PyErr_Format(exception_request_name_exists, "Name \"%s\" already owned.", service_name_char_ptr, NULL);
-        break;
-    case -EALREADY:
-        return PyErr_Format(exception_request_name_already_owner, "Already own name \"%s\".", service_name_char_ptr, NULL);
-        break;
-    case 0:
-        return PyErr_Format(exception_request_name_in_queue, "Queued up to acquire name \"%s\".", service_name_char_ptr, NULL);
-        break;
-    case 1:
-        Py_RETURN_NONE;
-        break;
-    default:
-        CALL_SD_BUS_AND_CHECK(request_name_return_code);
-        break;
-    }
-    Py_UNREACHABLE();
-}
-
-#ifndef Py_LIMITED_API
 static SdBusSlotObject * SdBus_add_object_manager(SdBusObject * self, PyObject * const * args, Py_ssize_t nargs) {
     SD_BUS_PY_CHECK_ARGS_NUMBER(1);
     SD_BUS_PY_CHECK_ARG_CHECK_FUNC(0, PyUnicode_Check);
@@ -721,7 +682,6 @@ static PyMethodDef SdBus_methods[] = {
     { "match_signal_async", (SD_BUS_PY_FUNC_TYPE)SdBus_match_signal_async, SD_BUS_PY_METH,
         PyDoc_STR("Register signal callback asynchronously. Returns a Future that returns a SdBusSlot.") },
     { "request_name_async", (SD_BUS_PY_FUNC_TYPE)SdBus_request_name_async, SD_BUS_PY_METH, PyDoc_STR("Request D-Bus name async.") },
-    { "request_name", (SD_BUS_PY_FUNC_TYPE)SdBus_request_name, SD_BUS_PY_METH, PyDoc_STR("Request D-Bus name blocking.") },
     { "add_object_manager", (SD_BUS_PY_FUNC_TYPE)SdBus_add_object_manager, SD_BUS_PY_METH, PyDoc_STR("Add object manager at the path.") },
     { "emit_object_added", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_object_added, SD_BUS_PY_METH, PyDoc_STR("Emit signal that object was added.") },
     { "emit_object_removed", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_object_removed, SD_BUS_PY_METH, PyDoc_STR("Emit signal that object was removed.") },

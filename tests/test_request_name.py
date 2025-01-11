@@ -120,41 +120,6 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
                 timeout=1,
             )
 
-    def test_name_exists_block(self) -> None:
-        extra_bus = sd_bus_open_user()
-        self.bus.request_name(TEST_BUS_NAME, 0)
-
-        with self.assertRaisesRegex(
-            SdBusRequestNameExistsError,
-            TEST_BUS_NAME_regex_match,
-        ):
-            extra_bus.request_name(TEST_BUS_NAME, 0)
-
-    def test_name_already_block(self) -> None:
-        self.bus.request_name(TEST_BUS_NAME, 0)
-
-        with self.assertRaisesRegex(
-            SdBusRequestNameAlreadyOwnerError,
-            TEST_BUS_NAME_regex_match,
-        ):
-            self.bus.request_name(TEST_BUS_NAME, 0)
-
-    def test_name_queued_block(self) -> None:
-        extra_bus = sd_bus_open_user()
-        self.bus.request_name(TEST_BUS_NAME, 0)
-
-        with self.assertRaisesRegex(
-            SdBusRequestNameInQueueError,
-            TEST_BUS_NAME_regex_match,
-        ):
-            extra_bus.request_name(TEST_BUS_NAME, NameQueueFlag)
-
-    def test_name_other_error_block(self) -> None:
-        extra_bus = sd_bus_open_user()
-        extra_bus.close()
-        with self.assertRaises(SdBusLibraryError):
-            extra_bus.request_name(TEST_BUS_NAME, 0)
-
 
 class TestRequestNameAsync(IsolatedDbusTestCase):
     async def test_request_name_replacement(self) -> None:
