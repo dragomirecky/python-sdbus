@@ -169,47 +169,7 @@ static SdBusMessageObject * SdBus_new_signal_message(SdBusObject * self, PyObjec
 static int _check_sdbus_message(PyObject * something) {
     return PyType_IsSubtype(Py_TYPE(something), (PyTypeObject *)SdBusMessage_class);
 }
-
-static SdBusMessageObject * SdBus_call(SdBusObject * self, PyObject * const * args, Py_ssize_t nargs) {
-    // TODO: Check reference counting
-    SD_BUS_PY_CHECK_ARGS_NUMBER(1);
-    SD_BUS_PY_CHECK_ARG_CHECK_FUNC(0, _check_sdbus_message);
-
-    SdBusMessageObject * call_message = (SdBusMessageObject *)args[0];
-#else
-static SdBusMessageObject * SdBus_call(SdBusObject * self, PyObject * args) {
-    SdBusMessageObject * call_message = NULL;
-    CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "O", &call_message, NULL));
 #endif
-    SdBusMessageObject * reply_message_object CLEANUP_SD_BUS_MESSAGE = (SdBusMessageObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBusMessage_class));
-
-    sd_bus_error error __attribute__((cleanup(sd_bus_error_free))) = SD_BUS_ERROR_NULL;
-
-    int return_value = sd_bus_call(self->sd_bus_ref, call_message->message_ref, (uint64_t)0, &error, &reply_message_object->message_ref);
-
-    if (sd_bus_error_get_errno(&error)) {
-        PyObject * error_name_str CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyUnicode_FromString(error.name));
-        PyObject * exception_to_raise = PyDict_GetItemWithError(dbus_error_to_exception_dict, error_name_str);
-
-        if (PyErr_Occurred()) {
-            return NULL;
-        }
-
-        if (exception_to_raise == NULL) {
-            PyObject * exception_tuple CLEANUP_PY_OBJECT = Py_BuildValue("(ss)", error.name, error.message);
-            PyErr_SetObject(unmapped_error_exception, exception_tuple);
-            return NULL;
-        } else {
-            PyErr_SetString(exception_to_raise, error.message);
-            return NULL;
-        }
-    }
-
-    CALL_SD_BUS_AND_CHECK(return_value);
-
-    Py_INCREF(reply_message_object);
-    return reply_message_object;
-}
 
 int future_set_exception_from_message(PyObject * future, sd_bus_message * message) {
     const sd_bus_error * callback_error = sd_bus_message_get_error(message);
@@ -670,7 +630,6 @@ static PyObject * SdBus_asyncio_update_fd_watchers(SdBusObject * self) {
 }
 
 static PyMethodDef SdBus_methods[] = {
-    { "call", (SD_BUS_PY_FUNC_TYPE)SdBus_call, SD_BUS_PY_METH, PyDoc_STR("Send message and block until the reply.") },
     { "call_async", (SD_BUS_PY_FUNC_TYPE)SdBus_call_async, SD_BUS_PY_METH, PyDoc_STR("Async send message, returns awaitable future.") },
     { "process", (PyCFunction)SdBus_process, METH_NOARGS, PyDoc_STR("Process pending IO work.") },
     { "get_fd", (SD_BUS_PY_FUNC_TYPE)SdBus_get_fd, SD_BUS_PY_METH, PyDoc_STR("Get file descriptor to poll on.") },
