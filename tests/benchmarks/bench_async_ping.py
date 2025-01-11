@@ -24,8 +24,9 @@ from asyncio import run as asyncio_run
 from time import perf_counter
 
 import pyperf  # type: ignore
-from sdbus import DbusInterfaceCommonAsync
-from sdbus.unittest import _isolated_dbus
+
+from aiodbus import DbusInterfaceCommonAsync
+from aiodbus.unittest import _isolated_dbus
 
 
 def bench_async_ping_gather(loops: int) -> float:

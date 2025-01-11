@@ -29,3 +29,7 @@ repos:
         pass_filenames: false
         'types_or': [python, pyi]
         language: system
+exclude: |
+    (?x)(
+        .*egg-info/.*
+    )

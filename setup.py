@@ -97,27 +97,6 @@ if __name__ == "__main__":
         long_description = f.read()
 
     setup(
-        version="0.13.0",
-        author="igo95862",
-        author_email="igo95862@yandex.ru",
-        license="LGPL-2.1-or-later",
-        keywords="dbus ipc linux freedesktop",
-        project_urls={
-            "Documentation": "https://python-sdbus.readthedocs.io/en/latest/",
-            "Source": "https://github.com/igo95862/python-sdbus/",
-            "Tracker": "https://github.com/igo95862/python-sdbus/issues/",
-        },
-        classifiers=[
-            "Development Status :: 4 - Beta",
-            "Intended Audience :: Developers",
-            (
-                "License :: OSI Approved :: "
-                "GNU Lesser General Public License v2 or later (LGPLv2+)"
-            ),
-            "Operating System :: POSIX :: Linux",
-            "Programming Language :: Python :: 3 :: Only",
-            "Topic :: Software Development :: Libraries :: Python Modules",
-        ],
         packages=[
             "_sdbus",
             "aiodbus",
