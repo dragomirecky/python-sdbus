@@ -321,7 +321,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         class TestInheritence(SomeTestInterface):
             @dbus_method_override()
-            async def test_int(self) -> int:
+            async def test_int(self) -> int:  # type: ignore
                 return 2
 
             @dbus_property_async_override()

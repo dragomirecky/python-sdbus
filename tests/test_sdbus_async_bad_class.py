@@ -159,7 +159,7 @@ class TestBadAsyncDbusClass(TestCase):
         with self.assertRaises(ValueError):
 
             class TestInheritence(SomeTestInterface):
-                async def test_int(self) -> int:
+                async def test_int(self) -> int:  # type: ignore
                     return 2
 
         with self.assertRaises(ValueError):

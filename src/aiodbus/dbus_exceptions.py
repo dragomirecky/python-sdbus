@@ -35,7 +35,7 @@ class DbusErrorMeta(type):
         name: str,
         bases: Tuple[type, ...],
         namespace: Dict[str, Any],
-    ) -> DbusErrorMeta:
+    ):
 
         dbus_error_name = namespace.get("dbus_error_name")
 
@@ -47,7 +47,7 @@ class DbusErrorMeta(type):
             new_cls, Exception
         ), f"New class {new_cls} is not an Exception but {bases}."
 
-        add_exception_mapping(new_cls)
+        add_exception_mapping(new_cls)  # type: ignore
 
         return new_cls
 

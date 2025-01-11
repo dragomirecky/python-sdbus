@@ -110,7 +110,7 @@ if __name__ == "__main__":
         package_data={
             "_sdbus": [
                 "py.typed",
-                "_sdbus.pyi",
+                "__init__.pyi",
                 "_sdbus.h",
             ],
         },

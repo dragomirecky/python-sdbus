@@ -258,8 +258,8 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
         new_queue: Queue[T] = Queue()
 
         signal_callbacks = self.dbus_signal.local_callbacks
+        put_method = new_queue.put_nowait
         try:
-            put_method = new_queue.put_nowait
             signal_callbacks.add(put_method)
             while True:
                 next_data = await new_queue.get()

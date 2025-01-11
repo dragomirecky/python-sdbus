@@ -23,7 +23,7 @@ from __future__ import annotations
 from copy import copy
 from inspect import getmembers
 from itertools import chain
-from types import MethodType
+from types import FunctionType
 from typing import (
     Any,
     Callable,
@@ -88,7 +88,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             )
 
         new_method = copy(original_method)
-        new_method.original_method = cast(MethodType, override.override_method)
+        new_method.original_method = cast(FunctionType, override.override_method)
         return new_method
 
     @staticmethod
@@ -317,7 +317,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         # TODO: can be optimized with a single loop
         interface_map: Dict[str, List[DbusLocalMember]] = {}
 
-        for key, value in getmembers(self):
+        for _, value in getmembers(self):
             assert not isinstance(value, DbusMember)
 
             if isinstance(value, DbusLocalMember) and value.member.serving_enabled:
