@@ -87,7 +87,7 @@ async def request_default_bus_name(
     queue: bool = False,
 ) -> None:
     default_bus = get_default_bus()
-    await default_bus.request_name_async(
+    await default_bus.request_name(
         new_name,
         _prepare_request_name_flags(
             allow_replacement,

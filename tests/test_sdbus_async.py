@@ -83,7 +83,7 @@ class TestPing(IsolatedDbusTestCase):
 
 class TestRequestName(IsolatedDbusTestCase):
     async def test_request_name(self) -> None:
-        await self.bus.request_name_async("org.example.test", 0)
+        await self.bus.request_name("org.example.test", 0)
 
 
 TEST_INTERFACE_NAME = "org.test.test"
@@ -251,7 +251,7 @@ def initialize_object() -> Tuple[SomeTestInterface, SomeTestInterface]:
 class TestProxy(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-        await self.bus.request_name_async(TEST_SERVICE_NAME, 0)
+        await self.bus.request_name(TEST_SERVICE_NAME, 0)
 
     async def test_method_kwargs(self) -> None:
         test_object, test_object_connection = initialize_object()

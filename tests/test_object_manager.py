@@ -70,7 +70,7 @@ MANAGED_PATH = "/object_manager/test"
 
 class TestObjectManager(IsolatedDbusTestCase):
     async def test_object_manager(self) -> None:
-        await self.bus.request_name_async(CONNECTION_NAME, 0)
+        await self.bus.request_name(CONNECTION_NAME, 0)
 
         object_manager = ObjectManagerTestInterface()
         object_manager.export_to_dbus(OBJECT_MANAGER_PATH)
@@ -137,7 +137,7 @@ class TestObjectManager(IsolatedDbusTestCase):
             def test_str(self) -> str:
                 return "test"
 
-        await self.bus.request_name_async(CONNECTION_NAME, 0)
+        await self.bus.request_name(CONNECTION_NAME, 0)
 
         object_manager = DbusObjectManagerInterfaceAsync()
         object_manager.export_to_dbus(OBJECT_MANAGER_PATH)
@@ -313,7 +313,7 @@ class TestObjectManager(IsolatedDbusTestCase):
             self.assertIsNone(python_class)
 
     async def test_main_export_handle(self) -> None:
-        await self.bus.request_name_async(CONNECTION_NAME, 0)
+        await self.bus.request_name(CONNECTION_NAME, 0)
 
         object_manager = ObjectManagerTestInterface()
 
@@ -334,7 +334,7 @@ class TestObjectManager(IsolatedDbusTestCase):
             )
 
     async def test_secondary_export_handle(self) -> None:
-        await self.bus.request_name_async(CONNECTION_NAME, 0)
+        await self.bus.request_name(CONNECTION_NAME, 0)
 
         object_manager = ObjectManagerTestInterface()
 

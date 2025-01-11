@@ -96,7 +96,7 @@ class LeakTests(IsolatedDbusTestCase):
 
     async def test_objects(self) -> None:
         leak_test_enabled()
-        await self.bus.request_name_async("org.example.test", 0)
+        await self.bus.request_name("org.example.test", 0)
 
         pseudo_test = cast(TestProxy, self)
 
@@ -145,7 +145,7 @@ class LeakTests(IsolatedDbusTestCase):
 
     async def test_single_object(self) -> None:
         leak_test_enabled()
-        await self.bus.request_name_async("org.example.test", 0)
+        await self.bus.request_name("org.example.test", 0)
 
         test_object, test_object_connection = initialize_object()
 

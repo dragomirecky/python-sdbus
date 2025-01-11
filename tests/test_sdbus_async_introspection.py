@@ -43,7 +43,7 @@ class TestIntrospection(IsolatedDbusTestCase):
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-        await self.bus.request_name_async("org.example.test", 0)
+        await self.bus.request_name("org.example.test", 0)
 
     async def test_method_arg_names_none(self) -> None:
         class TestInterface(

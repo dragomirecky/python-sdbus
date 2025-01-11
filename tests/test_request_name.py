@@ -83,30 +83,30 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
 
     async def test_name_exists_async(self) -> None:
         extra_bus = sd_bus_open_user()
-        await self.bus.request_name_async(TEST_BUS_NAME, 0)
+        await self.bus.request_name(TEST_BUS_NAME, 0)
 
         with self.assertRaises(SdBusRequestNameExistsError):
             await wait_for(
-                extra_bus.request_name_async(TEST_BUS_NAME, 0),
+                extra_bus.request_name(TEST_BUS_NAME, 0),
                 timeout=1,
             )
 
     async def test_name_already_async(self) -> None:
-        await self.bus.request_name_async(TEST_BUS_NAME, 0)
+        await self.bus.request_name(TEST_BUS_NAME, 0)
 
         with self.assertRaises(SdBusRequestNameAlreadyOwnerError):
             await wait_for(
-                self.bus.request_name_async(TEST_BUS_NAME, 0),
+                self.bus.request_name(TEST_BUS_NAME, 0),
                 timeout=1,
             )
 
     async def test_name_queued_async(self) -> None:
         extra_bus = sd_bus_open_user()
-        await self.bus.request_name_async(TEST_BUS_NAME, 0)
+        await self.bus.request_name(TEST_BUS_NAME, 0)
 
         with self.assertRaises(SdBusRequestNameInQueueError):
             await wait_for(
-                extra_bus.request_name_async(TEST_BUS_NAME, NameQueueFlag),
+                extra_bus.request_name(TEST_BUS_NAME, NameQueueFlag),
                 timeout=1,
             )
 
@@ -116,7 +116,7 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
 
         with self.assertRaises(SdBusLibraryError):
             await wait_for(
-                extra_bus.request_name_async(TEST_BUS_NAME, 0),
+                extra_bus.request_name(TEST_BUS_NAME, 0),
                 timeout=1,
             )
 
@@ -124,7 +124,7 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
 class TestRequestNameAsync(IsolatedDbusTestCase):
     async def test_request_name_replacement(self) -> None:
         extra_bus = sd_bus_open_user()
-        await extra_bus.request_name_async(
+        await extra_bus.request_name(
             TEST_BUS_NAME,
             NameAllowReplacementFlag,
         )
@@ -139,7 +139,7 @@ class TestRequestNameAsync(IsolatedDbusTestCase):
 
     async def test_request_name_queue(self) -> None:
         extra_bus = sd_bus_open_user()
-        await extra_bus.request_name_async(TEST_BUS_NAME, 0)
+        await extra_bus.request_name(TEST_BUS_NAME, 0)
 
         with self.assertRaises(SdBusRequestNameInQueueError):
             await request_default_bus_name(
