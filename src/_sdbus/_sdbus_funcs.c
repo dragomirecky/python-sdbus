@@ -131,58 +131,6 @@ static PyObject * decode_object_path(PyObject * Py_UNUSED(self), PyObject * args
 }
 
 #ifndef Py_LIMITED_API
-static PyObject * map_exception_to_dbus_error(PyObject * Py_UNUSED(self), PyObject * const * args, Py_ssize_t nargs) {
-    SD_BUS_PY_CHECK_ARGS_NUMBER(2);
-    SD_BUS_PY_CHECK_ARG_CHECK_FUNC(0, PyExceptionClass_Check);
-    SD_BUS_PY_CHECK_ARG_CHECK_FUNC(1, PyUnicode_Check);
-    PyObject * exception = args[0];
-    PyObject * dbus_error_string = args[1];
-#else
-static PyObject * map_exception_to_dbus_error(PyObject * Py_UNUSED(self), PyObject * args) {
-    PyObject * exception = NULL;
-    PyObject * dbus_error_string = NULL;
-    CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "O!O!", PyExc_BaseException->ob_type, &exception, &PyUnicode_Type, &dbus_error_string, NULL));
-
-#endif
-    if (CALL_PYTHON_INT_CHECK(PyDict_Contains(dbus_error_to_exception_dict, dbus_error_string)) > 0) {
-        PyErr_Format(PyExc_ValueError, "Dbus error %R is already mapped.", dbus_error_string);
-        return NULL;
-    }
-
-    CALL_PYTHON_INT_CHECK(PyDict_SetItem(dbus_error_to_exception_dict, dbus_error_string, exception));
-    CALL_PYTHON_INT_CHECK(PyDict_SetItem(exception_to_dbus_error_dict, exception, dbus_error_string));
-
-    Py_RETURN_NONE;
-}
-
-#ifndef Py_LIMITED_API
-static PyObject * add_exception_mapping(PyObject * Py_UNUSED(self), PyObject * const * args, Py_ssize_t nargs) {
-    SD_BUS_PY_CHECK_ARGS_NUMBER(1);
-    PyObject * exception = args[0];
-#else
-static PyObject * add_exception_mapping(PyObject * Py_UNUSED(self), PyObject * args) {
-    PyObject * exception = NULL;
-    CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "O", &exception, NULL));
-#endif
-    PyObject * dbus_error_string CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyObject_GetAttrString(exception, "dbus_error_name"));
-
-    if (CALL_PYTHON_INT_CHECK(PyDict_Contains(dbus_error_to_exception_dict, dbus_error_string)) > 0) {
-        PyErr_Format(PyExc_ValueError, "Dbus error %R is already mapped.", dbus_error_string);
-        return NULL;
-    }
-
-    if (CALL_PYTHON_INT_CHECK(PyDict_Contains(exception_to_dbus_error_dict, exception)) > 0) {
-        PyErr_Format(PyExc_ValueError, "Exception %R is already mapped to dbus error.", exception);
-        return NULL;
-    }
-
-    CALL_PYTHON_INT_CHECK(PyDict_SetItem(dbus_error_to_exception_dict, dbus_error_string, exception));
-    CALL_PYTHON_INT_CHECK(PyDict_SetItem(exception_to_dbus_error_dict, exception, dbus_error_string));
-
-    Py_RETURN_NONE;
-}
-
-#ifndef Py_LIMITED_API
 static PyObject * is_interface_name_valid(PyObject * Py_UNUSED(self), PyObject * const * args, Py_ssize_t nargs) {
     SD_BUS_PY_CHECK_ARGS_NUMBER(1);
     SD_BUS_PY_CHECK_ARG_CHECK_FUNC(0, PyUnicode_Check);
@@ -285,8 +233,6 @@ PyMethodDef SdBusPyInternal_methods[] = {
         PyDoc_STR("Encode object path with object path prefix and arbitrary string.") },
     { "decode_object_path", (SD_BUS_PY_FUNC_TYPE)decode_object_path, SD_BUS_PY_METH,
         PyDoc_STR("Decode object path with object path prefix and arbitrary string.") },
-    { "map_exception_to_dbus_error", (SD_BUS_PY_FUNC_TYPE)map_exception_to_dbus_error, SD_BUS_PY_METH, PyDoc_STR("Map exception to a D-Bus error name.") },
-    { "add_exception_mapping", (SD_BUS_PY_FUNC_TYPE)add_exception_mapping, SD_BUS_PY_METH, PyDoc_STR("Add exception to the mapping of dbus error names.") },
     { "is_interface_name_valid", (SD_BUS_PY_FUNC_TYPE)is_interface_name_valid, SD_BUS_PY_METH, PyDoc_STR("Is the string valid interface name?") },
     { "is_service_name_valid", (SD_BUS_PY_FUNC_TYPE)is_service_name_valid, SD_BUS_PY_METH, PyDoc_STR("Is the string valid service name?") },
     { "is_member_name_valid", (SD_BUS_PY_FUNC_TYPE)is_member_name_valid, SD_BUS_PY_METH, PyDoc_STR("Is the string valid member name?") },

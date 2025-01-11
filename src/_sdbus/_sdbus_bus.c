@@ -172,27 +172,40 @@ static int _check_sdbus_message(PyObject * something) {
 #endif
 
 int future_set_exception_from_message(PyObject * future, sd_bus_message * message) {
+    PyObject * is_cancelled CLEANUP_PY_OBJECT = PyObject_CallMethod(future, "cancelled", "");
+    if (Py_True == is_cancelled) {
+        return 0;
+    }
+
     const sd_bus_error * callback_error = sd_bus_message_get_error(message);
 
     PyObject * error_name_str CLEANUP_PY_OBJECT = CALL_PYTHON_CHECK_RETURN_NEG1(PyUnicode_FromString(callback_error->name));
     PyObject * error_message_str CLEANUP_PY_OBJECT = CALL_PYTHON_CHECK_RETURN_NEG1(PyUnicode_FromString(callback_error->message));
 
-    PyObject * exception_to_raise = PyDict_GetItemWithError(dbus_error_to_exception_dict, error_name_str);
+    // make message object
+    sd_bus_message * reply_message __attribute__((cleanup(sd_bus_message_unrefp))) = sd_bus_message_ref(message);
+    SdBusMessageObject * reply_message_object CLEANUP_SD_BUS_MESSAGE = (SdBusMessageObject *)SD_BUS_PY_CLASS_DUNDER_NEW(SdBusMessage_class);
+    if (reply_message_object == NULL) {
+        return -1;
+    }
+    _SdBusMessage_set_messsage(reply_message_object, reply_message);
 
+    // raise if unexpected exception
     PyObject * exception_occurred = PyErr_Occurred();
     if (exception_occurred) {
         Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethodObjArgs(future, set_exception_str, exception_occurred, NULL)));
         return 0;
     }
 
-    if (exception_to_raise) {
-        PyObject * new_exception CLEANUP_PY_OBJECT = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(exception_to_raise, error_message_str, NULL));
-        Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethodObjArgs(future, set_exception_str, new_exception, NULL)));
-    } else {
-        PyObject * new_exception CLEANUP_PY_OBJECT = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(unmapped_error_exception, error_name_str, error_message_str, NULL));
-        Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethodObjArgs(future, set_exception_str, new_exception, NULL)));
+    // create new exception
+    PyObject * new_exception CLEANUP_PY_OBJECT = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(sdbus_method_error, error_name_str, error_message_str, NULL));
+    if (PyObject_SetAttrString(new_exception, "response", (PyObject *)reply_message_object) < 0) {
+        PyErr_WriteUnraisable(new_exception);
+        return 0;
     }
 
+    // set exception on future
+    Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethodObjArgs(future, set_exception_str, new_exception, NULL)));
     return 0;
 }
 
@@ -237,7 +250,7 @@ static PyObject * SdBus_process(SdBusObject * self, PyObject * Py_UNUSED(args)) 
     Py_RETURN_NONE;
 }
 
-int SdBus_async_callback(sd_bus_message * m,
+static int SdBus_call_callback(sd_bus_message * m,
     void * userdata, // Should be the asyncio.Future
     sd_bus_error * Py_UNUSED(ret_error)) {
     sd_bus_message * reply_message __attribute__((cleanup(sd_bus_message_unrefp))) = sd_bus_message_ref(m);
@@ -248,23 +261,15 @@ int SdBus_async_callback(sd_bus_message * m,
         return 0;
     }
 
-    if (!sd_bus_message_is_method_error(m, NULL)) {
-        // Not Error, set Future result to new message object
+    SdBusMessageObject * reply_message_object CLEANUP_SD_BUS_MESSAGE = (SdBusMessageObject *)SD_BUS_PY_CLASS_DUNDER_NEW(SdBusMessage_class);
+    if (reply_message_object == NULL) {
+        return -1;
+    }
 
-        SdBusMessageObject * reply_message_object CLEANUP_SD_BUS_MESSAGE = (SdBusMessageObject *)SD_BUS_PY_CLASS_DUNDER_NEW(SdBusMessage_class);
-        if (reply_message_object == NULL) {
-            return -1;
-        }
-        _SdBusMessage_set_messsage(reply_message_object, reply_message);
-        PyObject * return_object CLEANUP_PY_OBJECT = PyObject_CallMethod(py_future, "set_result", "O", reply_message_object);
-        if (return_object == NULL) {
-            return -1;
-        }
-    } else {
-        // An Error, set exception
-        if (future_set_exception_from_message(py_future, m) < 0) {
-            return -1;
-        }
+    _SdBusMessage_set_messsage(reply_message_object, reply_message);
+    PyObject * return_object CLEANUP_PY_OBJECT = PyObject_CallMethod(py_future, "set_result", "O", reply_message_object);
+    if (return_object == NULL) {
+        return -1;
     }
 
     return 0;
@@ -288,7 +293,7 @@ static PyObject * SdBus_call_async(SdBusObject * self, PyObject * args) {
     SdBusSlotObject * new_slot_object CLEANUP_SD_BUS_SLOT = (SdBusSlotObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBusSlot_class));
 
     CALL_SD_BUS_AND_CHECK(
-        sd_bus_call_async(self->sd_bus_ref, &new_slot_object->slot_ref, call_message->message_ref, SdBus_async_callback, new_future, (uint64_t)0));
+        sd_bus_call_async(self->sd_bus_ref, &new_slot_object->slot_ref, call_message->message_ref, SdBus_call_callback, new_future, (uint64_t)0));
 
     if (PyObject_SetAttrString(new_future, "_sd_bus_py_slot", (PyObject *)new_slot_object) < 0) {
         return NULL;
@@ -410,52 +415,6 @@ static PyObject * SdBus_match_signal_async(SdBusObject * self, PyObject * args) 
     return new_future;
 }
 
-int SdBus_request_name_callback(sd_bus_message * m,
-    void * userdata, // Should be the asyncio.Future
-    sd_bus_error * Py_UNUSED(ret_error)) {
-    PyObject * py_future = userdata;
-    PyObject * is_cancelled CLEANUP_PY_OBJECT = PyObject_CallMethod(py_future, "cancelled", "");
-    if (Py_True == is_cancelled) {
-        // A bit unpythonic but SdBus_process does not error out
-        return 0;
-    }
-
-    if (!sd_bus_message_is_method_error(m, NULL)) {
-        uint32_t request_name_result = 0;
-        CALL_SD_BUS_CHECK_RETURN_NEG1(sd_bus_message_read_basic(m, 'u', &request_name_result));
-        if (1 == request_name_result) {
-            // Successfully acquired the name
-            Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethod(py_future, "set_result", "O", Py_None)));
-            return 0;
-        }
-
-        PyObject * exception_to_raise CLEANUP_PY_OBJECT = NULL;
-        switch (request_name_result) {
-        case 2:
-            exception_to_raise = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(exception_request_name_in_queue, NULL));
-            break;
-        case 3:
-            exception_to_raise = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(exception_request_name_exists, NULL));
-            break;
-        case 4:
-            exception_to_raise = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(exception_request_name_already_owner, NULL));
-            break;
-        default:
-            exception_to_raise = CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallFunctionObjArgs(exception_request_name, NULL));
-            break;
-        }
-        Py_XDECREF(CALL_PYTHON_CHECK_RETURN_NEG1(PyObject_CallMethod(py_future, "set_exception", "O", exception_to_raise)));
-        return -1;
-    } else {
-        // An Error, set exception
-        if (future_set_exception_from_message(py_future, m) < 0) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
 #ifndef Py_LIMITED_API
 static PyObject * SdBus_request_name(SdBusObject * self, PyObject * const * args, Py_ssize_t nargs) {
     SD_BUS_PY_CHECK_ARGS_NUMBER(2);
@@ -479,7 +438,7 @@ static PyObject * SdBus_request_name(SdBusObject * self, PyObject * args) {
     SdBusSlotObject * new_slot_object CLEANUP_SD_BUS_SLOT = (SdBusSlotObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBusSlot_class));
 
     CALL_SD_BUS_AND_CHECK(
-        sd_bus_request_name_async(self->sd_bus_ref, &new_slot_object->slot_ref, service_name_char_ptr, flags, SdBus_request_name_callback, new_future));
+        sd_bus_request_name_async(self->sd_bus_ref, &new_slot_object->slot_ref, service_name_char_ptr, flags, SdBus_call_callback, new_future));
 
     CALL_PYTHON_INT_CHECK(PyObject_SetAttrString(new_future, "_sd_bus_py_slot", (PyObject *)new_slot_object));
     CHECK_ASYNCIO_WATCHERS;

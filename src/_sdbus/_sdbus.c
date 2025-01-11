@@ -38,17 +38,8 @@ PyObject * append_str = NULL;
 PyObject * call_soon_str = NULL;
 PyObject * create_task_str = NULL;
 // Exceptions
-PyObject * exception_base = NULL;
-PyObject * unmapped_error_exception = NULL;
-PyObject * exception_lib = NULL;
-PyObject * exception_request_name = NULL; // Base to any request name exception
-PyObject * exception_request_name_in_queue = NULL; // Queued up to acquire name
-PyObject * exception_request_name_exists = NULL; // Someone already owns the name
-PyObject * exception_request_name_already_owner = NULL; // Already an owner of the name
-
-PyObject * dbus_error_to_exception_dict = NULL;
-PyObject * exception_to_dbus_error_dict = NULL;
-
+PyObject * sdbus_exception = NULL;
+PyObject * sdbus_method_error = NULL;
 // SdBusSlot
 
 static void SdBusSlot_dealloc(SdBusSlotObject * self) {
@@ -125,41 +116,13 @@ PyMODINIT_FUNC PyInit__sdbus(void) {
     SdBusInterface_class = SD_BUS_PY_INIT_TYPE_READY(SdBusInterfaceType);
     SD_BUS_PY_INIT_ADD_OBJECT("SdBusInterface", SdBusInterface_class);
 
-    // Exception map
-    dbus_error_to_exception_dict = CALL_PYTHON_AND_CHECK(PyDict_New());
-    SD_BUS_PY_INIT_ADD_OBJECT("DBUS_ERROR_TO_EXCEPTION", dbus_error_to_exception_dict);
+    PyObject * new_sdbus_exc CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("_sdbus.SdBusError", NULL, NULL));
+    SD_BUS_PY_INIT_ADD_OBJECT("SdBusError", new_sdbus_exc);
+    sdbus_exception = new_sdbus_exc;
 
-    exception_to_dbus_error_dict = CALL_PYTHON_AND_CHECK(PyDict_New());
-    SD_BUS_PY_INIT_ADD_OBJECT("EXCEPTION_TO_DBUS_ERROR", exception_to_dbus_error_dict);
-
-    PyObject * new_base_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusBaseError", NULL, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusBaseError", new_base_exception);
-    exception_base = new_base_exception;
-
-    PyObject * new_unmapped_error_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusUnmappedMessageError", new_base_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusUnmappedMessageError", new_unmapped_error_exception);
-    unmapped_error_exception = new_unmapped_error_exception;
-
-    PyObject * library_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusLibraryError", new_base_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusLibraryError", library_exception);
-    exception_lib = library_exception;
-
-    // Request name exceptions
-    PyObject * request_name_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusRequestNameError", new_base_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusRequestNameError", request_name_exception);
-    exception_request_name = request_name_exception;
-    // Request name but in queue
-    PyObject * request_name_in_queue_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusRequestNameInQueueError", request_name_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusRequestNameInQueueError", request_name_in_queue_exception);
-    exception_request_name_in_queue = request_name_in_queue_exception;
-    // Request name but someone already owns the name
-    PyObject * request_name_exists_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusRequestNameExistsError", request_name_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusRequestNameExistsError", request_name_exists_exception);
-    exception_request_name_exists = request_name_exists_exception;
-    // Request name but we already own the name
-    PyObject * request_name_already_owner_exception CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("sd_bus_internals.SdBusRequestNameAlreadyOwnerError", request_name_exception, NULL));
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBusRequestNameAlreadyOwnerError", request_name_already_owner_exception);
-    exception_request_name_already_owner = request_name_already_owner_exception;
+    PyObject * new_sdbus_method_exc CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyErr_NewException("_sdbus.SdBusMethodError", NULL, NULL));
+    SD_BUS_PY_INIT_ADD_OBJECT("SdBusMethodError", new_sdbus_method_exc);
+    sdbus_method_error = new_sdbus_method_exc;
 
     PyObject * asyncio_module = CALL_PYTHON_AND_CHECK(PyImport_ImportModule("asyncio"));
 
@@ -194,6 +157,11 @@ PyMODINIT_FUNC PyInit__sdbus(void) {
     CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "NameAllowReplacementFlag", SD_BUS_NAME_ALLOW_REPLACEMENT));
     CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "NameReplaceExistingFlag", SD_BUS_NAME_REPLACE_EXISTING));
     CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "NameQueueFlag", SD_BUS_NAME_QUEUE));
+
+    CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "DbusMessageTypeMethodCall", SD_BUS_MESSAGE_METHOD_CALL));
+    CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "DbusMessageTypeMethodReturn", SD_BUS_MESSAGE_METHOD_RETURN));
+    CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "DbusMessageTypeMethodError", SD_BUS_MESSAGE_METHOD_ERROR));
+    CALL_PYTHON_INT_CHECK(PyModule_AddIntConstant(m, "DbusMessageTypeSignal", SD_BUS_MESSAGE_SIGNAL));
 
     Py_INCREF(m);
     return m;

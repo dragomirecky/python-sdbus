@@ -40,7 +40,7 @@ from typing import (
 )
 from weakref import ref as weak_ref
 
-from _sdbus import DbusNoReplyFlag, SdBusInterface, SdBusMessage
+from _sdbus import DbusNoReplyFlag, SdBusError, SdBusInterface, SdBusMessage
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
@@ -50,7 +50,7 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_exceptions import DbusFailedError
+from aiodbus.exceptions import DbusFailedError, DbusMethodError
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
@@ -139,6 +139,9 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
     async def _dbus_call(self, call_message: SdBusMessage) -> Any:
         bus = self.proxy_meta.attached_bus
         reply_message = await bus.call_async(call_message)
+        if error := reply_message.get_error():
+            name, message = error
+            raise DbusMethodError.create(name, message)
         return reply_message.get_contents()
 
     @staticmethod
@@ -234,55 +237,62 @@ class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
         )
 
     async def _dbus_reply_call(self, request_message: SdBusMessage) -> None:
-        local_object = self.local_object_ref()
-        if local_object is None:
-            raise RuntimeError("Local object no longer exists!")
-
-        call_context = copy_context()
-
         try:
-            reply_data = await call_context.run(
-                self._dbus_reply_call_method,
-                request_message,
-                local_object,
-            )
-        except DbusFailedError as e:
+            local_object = self.local_object_ref()
+            if local_object is None:
+                raise RuntimeError("Local object no longer exists!")
+
+            call_context = copy_context()
+
+            try:
+                reply_data = await call_context.run(
+                    self._dbus_reply_call_method,
+                    request_message,
+                    local_object,
+                )
+            except DbusMethodError as e:
+                if not request_message.expect_reply:
+                    return
+
+                error_message = request_message.create_error_reply(
+                    e.error_name,
+                    str(e.args[0]) if e.args else "",
+                )
+                error_message.send()
+                return
+            except Exception:
+                if not request_message.expect_reply:
+                    return
+
+                logger = logging.getLogger(__name__)
+                logger.exception("Unhandled exception when handling a method call")
+                error_message = request_message.create_error_reply(
+                    DbusFailedError.error_name,
+                    "",
+                )
+                error_message.send()
+                return
+
             if not request_message.expect_reply:
                 return
 
-            error_message = request_message.create_error_reply(
-                e.dbus_error_name,
-                str(e.args[0]) if e.args else "",
-            )
-            error_message.send()
-            return
-        except Exception:
-            logger = logging.getLogger(__name__)
-            logger.exception("Exception when handling a method call")
-            error_message = request_message.create_error_reply(
-                DbusFailedError.dbus_error_name,
-                "",
-            )
-            error_message.send()
-            return
+            reply_message = request_message.create_reply()
 
-        if not request_message.expect_reply:
-            return
-
-        reply_message = request_message.create_reply()
-
-        if isinstance(reply_data, tuple):
-            try:
-                reply_message.append_data(self.dbus_method.result_signature, *reply_data)
-            except TypeError:
-                # In case of single struct result type
-                # We can't figure out if return is multiple values
-                # or a tuple
+            if isinstance(reply_data, tuple):
+                try:
+                    reply_message.append_data(self.dbus_method.result_signature, *reply_data)
+                except TypeError:
+                    # In case of single struct result type
+                    # We can't figure out if return is multiple values
+                    # or a tuple
+                    reply_message.append_data(self.dbus_method.result_signature, reply_data)
+            elif reply_data is not None:
                 reply_message.append_data(self.dbus_method.result_signature, reply_data)
-        elif reply_data is not None:
-            reply_message.append_data(self.dbus_method.result_signature, reply_data)
 
-        reply_message.send()
+            reply_message.send()
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.exception("Fatal error")
 
 
 def dbus_method(

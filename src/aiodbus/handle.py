@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 
 
 class Closeable(Protocol):
@@ -24,18 +24,8 @@ class DbusExportHandle:
     def __enter__(self) -> DbusExportHandle:
         return self
 
-    def __exit__(
-        self,
-        exc_type: Any,
-        exc_value: Any,
-        traceback: Any,
-    ) -> None:
+    def __exit__(self, *_) -> None:
         self.close()
 
-    async def __aexit__(
-        self,
-        exc_type: Any,
-        exc_value: Any,
-        traceback: Any,
-    ) -> None:
+    async def __aexit__(self, *_) -> None:
         self.close()

@@ -24,7 +24,7 @@ from typing import Dict, List
 from unittest import main
 
 from _sdbus import SdBus, SdBusMessage
-from aiodbus import SdBusLibraryError
+from aiodbus import SdBusError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 
@@ -355,7 +355,7 @@ class TestDbusTypes(IsolatedDbusTestCase):
 
         message.append_data("s", "test")
         message.seal()
-        self.assertRaises(SdBusLibraryError, message.append_data, "s", "error")
+        self.assertRaises(SdBusError, message.append_data, "s", "error")
 
     def test_message_properties(self) -> None:
         message = create_message(self.bus)

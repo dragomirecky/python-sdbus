@@ -356,21 +356,17 @@ PyType_Spec SdBusInterfaceType = {
 };
 
 static int set_dbus_error_from_python_exception(sd_bus_error * ret_error) {
-#ifdef Py_LIMITED_API
-    PyObject * dbus_error_bytes CLEANUP_PY_OBJECT = NULL;
-#endif
     PyObject * current_exception = PyErr_Occurred();
     if (NULL == current_exception) {
-        goto fail;
+        return sd_bus_error_set(ret_error, SD_BUS_ERROR_FAILED, "");
     }
-    PyObject * dbus_error_str = CALL_PYTHON_GOTO_FAIL(PyDict_GetItem(exception_to_dbus_error_dict, current_exception));
-#ifndef Py_LIMITED_API
-    const char * dbus_error_char_ptr = SD_BUS_PY_UNICODE_AS_CHAR_PTR_GOTO_FAIL(dbus_error_str);
-#else
-    dbus_error_bytes = SD_BUS_PY_UNICODE_AS_BYTES_GOTO_FAIL(dbus_error_str);
-    const char * dbus_error_char_ptr = SD_BUS_PY_BYTES_AS_CHAR_PTR_GOTO_FAIL(dbus_error_bytes);
-#endif
-    return sd_bus_error_set(ret_error, dbus_error_char_ptr, "");
+
+    PyObject * error_name = CALL_PYTHON_GOTO_FAIL(PyObject_GetAttrString(current_exception, "error_name"));
+    const char * error_name_ptr = SD_BUS_PY_UNICODE_AS_CHAR_PTR_GOTO_FAIL(error_name);
+
+    int error_set_result = sd_bus_error_set(ret_error, error_name_ptr, "");
+    Py_XDECREF(error_name);
+    return error_set_result;
 fail:
     return sd_bus_error_set(ret_error, SD_BUS_ERROR_FAILED, "");
 }

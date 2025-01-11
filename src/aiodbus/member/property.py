@@ -48,6 +48,7 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
+from aiodbus.exceptions import DbusMethodError
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
@@ -165,6 +166,9 @@ class DbusProxyProperty(
             self.dbus_property.property_name,
         )
         reply_message = await bus.call_async(new_get_message)
+        if error := reply_message.get_error():
+            name, message = error
+            raise DbusMethodError.create(name, message)
         # Get method returns variant but we only need contents of variant
         return cast(T, reply_message.get_contents()[1])
 
@@ -180,7 +184,10 @@ class DbusProxyProperty(
             "v",
             (self.dbus_property.property_signature, complete_object),
         )
-        await bus.call_async(new_set_message)
+        response = await bus.call_async(new_set_message)
+        if error := response.get_error():
+            name, message = error
+            raise DbusMethodError.create(name, message)
 
 
 class DbusLocalProperty(

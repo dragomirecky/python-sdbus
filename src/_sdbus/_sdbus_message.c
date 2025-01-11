@@ -1025,6 +1025,22 @@ static SdBusMessageObject * SdBusMessage_create_error_reply(SdBusMessageObject *
     return new_reply_message;
 }
 
+static PyObject * SdBusMessage_get_type(SdBusMessageObject * self, PyObject * Py_UNUSED(args)) {
+    uint8_t type;
+    CALL_SD_BUS_AND_CHECK(sd_bus_message_get_type(self->message_ref, &type));
+    return PyLong_FromLong(type);
+}
+
+static PyObject * SdBusMessage_get_error(SdBusMessageObject * self, PyObject * Py_UNUSED(args)) {
+    const sd_bus_error * error = sd_bus_message_get_error(self->message_ref);
+    if (error == NULL) {
+        Py_RETURN_NONE;
+    }
+    return PyTuple_Pack(2,
+        PyUnicode_FromString(error->name),
+        error->message ? PyUnicode_FromString(error->message) : Py_None);
+}
+
 static PyMethodDef SdBusMessage_methods[] = {
     { "append_data", (SD_BUS_PY_FUNC_TYPE)SdBusMessage_append_data, SD_BUS_PY_METH, PyDoc_STR("Append basic data based on signature.") },
     { "open_container", (SD_BUS_PY_FUNC_TYPE)SdBusMessage_open_container, SD_BUS_PY_METH, PyDoc_STR("Open container for writing.") },
@@ -1039,6 +1055,8 @@ static PyMethodDef SdBusMessage_methods[] = {
     { "create_error_reply", (SD_BUS_PY_FUNC_TYPE)SdBusMessage_create_error_reply, SD_BUS_PY_METH,
         PyDoc_STR("Create error reply with error name and error message.") },
     { "send", (PyCFunction)SdBusMessage_send, METH_NOARGS, PyDoc_STR("Queue message to be sent.") },
+    { "get_type", (PyCFunction)SdBusMessage_get_type, METH_NOARGS, PyDoc_STR("Get message type.") },
+    { "get_error", (PyCFunction)SdBusMessage_get_error, METH_NOARGS, PyDoc_STR("If error, return tuple (error name, error message or None). None otherwise.") },
     { NULL, NULL, 0, NULL },
 };
 

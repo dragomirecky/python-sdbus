@@ -26,7 +26,7 @@ from unittest import main
 from _sdbus import NameAllowReplacementFlag, NameQueueFlag
 from aiodbus import request_default_bus_name, sd_bus_open_user
 from aiodbus.exceptions import (
-    SdBusLibraryError,
+    DbusError,
     SdBusRequestNameAlreadyOwnerError,
     SdBusRequestNameError,
     SdBusRequestNameExistsError,
@@ -114,7 +114,7 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
         extra_bus = sd_bus_open_user()
         extra_bus.close()
 
-        with self.assertRaises(SdBusLibraryError):
+        with self.assertRaises(DbusError):
             await wait_for(
                 extra_bus.request_name(TEST_BUS_NAME, 0),
                 timeout=1,

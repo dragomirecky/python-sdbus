@@ -19,6 +19,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 
+import aiodbus.bus
 from _sdbus import (
     DbusDeprecatedFlag,
     DbusHiddenFlag,
@@ -30,12 +31,9 @@ from _sdbus import (
     DbusSensitiveFlag,
     DbusUnprivilegedFlag,
     SdBus,
-    SdBusBaseError,
-    SdBusLibraryError,
-    SdBusUnmappedMessageError,
+    SdBusError,
     decode_object_path,
     encode_object_path,
-    map_exception_to_dbus_error,
     sd_bus_open,
     sd_bus_open_system,
     sd_bus_open_system_machine,
@@ -54,7 +52,7 @@ from .dbus_common_funcs import (
     request_default_bus_name,
     set_default_bus,
 )
-from .dbus_exceptions import (
+from .exceptions import (
     DbusAccessDeniedError,
     DbusAddressInUseError,
     DbusAuthFailedError,
@@ -142,12 +140,9 @@ __all__ = (
     "DbusSensitiveFlag",
     "DbusUnprivilegedFlag",
     "SdBus",
-    "SdBusBaseError",
-    "SdBusLibraryError",
-    "SdBusUnmappedMessageError",
+    "SdBusError",
     "decode_object_path",
     "encode_object_path",
-    "map_exception_to_dbus_error",
     "sd_bus_open",
     "sd_bus_open_system",
     "sd_bus_open_system_machine",

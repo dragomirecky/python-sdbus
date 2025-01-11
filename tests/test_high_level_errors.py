@@ -24,14 +24,13 @@ from asyncio import get_running_loop, wait_for
 from typing import Any
 
 from aiodbus import DbusInterfaceCommonAsync, dbus_method, request_default_bus_name
-from aiodbus.exceptions import DbusFailedError
+from aiodbus.exceptions import DbusFailedError, DbusMethodError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 HELLO_WORLD = "Hello, world!"
 
 
-class DbusDeriveMethodError(DbusFailedError):
-    dbus_error_name = "org.example.Method.Error"
+class DbusDeriveMethodError(DbusMethodError, name="org.example.Method.Error"): ...
 
 
 class IndependentError(Exception): ...
@@ -51,7 +50,8 @@ class InterfaceWithErrors(
 
     @dbus_method(result_signature="s")
     async def hello_derrived_error(self) -> str:
-        raise DbusDeriveMethodError
+        print("called")
+        raise DbusDeriveMethodError()
 
 
 class TestHighLevelErrors(IsolatedDbusTestCase):

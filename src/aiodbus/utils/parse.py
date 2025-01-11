@@ -19,7 +19,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from aiodbus.dbus_common_funcs import _parse_properties_vardict
 from aiodbus.interface.base import (
@@ -27,38 +38,23 @@ from aiodbus.interface.base import (
     DBUS_INTERFACE_NAME_TO_CLASS,
     DbusInterfaceBase,
 )
+from aiodbus.interface.properties import DBUS_PROPERTIES_CHANGED_TYPING
 
-if TYPE_CHECKING:
-    from typing import (
-        Any,
-        Dict,
-        FrozenSet,
-        Iterable,
-        List,
-        Literal,
-        Optional,
-        Tuple,
-        Type,
-        Union,
-    )
-
-    from aiodbus.interface.properties import DBUS_PROPERTIES_CHANGED_TYPING
-
-    InterfacesInputElements = Union[
-        DbusInterfaceBase,
-        Type[DbusInterfaceBase],
-    ]
-    InterfacesInput = Union[
-        InterfacesInputElements,
-        Iterable[InterfacesInputElements],
-    ]
-    InterfacesToClassMap = Dict[FrozenSet[str], Type[DbusInterfaceBase]]
-    OnUnknownMember = Literal["error", "ignore", "reuse"]
-    OnUnknownInterface = Literal["error", "none"]
-    ParseGetManaged = Dict[
-        str,
-        Tuple[Optional[Type[DbusInterfaceBase]], Dict[str, Any]],
-    ]
+InterfacesInputElements = Union[
+    DbusInterfaceBase,
+    Type[DbusInterfaceBase],
+]
+InterfacesInput = Union[
+    InterfacesInputElements,
+    Iterable[InterfacesInputElements],
+]
+InterfacesToClassMap = Dict[FrozenSet[str], Type[DbusInterfaceBase]]
+OnUnknownMember = Literal["error", "ignore", "reuse"]
+OnUnknownInterface = Literal["error", "none"]
+ParseGetManaged = Dict[
+    str,
+    Tuple[Optional[Type[DbusInterfaceBase]], Dict[str, Any]],
+]
 
 
 def parse_properties_changed(

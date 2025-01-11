@@ -27,7 +27,7 @@ from asyncio.subprocess import create_subprocess_exec
 from typing import Tuple
 from unittest import SkipTest
 
-from _sdbus import DBUS_ERROR_TO_EXCEPTION, DbusPropertyEmitsChangeFlag
+from _sdbus import DbusPropertyEmitsChangeFlag, SdBusError, SdBusMethodError
 from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusNoReplyFlag,
@@ -41,11 +41,10 @@ from aiodbus import (
 from aiodbus.exceptions import (
     DbusFailedError,
     DbusFileExistsError,
+    DbusMethodError,
     DbusNoReplyError,
     DbusPropertyReadOnlyError,
     DbusUnknownObjectError,
-    SdBusLibraryError,
-    SdBusUnmappedMessageError,
 )
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.parse import parse_properties_changed
@@ -169,7 +168,7 @@ class SomeTestInterface(
 
     @dbus_method()
     async def raise_derived_exception(self) -> None:
-        raise DbusFileExistsError("Test error 2")
+        raise DbusFileExistsError()
 
     @dbus_method()
     async def raise_custom_error(self) -> None:
@@ -177,11 +176,6 @@ class SomeTestInterface(
 
     @dbus_method()
     async def raise_and_unmap_error(self) -> None:
-        try:
-            DBUS_ERROR_TO_EXCEPTION.pop("org.example.Nothing")
-        except KeyError:
-            ...
-
         raise DbusErrorUnmappedLater("Should be unmapped")
 
     @dbus_method("s", flags=DbusNoReplyFlag)
@@ -228,12 +222,10 @@ class SomeTestInterface(
         return len(input_str)
 
 
-class DbusErrorTest(DbusFailedError):
-    dbus_error_name = "org.example.Error"
+class DbusErrorTest(DbusMethodError, name="org.example.Error"): ...
 
 
-class DbusErrorUnmappedLater(DbusFailedError):
-    dbus_error_name = "org.example.Nothing"
+class DbusErrorUnmappedLater(DbusMethodError, name="org.example.Nothing"): ...
 
 
 TEST_SERVICE_NAME = "org.example.test"
@@ -541,7 +533,10 @@ class TestProxy(IsolatedDbusTestCase):
         async def first_test() -> None:
             await test_object_connection.raise_base_exception()
 
-        with self.assertRaises(DbusFailedError):
+        with self.assertRaises(DbusMethodError):
+            await wait_for(first_test(), timeout=1)
+
+        with self.assertRaises(DbusMethodError):
             await wait_for(first_test(), timeout=1)
 
         async def second_test() -> None:
@@ -556,21 +551,10 @@ class TestProxy(IsolatedDbusTestCase):
         with self.assertRaises(DbusErrorTest):
             await wait_for(third_test(), timeout=1)
 
-        def bad_exception_error_name_used() -> None:
-            class BadDbusError(DbusFailedError):
-                dbus_error_name = "org.freedesktop.DBus.Error.NoMemory"
-
-        self.assertRaises(ValueError, bad_exception_error_name_used)
-
-        def bad_exception_no_error_name() -> None:
-            class BadDbusError(DbusFailedError): ...
-
-        self.assertRaises(TypeError, bad_exception_no_error_name)
-
         async def test_unmapped_expection() -> None:
             await test_object_connection.raise_and_unmap_error()
 
-        with self.assertRaises(SdBusUnmappedMessageError):
+        with self.assertRaises(DbusMethodError):
             await wait_for(test_unmapped_expection(), timeout=1)
 
     async def test_no_reply_method(self) -> None:
@@ -655,7 +639,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.bus.close()
 
-        with self.assertRaises(SdBusLibraryError):
+        with self.assertRaises(SdBusError):
             await wait_for(too_long_wait(), timeout=1)
 
     async def test_bus_timerfd(self) -> None:

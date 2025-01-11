@@ -30,14 +30,13 @@ from aiodbus import (
     request_default_bus_name,
 )
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta
-from aiodbus.exceptions import DbusFailedError
+from aiodbus.exceptions import DbusFailedError, DbusMethodError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 HELLO_WORLD = "Hello, world!"
 
 
-class DbusDerivePropertydError(DbusFailedError):
-    dbus_error_name = "org.example.PropertyError"
+class DbusDerivePropertydError(DbusMethodError, name="org.example.PropertyError"): ...
 
 
 class IndependentError(Exception): ...
@@ -110,6 +109,13 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         self.assertIs(should_be_dbus_failed.__class__, DbusFailedError)
 
         await self.test_object_connection.hello_world()
+
+    async def test_generic_error_is_returned_as_dbus_failed(self) -> None:
+        with self.assertRaises(DbusFailedError) as cm:
+            await wait_for(
+                self.test_object_connection.hello_error(),
+                timeout=1,
+            )
 
     async def test_property_getter_derived_error(self) -> None:
         with self.assertRaises(DbusDerivePropertydError):
@@ -187,12 +193,6 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
             )
 
         interface.method_dict[TEST_KEY] = None
-
-        with self.assertRaises(TypeError):
-            await wait_for(
-                self.test_object_connection.hello_world(),
-                timeout=1,
-            )
 
         def test_raise(*args: Any, **kwargs: Any) -> None:
             raise DbusDerivePropertydError

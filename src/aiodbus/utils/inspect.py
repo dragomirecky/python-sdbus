@@ -19,7 +19,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Optional
 
 from _sdbus import SdBus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta, DbusRemoteObjectMeta

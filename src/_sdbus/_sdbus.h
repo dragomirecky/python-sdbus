@@ -86,7 +86,7 @@
     }
 
 #define SDBUS_LIBRARY_ERROR_FORMAT(func_call) \
-    PyErr_Format(exception_lib,               \
+    PyErr_Format(sdbus_exception,             \
         "File: %s Line: %d. " #func_call      \
         " in function %s returned "           \
         "error number: %i",                   \
@@ -256,16 +256,8 @@ extern PyObject * append_str;
 extern PyObject * call_soon_str;
 extern PyObject * create_task_str;
 // Exceptions
-extern PyObject * exception_base;
-extern PyObject * unmapped_error_exception;
-extern PyObject * exception_lib;
-extern PyObject * exception_request_name; // Base to any request name exception
-extern PyObject * exception_request_name_in_queue; // Queued up to acquire name
-extern PyObject * exception_request_name_exists; // Someone already owns the name
-extern PyObject * exception_request_name_already_owner; // Already an owner of the name
-
-extern PyObject * dbus_error_to_exception_dict;
-extern PyObject * exception_to_dbus_error_dict;
+extern PyObject * sdbus_exception;
+extern PyObject * sdbus_method_error;
 
 __attribute__((used)) static inline void _cleanup_char_ptr(const char ** ptr) {
     if (*ptr != NULL) {
