@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # Copyright (C) 2020-2023 igo95862
+# Copyright (C) 2025, Alan Dragomirecký
 
-# This file is part of python-sdbus
+# This file is part of aiodbus, a fork of python-sdbus.
 
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -162,12 +163,7 @@ class SdBus:
         raise NotImplementedError(__STUB_ERROR)
 
     def new_method_call_message(
-        self,
-        destination_name: str,
-        object_path: str,
-        interface_name: str,
-        member_name: str,
-        /,
+        self, destination_name: str, object_path: str, interface_name: str, member_name: str, /
     ) -> SdBusMessage:
         raise NotImplementedError(__STUB_ERROR)
 
