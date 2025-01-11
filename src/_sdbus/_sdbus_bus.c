@@ -23,7 +23,7 @@
 #include <poll.h>
 #include <sys/timerfd.h>
 #include <time.h>
-#include "sd_bus_internals.h"
+#include "_sdbus.h"
 
 static void SdBus_dealloc(SdBusObject* self) {
         if (NULL != self->loop && NULL != self->bus_fd) {

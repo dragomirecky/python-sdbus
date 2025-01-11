@@ -110,19 +110,19 @@ if __name__ == "__main__":
         package_data={
             "_sdbus": [
                 "py.typed",
-                "sd_bus_internals.pyi",
-                "sd_bus_internals.h",
+                "_sdbus.pyi",
+                "_sdbus.h",
             ],
         },
         ext_modules=[
             Extension(
                 "_sdbus",
                 [
-                    "src/_sdbus/sd_bus_internals.c",
-                    "src/_sdbus/sd_bus_internals_bus.c",
-                    "src/_sdbus/sd_bus_internals_funcs.c",
-                    "src/_sdbus/sd_bus_internals_interface.c",
-                    "src/_sdbus/sd_bus_internals_message.c",
+                    "src/_sdbus/_sdbus.c",
+                    "src/_sdbus/_sdbus_bus.c",
+                    "src/_sdbus/_sdbus_funcs.c",
+                    "src/_sdbus/_sdbus_interface.c",
+                    "src/_sdbus/_sdbus_message.c",
                 ],
                 extra_compile_args=compile_arguments,
                 extra_link_args=link_arguments,

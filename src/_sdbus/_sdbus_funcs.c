@@ -19,7 +19,7 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 */
-#include "sd_bus_internals.h"
+#include "_sdbus.h"
 
 static SdBusObject* sd_bus_py_open(PyObject* Py_UNUSED(self), PyObject* Py_UNUSED(ignored)) {
         SdBusObject* new_sd_bus = (SdBusObject*)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBus_class));

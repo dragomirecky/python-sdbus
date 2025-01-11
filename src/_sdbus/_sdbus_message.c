@@ -19,7 +19,7 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 */
-#include "sd_bus_internals.h"
+#include "_sdbus.h"
 
 void _SdBusMessage_set_messsage(SdBusMessageObject* self, sd_bus_message* new_message) {
         self->message_ref = sd_bus_message_ref(new_message);
