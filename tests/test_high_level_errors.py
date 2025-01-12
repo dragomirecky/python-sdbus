@@ -23,7 +23,10 @@ from __future__ import annotations
 from asyncio import get_running_loop, wait_for
 from typing import Any
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method, request_default_bus_name
+import pytest
+
+from aiodbus import DbusInterfaceCommonAsync, dbus_method
+from aiodbus.bus import get_default_bus
 from aiodbus.exceptions import DbusFailedError, DbusMethodError
 from aiodbus.unittest import IsolatedDbusTestCase
 
@@ -58,7 +61,7 @@ class TestHighLevelErrors(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        await request_default_bus_name("org.test")
+        await get_default_bus().request_name("org.test")
         self.test_object = InterfaceWithErrors()
         self.test_object.export_to_dbus("/")
 

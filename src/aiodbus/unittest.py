@@ -33,8 +33,9 @@ from typing import Any, AsyncContextManager, Iterator, List, Optional, TypeVar, 
 from unittest import IsolatedAsyncioTestCase
 from weakref import ref as weak_ref
 
-from _sdbus import SdBus, SdBusMessage, SdBusSlot, sd_bus_open_user
-from aiodbus.dbus_common_funcs import set_default_bus
+from _sdbus import SdBus, SdBusMessage, SdBusSlot
+from aiodbus.bus import Dbus, connect, set_default_bus
+from aiodbus.handle import Closeable
 from aiodbus.member.signal import (
     DbusBoundSignalBase,
     DbusLocalSignal,
@@ -109,16 +110,16 @@ class DbusSignalRecorderRemote(DbusSignalRecorderBase):
     def __init__(
         self,
         timeout: Union[int, float],
-        bus: SdBus,
+        bus: Dbus,
         remote_signal: DbusProxySignal[Any],
     ):
         super().__init__(timeout)
         self._bus = bus
-        self._match_slot: Optional[SdBusSlot] = None
+        self._handle: Optional[Closeable] = None
         self._remote_signal = remote_signal
 
     async def __aenter__(self) -> DbusSignalRecorderBase:
-        self._match_slot = await self._remote_signal._register_match_slot(
+        self._handle = await self._remote_signal._register_match_slot(
             self._bus,
             self._callback_method,
         )
@@ -134,8 +135,8 @@ class DbusSignalRecorderRemote(DbusSignalRecorderBase):
         try:
             await super().__aexit__(exc_type, exc_value, traceback)
         finally:
-            if self._match_slot is not None:
-                self._match_slot.close()
+            if self._handle is not None:
+                self._handle.close()
 
 
 class DbusSignalRecorderLocal(DbusSignalRecorderBase):
@@ -160,7 +161,7 @@ class DbusSignalRecorderLocal(DbusSignalRecorderBase):
 @contextmanager
 def _isolated_dbus(
     dbus_executable_name: str = "dbus-daemon",
-) -> Iterator[SdBus]:
+) -> Iterator[Dbus]:
     with ExitStack() as exit_stack:
         temp_dir_path = Path(exit_stack.enter_context(TemporaryDirectory(prefix="python-sdbus-")))
 
@@ -201,7 +202,7 @@ def _isolated_dbus(
             )
         environ["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={dbus_socket_path}"
 
-        bus = sd_bus_open_user()
+        bus = connect("session")
         set_default_bus(bus)
         yield bus
 
@@ -211,6 +212,7 @@ class IsolatedDbusTestCase(IsolatedAsyncioTestCase):
         # TODO: Use enterContext from Python 3.11
         _isolated_dbus_cm = _isolated_dbus()
         self.bus = _isolated_dbus_cm.__enter__()
+        self.sdbus = self.bus._sdbus
         self.addCleanup(_isolated_dbus_cm.__exit__, None, None, None)
 
     async def asyncSetUp(self) -> None:

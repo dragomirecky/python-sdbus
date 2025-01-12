@@ -159,13 +159,13 @@ class DbusProxyProperty(
 
     async def get(self) -> T:
         bus = self.proxy_meta.attached_bus
-        new_get_message = bus.new_property_get_message(
+        new_get_message = bus._sdbus.new_property_get_message(
             self.proxy_meta.service_name,
             self.proxy_meta.object_path,
             self.dbus_property.interface_name,
             self.dbus_property.property_name,
         )
-        reply_message = await bus.call_async(new_get_message)
+        reply_message = await bus._sdbus.call_async(new_get_message)
         if error := reply_message.get_error():
             name, message = error
             raise DbusMethodError.create(name, message)
@@ -174,7 +174,7 @@ class DbusProxyProperty(
 
     async def set(self, complete_object: T) -> None:
         bus = self.proxy_meta.attached_bus
-        new_set_message = bus.new_property_set_message(
+        new_set_message = bus._sdbus.new_property_set_message(
             self.proxy_meta.service_name,
             self.proxy_meta.object_path,
             self.dbus_property.interface_name,
@@ -184,7 +184,7 @@ class DbusProxyProperty(
             "v",
             (self.dbus_property.property_signature, complete_object),
         )
-        response = await bus.call_async(new_set_message)
+        response = await bus._sdbus.call_async(new_set_message)
         if error := response.get_error():
             name, message = error
             raise DbusMethodError.create(name, message)

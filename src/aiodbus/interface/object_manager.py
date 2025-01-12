@@ -23,7 +23,8 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from aiodbus.dbus_common_funcs import get_default_bus
+from aiodbus import get_default_bus
+from aiodbus.bus import Dbus
 from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 from aiodbus.interface.common import DbusInterfaceCommonAsync
 from aiodbus.member.method import dbus_method
@@ -32,7 +33,7 @@ from aiodbus.member.signal import dbus_signal
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Tuple
 
-    from _sdbus import SdBus, SdBusSlot
+    from _sdbus import SdBusSlot
 
 
 class CloseableFromCallback:
@@ -65,7 +66,7 @@ class DbusObjectManagerInterfaceAsync(
     def export_to_dbus(
         self,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> DbusExportHandle:
         if bus is None:
             bus = get_default_bus()
@@ -74,7 +75,7 @@ class DbusObjectManagerInterfaceAsync(
             object_path,
             bus,
         )
-        slot = bus.add_object_manager(object_path)
+        slot = bus._sdbus.add_object_manager(object_path)
         self._object_manager_slot = slot
         export_handle.append(slot)
         return export_handle
@@ -83,7 +84,7 @@ class DbusObjectManagerInterfaceAsync(
         self,
         object_path: str,
         object_to_export: DbusInterfaceBase,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> DbusExportHandle:
         if self._object_manager_slot is None:
             raise RuntimeError("ObjectManager not intitialized")
@@ -100,7 +101,7 @@ class DbusObjectManagerInterfaceAsync(
                 partial(self.remove_managed_object, object_to_export),
             )
         )
-        bus.emit_object_added(object_path)
+        bus._sdbus.emit_object_added(object_path)
         self._managed_object_to_path[object_to_export] = object_path
         return export_handle
 
@@ -109,4 +110,4 @@ class DbusObjectManagerInterfaceAsync(
             raise RuntimeError("Object manager not exported")
 
         removed_path = self._managed_object_to_path.pop(managed_object)
-        self._dbus.attached_bus.emit_object_removed(removed_path)
+        self._dbus.attached_bus._sdbus.emit_object_removed(removed_path)

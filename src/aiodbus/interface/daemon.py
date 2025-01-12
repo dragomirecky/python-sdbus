@@ -22,19 +22,14 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from aiodbus import (
-    DbusInterfaceCommonAsync,
-    SdBus,
-    dbus_method,
-    dbus_property,
-    dbus_signal,
-)
+from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property, dbus_signal
+from aiodbus.bus import Dbus
 
 
 class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.DBus"):
     """D-Bus daemon."""
 
-    def __init__(self, bus: Optional[SdBus] = None):
+    def __init__(self, bus: Optional[Dbus] = None):
         """This is the D-Bus daemon interface. Used for querying D-Bus state.
 
         D-Bus interface object path and service name is

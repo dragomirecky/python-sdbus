@@ -21,16 +21,17 @@ from __future__ import annotations
 
 from typing import Optional
 
+import aiodbus
 from _sdbus import SdBus
+from aiodbus.bus import Dbus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta, DbusRemoteObjectMeta
-from aiodbus.dbus_common_funcs import get_default_bus
 from aiodbus.interface.base import DbusInterfaceBase
 
 
 def _inspect_dbus_path_proxy(
     obj: object,
     dbus_meta: DbusRemoteObjectMeta,
-    bus: SdBus,
+    bus: Dbus,
 ) -> str:
     if bus != dbus_meta.attached_bus:
         raise LookupError(
@@ -44,7 +45,7 @@ def _inspect_dbus_path_proxy(
 def _inspect_dbus_path_local(
     obj: object,
     dbus_meta: DbusLocalObjectMeta,
-    bus: SdBus,
+    bus: Dbus,
 ) -> str:
     attached_bus = dbus_meta.attached_bus
     object_path = dbus_meta.serving_object_path
@@ -62,10 +63,10 @@ def _inspect_dbus_path_local(
 
 def inspect_dbus_path(
     obj: DbusInterfaceBase,
-    bus: Optional[SdBus] = None,
+    bus: Optional[Dbus] = None,
 ) -> str:
     if bus is None:
-        bus = get_default_bus()
+        bus = aiodbus.get_default_bus()
 
     if isinstance(obj, DbusInterfaceBase):
         dbus_meta = obj._dbus

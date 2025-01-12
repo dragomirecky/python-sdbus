@@ -20,7 +20,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from aiodbus import DbusInterfaceCommonAsync, sd_bus_open_user
+from aiodbus import DbusInterfaceCommonAsync
+from aiodbus.bus import connect
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.inspect import inspect_dbus_path
 
@@ -33,7 +34,7 @@ class TestSdbusUtilsInspect(IsolatedDbusTestCase):
 
         self.assertEqual(inspect_dbus_path(proxy), TEST_PATH)
 
-        new_bus = sd_bus_open_user()
+        new_bus = connect("session", make_default=False)
 
         with self.assertRaisesRegex(LookupError, "is not attached to bus"):
             inspect_dbus_path(proxy, new_bus)
@@ -51,7 +52,7 @@ class TestSdbusUtilsInspect(IsolatedDbusTestCase):
 
         self.assertEqual(inspect_dbus_path(local_obj), TEST_PATH)
 
-        new_bus = sd_bus_open_user()
+        new_bus = connect("session", make_default=False)
 
         with self.assertRaisesRegex(LookupError, "is not attached to bus"):
             inspect_dbus_path(local_obj, new_bus)

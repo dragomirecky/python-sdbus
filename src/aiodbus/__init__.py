@@ -19,7 +19,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 
-import aiodbus.bus
 from _sdbus import (
     DbusDeprecatedFlag,
     DbusHiddenFlag,
@@ -30,8 +29,6 @@ from _sdbus import (
     DbusPropertyExplicitFlag,
     DbusSensitiveFlag,
     DbusUnprivilegedFlag,
-    SdBus,
-    SdBusError,
     decode_object_path,
     encode_object_path,
     sd_bus_open,
@@ -41,17 +38,13 @@ from _sdbus import (
     sd_bus_open_user,
     sd_bus_open_user_machine,
 )
+from aiodbus.bus import Dbus, connect, get_default_bus, set_default_bus
 from aiodbus.interface.common import DbusInterfaceCommonAsync
 from aiodbus.interface.object_manager import DbusObjectManagerInterfaceAsync
 from aiodbus.member.method import dbus_method, dbus_method_override, get_current_message
 from aiodbus.member.property import dbus_property, dbus_property_async_override
 from aiodbus.member.signal import dbus_signal
 
-from .dbus_common_funcs import (
-    get_default_bus,
-    request_default_bus_name,
-    set_default_bus,
-)
 from .exceptions import (
     DbusAccessDeniedError,
     DbusAddressInUseError,
@@ -87,10 +80,6 @@ from .exceptions import (
 )
 
 __all__ = (
-    "get_default_bus",
-    "request_default_bus_name",
-    "request_default_bus_name",
-    "set_default_bus",
     "DbusAccessDeniedError",
     "DbusAddressInUseError",
     "DbusAuthFailedError",
@@ -139,14 +128,10 @@ __all__ = (
     "DbusPropertyExplicitFlag",
     "DbusSensitiveFlag",
     "DbusUnprivilegedFlag",
-    "SdBus",
-    "SdBusError",
     "decode_object_path",
     "encode_object_path",
-    "sd_bus_open",
-    "sd_bus_open_system",
-    "sd_bus_open_system_machine",
-    "sd_bus_open_system_remote",
-    "sd_bus_open_user",
-    "sd_bus_open_user_machine",
+    "connect",
+    "get_default_bus",
+    "set_default_bus",
+    "Dbus",
 )

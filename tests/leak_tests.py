@@ -26,7 +26,7 @@ from resource import RUSAGE_SELF, getrusage
 from typing import Any, List, cast
 from unittest import SkipTest
 
-from aiodbus import request_default_bus_name
+from aiodbus import get_default_bus
 from aiodbus.exceptions import DbusFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
 
@@ -96,7 +96,7 @@ class LeakTests(IsolatedDbusTestCase):
 
     async def test_objects(self) -> None:
         leak_test_enabled()
-        await self.bus.request_name("org.example.test", 0)
+        await self.bus.request_name("org.example.test")
 
         pseudo_test = cast(TestProxy, self)
 
@@ -116,7 +116,7 @@ class LeakTests(IsolatedDbusTestCase):
     async def test_low_level_errors(self) -> None:
         leak_test_enabled()
 
-        await request_default_bus_name("org.test")
+        await get_default_bus().request_name("org.test")
         self.test_object = InterfaceWithErrors()
         self.test_object.export_to_dbus("/")
 
@@ -145,7 +145,7 @@ class LeakTests(IsolatedDbusTestCase):
 
     async def test_single_object(self) -> None:
         leak_test_enabled()
-        await self.bus.request_name("org.example.test", 0)
+        await self.bus.request_name("org.example.test")
 
         test_object, test_object_connection = initialize_object()
 

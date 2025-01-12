@@ -21,7 +21,6 @@
 from __future__ import annotations
 
 from asyncio import get_running_loop
-from contextvars import ContextVar
 from typing import Any, Dict, Iterator, Literal, Mapping, Tuple
 
 from _sdbus import (
@@ -32,11 +31,7 @@ from _sdbus import (
     NameAllowReplacementFlag,
     NameQueueFlag,
     NameReplaceExistingFlag,
-    SdBus,
-    sd_bus_open,
 )
-
-DEFAULT_BUS: ContextVar[SdBus] = ContextVar("DEFAULT_BUS")
 
 PROPERTY_FLAGS_MASK = (
     DbusPropertyConstFlag
@@ -64,36 +59,6 @@ def _prepare_request_name_flags(
         (NameAllowReplacementFlag if allow_replacement else 0)
         + (NameReplaceExistingFlag if replace_existing else 0)
         + (NameQueueFlag if queue else 0)
-    )
-
-
-def get_default_bus() -> SdBus:
-    try:
-        return DEFAULT_BUS.get()
-    except LookupError:
-        new_bus = sd_bus_open()
-        DEFAULT_BUS.set(new_bus)
-        return new_bus
-
-
-def set_default_bus(new_default: SdBus) -> None:
-    DEFAULT_BUS.set(new_default)
-
-
-async def request_default_bus_name(
-    new_name: str,
-    allow_replacement: bool = False,
-    replace_existing: bool = False,
-    queue: bool = False,
-) -> None:
-    default_bus = get_default_bus()
-    await default_bus.request_name(
-        new_name,
-        _prepare_request_name_flags(
-            allow_replacement,
-            replace_existing,
-            queue,
-        ),
     )
 
 

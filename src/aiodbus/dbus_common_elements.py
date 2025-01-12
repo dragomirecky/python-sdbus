@@ -36,14 +36,11 @@ from typing import (
     TypeVar,
 )
 
-from _sdbus import SdBus, SdBusInterface, is_interface_name_valid, is_member_name_valid
+from _sdbus import SdBusInterface, is_interface_name_valid, is_member_name_valid
+from aiodbus.bus import Dbus, get_default_bus
 from aiodbus.handle import DbusExportHandle
 
-from .dbus_common_funcs import (
-    _is_property_flags_correct,
-    _method_name_converter,
-    get_default_bus,
-)
+from .dbus_common_funcs import _is_property_flags_correct, _method_name_converter
 
 SelfMeta = TypeVar("SelfMeta", bound="DbusInterfaceMetaCommon")
 
@@ -349,7 +346,7 @@ class DbusRemoteObjectMeta:
         self,
         service_name: str,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ):
         self.service_name = service_name
         self.object_path = object_path
@@ -360,7 +357,7 @@ class DbusLocalObjectMeta:
     def __init__(self) -> None:
         self.activated_interfaces: List[SdBusInterface] = []
         self.serving_object_path: Optional[str] = None
-        self.attached_bus: Optional[SdBus] = None
+        self.attached_bus: Optional[Dbus] = None
 
 
 class DbusClassMeta:

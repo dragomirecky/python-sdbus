@@ -120,14 +120,10 @@ async def run_gen_from_connection(
     connection_name = connection_name
     object_paths = object_paths
 
+    import aiodbus
     from aiodbus.interface.common import DbusInterfaceCommonAsync
 
-    if system:
-        from aiodbus import sd_bus_open_system
-
-        from .dbus_common_funcs import set_default_bus
-
-        set_default_bus(sd_bus_open_system())
+    bus = aiodbus.connect("system" if system else "session", make_default=True)
 
     interfaces: List[DbusInterfaceIntrospection] = []
     for object_path in object_paths:

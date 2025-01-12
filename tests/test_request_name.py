@@ -23,8 +23,9 @@ from __future__ import annotations
 from asyncio import get_running_loop, sleep, wait_for
 from unittest import main
 
+import aiodbus
 from _sdbus import NameAllowReplacementFlag, NameQueueFlag
-from aiodbus import request_default_bus_name, sd_bus_open_user
+from aiodbus.bus import get_default_bus
 from aiodbus.exceptions import (
     DbusError,
     SdBusRequestNameAlreadyOwnerError,
@@ -82,67 +83,67 @@ class TestRequestNameLowLevel(IsolatedDbusTestCase):
         )
 
     async def test_name_exists_async(self) -> None:
-        extra_bus = sd_bus_open_user()
-        await self.bus.request_name(TEST_BUS_NAME, 0)
+        with aiodbus.connect("session", make_default=False) as extra_bus:
+            await self.bus.request_name(TEST_BUS_NAME)
 
-        with self.assertRaises(SdBusRequestNameExistsError):
-            await wait_for(
-                extra_bus.request_name(TEST_BUS_NAME, 0),
-                timeout=1,
-            )
+            with self.assertRaises(SdBusRequestNameExistsError):
+                await wait_for(
+                    extra_bus.request_name(TEST_BUS_NAME),
+                    timeout=1,
+                )
 
     async def test_name_already_async(self) -> None:
-        await self.bus.request_name(TEST_BUS_NAME, 0)
+        await self.bus.request_name(TEST_BUS_NAME)
 
         with self.assertRaises(SdBusRequestNameAlreadyOwnerError):
             await wait_for(
-                self.bus.request_name(TEST_BUS_NAME, 0),
+                self.bus.request_name(TEST_BUS_NAME),
                 timeout=1,
             )
 
     async def test_name_queued_async(self) -> None:
-        extra_bus = sd_bus_open_user()
-        await self.bus.request_name(TEST_BUS_NAME, 0)
+        with aiodbus.connect("session", make_default=False) as extra_bus:
+            await self.bus.request_name(TEST_BUS_NAME)
 
-        with self.assertRaises(SdBusRequestNameInQueueError):
-            await wait_for(
-                extra_bus.request_name(TEST_BUS_NAME, NameQueueFlag),
-                timeout=1,
-            )
+            with self.assertRaises(SdBusRequestNameInQueueError):
+                await wait_for(
+                    extra_bus.request_name(TEST_BUS_NAME, queue=True),
+                    timeout=1,
+                )
 
     async def test_name_other_error_async(self) -> None:
-        extra_bus = sd_bus_open_user()
+        extra_bus = aiodbus.connect("session", make_default=False)
         extra_bus.close()
 
         with self.assertRaises(DbusError):
             await wait_for(
-                extra_bus.request_name(TEST_BUS_NAME, 0),
+                extra_bus.request_name(TEST_BUS_NAME),
                 timeout=1,
             )
 
 
 class TestRequestNameAsync(IsolatedDbusTestCase):
     async def test_request_name_replacement(self) -> None:
-        extra_bus = sd_bus_open_user()
+        extra_bus = aiodbus.connect("session", make_default=False)
         await extra_bus.request_name(
             TEST_BUS_NAME,
-            NameAllowReplacementFlag,
+            allow_replacement=True,
         )
 
         with self.assertRaises(SdBusRequestNameExistsError):
-            await request_default_bus_name(TEST_BUS_NAME)
+            await get_default_bus().request_name(TEST_BUS_NAME)
 
-        await request_default_bus_name(
+        await get_default_bus().request_name(
             TEST_BUS_NAME,
             replace_existing=True,
         )
 
     async def test_request_name_queue(self) -> None:
-        extra_bus = sd_bus_open_user()
-        await extra_bus.request_name(TEST_BUS_NAME, 0)
+        extra_bus = aiodbus.connect("session", make_default=False)
+        await extra_bus.request_name(TEST_BUS_NAME)
 
         with self.assertRaises(SdBusRequestNameInQueueError):
-            await request_default_bus_name(
+            await get_default_bus().request_name(
                 TEST_BUS_NAME,
                 queue=True,
             )
@@ -167,7 +168,7 @@ class TestRequestNameAsync(IsolatedDbusTestCase):
         await wait_for(owner_changed_task, timeout=0.5)
 
         with self.assertRaises(SdBusRequestNameAlreadyOwnerError):
-            await request_default_bus_name(TEST_BUS_NAME)
+            await get_default_bus().request_name(TEST_BUS_NAME)
 
 
 if __name__ == "__main__":

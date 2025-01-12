@@ -41,8 +41,8 @@ class TestAsyncLowLevel(IsolatedDbusTestCase):
         self.assertIsNotNone(self.bus.address)
 
     async def test_bus_fd_unregister_close(self) -> None:
-        await self.bus.request_name("org.example", 0)
-        bus_fd = self.bus.get_fd()
+        await self.bus.request_name("org.example")
+        bus_fd = self.bus._sdbus.get_fd()
 
         self.bus.close()
 

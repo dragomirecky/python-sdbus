@@ -70,19 +70,19 @@ class TestPing(IsolatedDbusTestCase):
         self.assertEqual(return_code, 0)
 
     async def test_ping(self) -> None:
-        m = self.bus.new_method_call_message(
+        m = self.bus._sdbus.new_method_call_message(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
             "org.freedesktop.DBus.Peer",
             "Ping",
         )
-        r = await self.bus.call_async(m)
+        r = await self.sdbus.call_async(m)
         self.assertIsNone(r.get_contents())
 
 
 class TestRequestName(IsolatedDbusTestCase):
     async def test_request_name(self) -> None:
-        await self.bus.request_name("org.example.test", 0)
+        await self.bus.request_name("org.example.test")
 
 
 TEST_INTERFACE_NAME = "org.test.test"
@@ -243,7 +243,7 @@ def initialize_object() -> Tuple[SomeTestInterface, SomeTestInterface]:
 class TestProxy(IsolatedDbusTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-        await self.bus.request_name(TEST_SERVICE_NAME, 0)
+        await self.bus.request_name(TEST_SERVICE_NAME)
 
     async def test_method_kwargs(self) -> None:
         test_object, test_object_connection = initialize_object()
@@ -645,7 +645,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_bus_timerfd(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        self.bus.method_call_timeout_usec = 10_000  # 0.01 seconds
+        self.bus._sdbus.method_call_timeout_usec = 10_000  # 0.01 seconds
 
         loop = get_running_loop()
 
@@ -662,8 +662,9 @@ class TestProxy(IsolatedDbusTestCase):
         loop = get_running_loop()
         future = loop.create_future()
 
-        slot = await self.bus.match_signal_async(
-            TEST_SERVICE_NAME, None, None, None, future.set_result
+        slot = await self.bus.subscribe_signals(
+            sender_filter=TEST_SERVICE_NAME,
+            callback=future.set_result,
         )
 
         try:

@@ -23,13 +23,13 @@ from __future__ import annotations
 from typing import Dict, List
 from unittest import main
 
-from _sdbus import SdBus, SdBusMessage
-from aiodbus import SdBusError
+from _sdbus import SdBus, SdBusError, SdBusMessage
+from aiodbus.bus import Dbus
 from aiodbus.unittest import IsolatedDbusTestCase
 
 
-def create_message(bus: SdBus) -> SdBusMessage:
-    return bus.new_method_call_message(
+def create_message(bus: Dbus) -> SdBusMessage:
+    return bus._sdbus.new_method_call_message(
         "org.freedesktop.systemd1",
         "/org/freedesktop/systemd1",
         "org.freedesktop.systemd1.Manager",

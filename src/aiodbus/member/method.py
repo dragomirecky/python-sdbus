@@ -40,7 +40,7 @@ from typing import (
 )
 from weakref import ref as weak_ref
 
-from _sdbus import DbusNoReplyFlag, SdBusError, SdBusInterface, SdBusMessage
+from _sdbus import DbusNoReplyFlag, SdBusInterface, SdBusMessage
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
@@ -138,7 +138,7 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
 
     async def _dbus_call(self, call_message: SdBusMessage) -> Any:
         bus = self.proxy_meta.attached_bus
-        reply_message = await bus.call_async(call_message)
+        reply_message = await bus._sdbus.call_async(call_message)
         if error := reply_message.get_error():
             name, message = error
             raise DbusMethodError.create(name, message)
@@ -152,7 +152,7 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
         bus = self.proxy_meta.attached_bus
         dbus_method = self.dbus_method
 
-        new_call_message = bus.new_method_call_message(
+        new_call_message = bus._sdbus.new_method_call_message(
             self.proxy_meta.service_name,
             self.proxy_meta.object_path,
             dbus_method.interface_name,

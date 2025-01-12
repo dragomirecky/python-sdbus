@@ -42,7 +42,8 @@ from typing import (
 from warnings import warn
 from weakref import WeakKeyDictionary, WeakValueDictionary
 
-from _sdbus import SdBus, SdBusInterface
+from _sdbus import SdBusInterface
+from aiodbus.bus import Dbus, get_default_bus
 from aiodbus.dbus_common_elements import (
     DbusClassMeta,
     DbusInterfaceMetaCommon,
@@ -54,7 +55,6 @@ from aiodbus.dbus_common_elements import (
     DbusPropertyOverride,
     DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_common_funcs import get_default_bus
 from aiodbus.handle import DbusExportHandle
 from aiodbus.member.method import DbusMethod
 from aiodbus.member.property import DbusProperty
@@ -287,7 +287,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
     async def start_serving(
         self,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> None:
 
         warn("start_serving is deprecated in favor of export_to_dbus", DeprecationWarning)
@@ -296,7 +296,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
     def export_to_dbus(
         self,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> DbusExportHandle:
 
         local_object_meta = self._dbus
@@ -339,7 +339,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
             new_interface = SdBusInterface()
             for dbus_something in member_list:
                 dbus_something._append_to_interface(new_interface, export_handle)
-            bus.add_interface(new_interface, object_path, interface_name)
+            bus._sdbus.add_interface(new_interface, object_path, interface_name)
             local_object_meta.activated_interfaces.append(new_interface)
 
             assert new_interface.slot is not None
@@ -351,7 +351,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         self,
         service_name: str,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> None:
         self._proxify(
             service_name,
@@ -363,7 +363,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         self,
         service_name: str,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> None:
 
         self._dbus = DbusRemoteObjectMeta(
@@ -377,7 +377,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         cls: Type[Self],
         service_name: str,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> Self:
         warn(
             (
@@ -395,7 +395,7 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         cls: Type[Self],
         service_name: str,
         object_path: str,
-        bus: Optional[SdBus] = None,
+        bus: Optional[Dbus] = None,
     ) -> Self:
 
         new_object = cls.__new__(cls)
