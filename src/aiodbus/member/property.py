@@ -48,7 +48,7 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
-from aiodbus.exceptions import DbusMethodError
+from aiodbus.exceptions import MethodCallError
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
@@ -159,35 +159,24 @@ class DbusProxyProperty(
 
     async def get(self) -> T:
         bus = self.proxy_meta.attached_bus
-        new_get_message = bus._sdbus.new_property_get_message(
-            self.proxy_meta.service_name,
-            self.proxy_meta.object_path,
-            self.dbus_property.interface_name,
-            self.dbus_property.property_name,
+        response = await bus.get_property(
+            destination=self.proxy_meta.service_name,
+            path=self.proxy_meta.object_path,
+            interface=self.dbus_property.interface_name,
+            member=self.dbus_property.property_name,
         )
-        reply_message = await bus._sdbus.call_async(new_get_message)
-        if error := reply_message.get_error():
-            name, message = error
-            raise DbusMethodError.create(name, message)
-        # Get method returns variant but we only need contents of variant
-        return cast(T, reply_message.get_contents()[1])
+        return cast(T, response[1])
 
     async def set(self, complete_object: T) -> None:
         bus = self.proxy_meta.attached_bus
-        new_set_message = bus._sdbus.new_property_set_message(
-            self.proxy_meta.service_name,
-            self.proxy_meta.object_path,
-            self.dbus_property.interface_name,
-            self.dbus_property.property_name,
+        await bus.set_property(
+            destination=self.proxy_meta.service_name,
+            path=self.proxy_meta.object_path,
+            interface=self.dbus_property.interface_name,
+            member=self.dbus_property.property_name,
+            signature=self.dbus_property.property_signature,
+            args=(complete_object,),
         )
-        new_set_message.append_data(
-            "v",
-            (self.dbus_property.property_signature, complete_object),
-        )
-        response = await bus._sdbus.call_async(new_set_message)
-        if error := response.get_error():
-            name, message = error
-            raise DbusMethodError.create(name, message)
 
 
 class DbusLocalProperty(

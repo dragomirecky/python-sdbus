@@ -39,12 +39,12 @@ from aiodbus import (
     get_current_message,
 )
 from aiodbus.exceptions import (
-    DbusFailedError,
-    DbusFileExistsError,
-    DbusMethodError,
-    DbusNoReplyError,
-    DbusPropertyReadOnlyError,
-    DbusUnknownObjectError,
+    CallFailedError,
+    FileExistsError,
+    MethodCallError,
+    NoReplyError,
+    PropertyReadOnlyError,
+    UnknownObjectError,
 )
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.parse import parse_properties_changed
@@ -164,11 +164,11 @@ class SomeTestInterface(
 
     @dbus_method()
     async def raise_base_exception(self) -> None:
-        raise DbusFailedError("Test error")
+        raise CallFailedError("Test error")
 
     @dbus_method()
     async def raise_derived_exception(self) -> None:
-        raise DbusFileExistsError()
+        raise FileExistsError()
 
     @dbus_method()
     async def raise_custom_error(self) -> None:
@@ -222,10 +222,10 @@ class SomeTestInterface(
         return len(input_str)
 
 
-class DbusErrorTest(DbusMethodError, name="org.example.Error"): ...
+class DbusErrorTest(MethodCallError, name="org.example.Error"): ...
 
 
-class DbusErrorUnmappedLater(DbusMethodError, name="org.example.Nothing"): ...
+class DbusErrorUnmappedLater(MethodCallError, name="org.example.Nothing"): ...
 
 
 TEST_SERVICE_NAME = "org.example.test"
@@ -533,16 +533,16 @@ class TestProxy(IsolatedDbusTestCase):
         async def first_test() -> None:
             await test_object_connection.raise_base_exception()
 
-        with self.assertRaises(DbusMethodError):
+        with self.assertRaises(MethodCallError):
             await wait_for(first_test(), timeout=1)
 
-        with self.assertRaises(DbusMethodError):
+        with self.assertRaises(MethodCallError):
             await wait_for(first_test(), timeout=1)
 
         async def second_test() -> None:
             await test_object_connection.raise_derived_exception()
 
-        with self.assertRaises(DbusFileExistsError):
+        with self.assertRaises(FileExistsError):
             await wait_for(second_test(), timeout=1)
 
         async def third_test() -> None:
@@ -554,7 +554,7 @@ class TestProxy(IsolatedDbusTestCase):
         async def test_unmapped_expection() -> None:
             await test_object_connection.raise_and_unmap_error()
 
-        with self.assertRaises(DbusMethodError):
+        with self.assertRaises(MethodCallError):
             await wait_for(test_unmapped_expection(), timeout=1)
 
     async def test_no_reply_method(self) -> None:
@@ -573,7 +573,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         collect()
 
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             await wait_for(test_object_connection.dbus_introspect(), timeout=0.2)
 
     def test_docstring(self) -> None:
@@ -651,7 +651,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         start = loop.time()
 
-        with self.assertRaises(DbusNoReplyError):
+        with self.assertRaises(NoReplyError):
             await wait_for(test_object_connection.looong_method(), timeout=1)
 
         self.assertAlmostEqual(loop.time() - start, 0.01, delta=0.01)
@@ -770,7 +770,7 @@ class TestProxy(IsolatedDbusTestCase):
         new_value = 200
         self.assertNotEqual(await test_object_connection.test_property_private, new_value)
 
-        with self.assertRaises(DbusPropertyReadOnlyError):
+        with self.assertRaises(PropertyReadOnlyError):
             await test_object_connection.test_property_private.set(new_value)
 
         async with self.assertDbusSignalEmits(
@@ -822,7 +822,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         catch_changed_task = get_running_loop().create_task(catch_properties_changed())
 
-        with self.assertRaises(DbusPropertyReadOnlyError):
+        with self.assertRaises(PropertyReadOnlyError):
             await test_object_connection.test_property_private.set(10)
 
         await test_object.test_property_private.set(10)
@@ -886,13 +886,13 @@ class TestProxy(IsolatedDbusTestCase):
             TEST_SERVICE_NAME,
             "/",
         )
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             await test_object_connection.returns_none_method()
 
         with test_object.export_to_dbus("/"):
             await test_object_connection.returns_none_method()
 
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             await test_object_connection.returns_none_method()
 
         test_object2 = SomeTestInterface()
@@ -900,7 +900,7 @@ class TestProxy(IsolatedDbusTestCase):
         await test_object_connection.returns_none_method()
         handle.close()
 
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             await test_object_connection.returns_none_method()
 
     def test_asyncio_run_different_loops(self) -> None:

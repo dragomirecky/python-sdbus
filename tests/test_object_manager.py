@@ -26,7 +26,7 @@ from aiodbus import (
     dbus_method,
     dbus_property,
 )
-from aiodbus.exceptions import DbusUnknownObjectError
+from aiodbus.exceptions import UnknownObjectError
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils import (
     parse_get_managed_objects,
@@ -327,7 +327,7 @@ class TestObjectManager(IsolatedDbusTestCase):
                 dict,
             )
 
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             self.assertIsInstance(
                 await object_manager_connection.get_managed_objects(),
                 dict,
@@ -365,5 +365,5 @@ class TestObjectManager(IsolatedDbusTestCase):
         self.assertEqual(added.output[0][0], MANAGED_PATH)
         self.assertEqual(removed.output[0][0], MANAGED_PATH)
 
-        with self.assertRaises(DbusUnknownObjectError):
+        with self.assertRaises(UnknownObjectError):
             await managed_proxy.test_int

@@ -27,13 +27,13 @@ import pytest
 
 from aiodbus import DbusInterfaceCommonAsync, dbus_method
 from aiodbus.bus import get_default_bus
-from aiodbus.exceptions import DbusFailedError, DbusMethodError
+from aiodbus.exceptions import CallFailedError, MethodCallError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 HELLO_WORLD = "Hello, world!"
 
 
-class DbusDeriveMethodError(DbusMethodError, name="org.example.Method.Error"): ...
+class DbusDeriveMethodError(MethodCallError, name="org.example.Method.Error"): ...
 
 
 class IndependentError(Exception): ...
@@ -74,14 +74,14 @@ class TestHighLevelErrors(IsolatedDbusTestCase):
         loop.set_exception_handler(silence_exceptions)
 
     async def test_method_indenendent_error(self) -> None:
-        with self.assertRaises(DbusFailedError) as cm:
+        with self.assertRaises(CallFailedError) as cm:
             await wait_for(
                 self.test_object_connection.hello_independent_error(),
                 timeout=1,
             )
 
         exception = cm.exception
-        self.assertIs(exception.__class__, DbusFailedError)
+        self.assertIs(exception.__class__, CallFailedError)
 
     async def test_method_derived_error(self) -> None:
         with self.assertRaises(DbusDeriveMethodError):

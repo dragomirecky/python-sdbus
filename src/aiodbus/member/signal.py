@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+from abc import abstractmethod
 from asyncio import Queue
 from contextlib import closing
 from types import FunctionType
@@ -142,6 +143,7 @@ class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
     def member(self) -> DbusMember:
         return self.dbus_signal
 
+    @abstractmethod
     async def catch(self) -> AsyncIterator[T]:
         raise NotImplementedError
         yield cast(T, None)
@@ -285,20 +287,13 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
         if serving_object_path is None:
             return
 
-        signal_message = attached_bus._sdbus.new_signal_message(
-            serving_object_path,
-            self.dbus_signal.interface_name,
-            self.dbus_signal.signal_name,
+        attached_bus.emit_signal(
+            path=serving_object_path,
+            interface=self.dbus_signal.interface_name,
+            member=self.dbus_signal.signal_name,
+            signature=self.dbus_signal.signal_signature,
+            args=args,  # type: ignore
         )
-
-        if (not self.dbus_signal.signal_signature.startswith("(")) and isinstance(args, tuple):
-            signal_message.append_data(self.dbus_signal.signal_signature, *args)
-        elif self.dbus_signal.signal_signature == "" and args is None:
-            ...
-        else:
-            signal_message.append_data(self.dbus_signal.signal_signature, args)
-
-        signal_message.send()
 
     def emit(self, args: T) -> None:
         self._emit_dbus_signal(args)

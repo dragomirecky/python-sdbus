@@ -27,7 +27,7 @@ from typing import Any, List, cast
 from unittest import SkipTest
 
 from aiodbus import get_default_bus
-from aiodbus.exceptions import DbusFailedError
+from aiodbus.exceptions import CallFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 from .test_low_level_errors import DbusDerivePropertydError, InterfaceWithErrors
@@ -129,7 +129,7 @@ class LeakTests(IsolatedDbusTestCase):
         loop.set_exception_handler(silence_exceptions)
 
         for _ in range(150_000):
-            with self.assertRaises(DbusFailedError):
+            with self.assertRaises(CallFailedError):
                 await wait_for(
                     self.test_object_connection.indep_err_getter.get(),
                     timeout=1,

@@ -50,7 +50,7 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
-from aiodbus.exceptions import DbusFailedError, DbusMethodError
+from aiodbus.exceptions import CallFailedError, MethodCallError
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
@@ -136,28 +136,9 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
 
         self.__doc__ = dbus_method.__doc__
 
-    async def _dbus_call(self, call_message: SdBusMessage) -> Any:
-        bus = self.proxy_meta.attached_bus
-        reply_message = await bus._sdbus.call_async(call_message)
-        if error := reply_message.get_error():
-            name, message = error
-            raise DbusMethodError.create(name, message)
-        return reply_message.get_contents()
-
-    @staticmethod
-    async def _no_reply() -> None:
-        return None
-
     async def _make_dbus_call(self, *args: Any, **kwargs: Any) -> Any:
         bus = self.proxy_meta.attached_bus
         dbus_method = self.dbus_method
-
-        new_call_message = bus._sdbus.new_method_call_message(
-            self.proxy_meta.service_name,
-            self.proxy_meta.object_path,
-            dbus_method.interface_name,
-            dbus_method.method_name,
-        )
 
         if len(args) == dbus_method.num_of_args:
             assert not kwargs, "Passed more arguments than method supports" f"Extra args: {kwargs}"
@@ -165,15 +146,15 @@ class DbusProxyMethod(DbusBoundMethodBase, DbusProxyMember):
         else:
             rebuilt_args = dbus_method._rebuild_args(dbus_method.original_method, *args, **kwargs)
 
-        if rebuilt_args:
-            new_call_message.append_data(dbus_method.input_signature, *rebuilt_args)
-
-        if dbus_method.flags & DbusNoReplyFlag:
-            new_call_message.expect_reply = False
-            new_call_message.send()
-            return await self._no_reply()
-
-        return await self._dbus_call(new_call_message)
+        return await bus.call_method(
+            destination=self.proxy_meta.service_name,
+            path=self.proxy_meta.object_path,
+            interface=self.dbus_method.interface_name,
+            member=self.dbus_method.method_name,
+            signature=self.dbus_method.input_signature,
+            args=rebuilt_args,
+            no_reply=bool(self.dbus_method.flags & DbusNoReplyFlag),
+        )
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return call_with_middlewares(
@@ -250,7 +231,7 @@ class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
                     request_message,
                     local_object,
                 )
-            except DbusMethodError as e:
+            except MethodCallError as e:
                 if not request_message.expect_reply:
                     return
 
@@ -267,7 +248,7 @@ class DbusLocalMethod(DbusBoundMethodBase, DbusLocalMember):
                 logger = logging.getLogger(__name__)
                 logger.exception("Unhandled exception when handling a method call")
                 error_message = request_message.create_error_reply(
-                    DbusFailedError.error_name,
+                    CallFailedError.error_name,
                     "",
                 )
                 error_message.send()

@@ -26,22 +26,22 @@ from typing import ClassVar, Dict, Type
 class DbusError(Exception): ...
 
 
-class SdBusRequestNameError(DbusError): ...
+class RequestNameError(DbusError): ...
 
 
-class SdBusRequestNameAlreadyOwnerError(SdBusRequestNameError): ...
+class AlreadyOwner(RequestNameError): ...
 
 
-class SdBusRequestNameExistsError(SdBusRequestNameError): ...
+class NameExistsError(RequestNameError): ...
 
 
-class SdBusRequestNameInQueueError(SdBusRequestNameError): ...
+class NameInQueueError(RequestNameError): ...
 
 
 class DbusClientError(DbusError): ...
 
 
-class DbusMethodError(DbusError):
+class MethodCallError(DbusError):
 
     error_name: str
 
@@ -52,13 +52,13 @@ class DbusMethodError(DbusError):
         self.error_message = message
         super().__init__(self.error_name)
 
-    subclasses: ClassVar[Dict[str, Type[DbusMethodError]]] = {}
+    subclasses: ClassVar[Dict[str, Type[MethodCallError]]] = {}
 
     @staticmethod
     def create(name: str, message: str | None = None):
-        DbusMethodErrorSubclass = DbusMethodError.subclasses.get(name)
+        DbusMethodErrorSubclass = MethodCallError.subclasses.get(name)
         if DbusMethodErrorSubclass is None:
-            return DbusMethodError(name=name, message=message)
+            return MethodCallError(name=name, message=message)
         else:
             return DbusMethodErrorSubclass(name=name, message=message)
 
@@ -68,186 +68,184 @@ class DbusMethodError(DbusError):
         cls.subclasses[name] = cls
 
 
-class DbusFailedError(
-    DbusMethodError,
+class CallFailedError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.Failed",
 ): ...
 
 
-class DbusNoMemoryError(
-    DbusMethodError,
+class NoMemoryError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NoMemory",
 ): ...
 
 
-class DbusServiceUnknownError(
-    DbusMethodError, name="org.freedesktop.DBus.Error.ServiceUnknown"
-): ...
+class ServiceUnknownError(MethodCallError, name="org.freedesktop.DBus.Error.ServiceUnknown"): ...
 
 
-class DbusNameHasNoOwnerError(
-    DbusMethodError,
+class NameHasNoOwnerError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NameHasNoOwner",
 ): ...
 
 
-class DbusNoReplyError(
-    DbusMethodError,
+class NoReplyError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NoReply",
 ): ...
 
 
-class DbusIOError(
-    DbusMethodError,
+class IOError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.IOError",
 ): ...
 
 
-class DbusBadAddressError(
-    DbusMethodError,
+class BadAddressError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.BadAddress",
 ): ...
 
 
-class DbusNotSupportedError(
-    DbusMethodError,
+class NotSupportedError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NotSupported",
 ): ...
 
 
-class DbusLimitsExceededError(
-    DbusMethodError,
+class LimitsExceededError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.LimitsExceeded",
 ): ...
 
 
-class DbusAccessDeniedError(
-    DbusMethodError,
+class AccessDeniedError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.AccessDenied",
 ): ...
 
 
-class DbusAuthFailedError(
-    DbusMethodError,
+class AuthFailedError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.AuthFailed",
 ): ...
 
 
-class DbusNoServerError(
-    DbusMethodError,
+class NoServerError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NoServer",
 ): ...
 
 
-class DbusTimeoutError(
-    DbusMethodError,
+class TimeoutError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.Timeout",
 ): ...
 
 
-class DbusNoNetworkError(
-    DbusMethodError,
+class NoNetworkError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.NoNetwork",
 ): ...
 
 
-class DbusAddressInUseError(
-    DbusMethodError,
+class AddressInUseError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.AddressInUse",
 ): ...
 
 
-class DbusDisconnectedError(
-    DbusMethodError,
+class DisconnectedError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.Disconnected",
 ): ...
 
 
-class DbusInvalidArgsError(
-    DbusMethodError,
+class InvalidArgsError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.InvalidArgs",
 ): ...
 
 
-class DbusFileNotFoundError(
-    DbusMethodError,
+class FileNotFoundError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.FileNotFound",
 ): ...
 
 
-class DbusFileExistsError(
-    DbusMethodError,
+class FileExistsError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.FileExists",
 ): ...
 
 
-class DbusUnknownMethodError(
-    DbusMethodError,
+class UknownMethodError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.UnknownMethod",
 ): ...
 
 
-class DbusUnknownObjectError(
-    DbusMethodError,
+class UnknownObjectError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.UnknownObject",
 ): ...
 
 
-class DbusUnknownInterfaceError(
-    DbusMethodError,
+class UnknownInterfaceError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.UnknownInterface",
 ): ...
 
 
-class DbusUnknownPropertyError(
-    DbusMethodError,
+class UnknownPropertyError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.UnknownProperty",
 ): ...
 
 
-class DbusPropertyReadOnlyError(
-    DbusMethodError,
+class PropertyReadOnlyError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.PropertyReadOnly",
 ): ...
 
 
-class DbusUnixProcessIdUnknownError(
-    DbusMethodError,
+class UnixProcessIdUnknown(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.UnixProcessIdUnknown",
 ): ...
 
 
-class DbusInvalidSignatureError(
-    DbusMethodError,
+class InvalidSignatureError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.InvalidSignature",
 ): ...
 
 
-class DbusInvalidFileContentError(
-    DbusMethodError,
+class InvalidFileContentError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.InvalidFileContent",
 ): ...
 
 
-class DbusInconsistentMessageError(
-    DbusMethodError,
+class InconsistentMessageError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.InconsistentMessage",
 ): ...
 
 
-class DbusMatchRuleNotFound(
-    DbusMethodError,
+class MatchRuleNotFoundError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.MatchRuleNotFound",
 ): ...
 
 
-class DbusMatchRuleInvalidError(
-    DbusMethodError,
+class MatchRuleInvalidError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error.MatchRuleInvalid",
 ): ...
 
 
-class DbusInteractiveAuthorizationRequiredError(
-    DbusMethodError,
+class InteractiveAuthorizationRequiredError(
+    MethodCallError,
     name="org.freedesktop.DBus.Error" ".InteractiveAuthorizationRequired",
 ): ...

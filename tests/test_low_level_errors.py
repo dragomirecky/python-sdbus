@@ -26,13 +26,13 @@ from typing import Any
 from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property
 from aiodbus.bus import get_default_bus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta
-from aiodbus.exceptions import DbusFailedError, DbusMethodError
+from aiodbus.exceptions import CallFailedError, MethodCallError
 from aiodbus.unittest import IsolatedDbusTestCase
 
 HELLO_WORLD = "Hello, world!"
 
 
-class DbusDerivePropertydError(DbusMethodError, name="org.example.PropertyError"): ...
+class DbusDerivePropertydError(MethodCallError, name="org.example.PropertyError"): ...
 
 
 class IndependentError(Exception): ...
@@ -95,19 +95,19 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         loop.set_exception_handler(silence_exceptions)
 
     async def test_property_getter_independent_error(self) -> None:
-        with self.assertRaises(DbusFailedError) as cm:
+        with self.assertRaises(CallFailedError) as cm:
             await wait_for(
                 self.test_object_connection.indep_err_getter.get(),
                 timeout=1,
             )
 
         should_be_dbus_failed = cm.exception
-        self.assertIs(should_be_dbus_failed.__class__, DbusFailedError)
+        self.assertIs(should_be_dbus_failed.__class__, CallFailedError)
 
         await self.test_object_connection.hello_world()
 
     async def test_generic_error_is_returned_as_dbus_failed(self) -> None:
-        with self.assertRaises(DbusFailedError) as cm:
+        with self.assertRaises(CallFailedError) as cm:
             await wait_for(
                 self.test_object_connection.hello_error(),
                 timeout=1,
@@ -132,14 +132,14 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
             GOOD_STR,
         )
 
-        with self.assertRaises(DbusFailedError) as cm:
+        with self.assertRaises(CallFailedError) as cm:
             await wait_for(
                 self.test_object_connection.indep_err_setable.set("Test"),
                 timeout=1,
             )
 
         should_be_dbus_failed = cm.exception
-        self.assertIs(should_be_dbus_failed.__class__, DbusFailedError)
+        self.assertIs(should_be_dbus_failed.__class__, CallFailedError)
 
         await self.test_object_connection.hello_world()
 
@@ -168,7 +168,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         interface = dbus_local_meta.activated_interfaces[0]
         interface.property_get_dict.pop(b"DerriveErrSettable")
 
-        with self.assertRaises(DbusFailedError):
+        with self.assertRaises(CallFailedError):
             await wait_for(
                 self.test_object_connection.derrive_err_settable,
                 timeout=1,
@@ -182,7 +182,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         interface = dbus_local_meta.activated_interfaces[0]
         interface.method_dict.pop(TEST_KEY)
 
-        with self.assertRaises(DbusFailedError):
+        with self.assertRaises(CallFailedError):
             await wait_for(
                 self.test_object_connection.hello_world(),
                 timeout=1,
