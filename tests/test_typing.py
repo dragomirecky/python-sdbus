@@ -117,5 +117,5 @@ async def check_async_element_class_access_typing() -> None:
     # test_list.append(
     #     TestTypingAsync.get_str_list_method.method_name
     # )
-    test_list.append(InterfaceTestTyping.str_list_property.property_name)
-    test_list.append(InterfaceTestTyping.str_list_signal.signal_name)
+    test_list.append(InterfaceTestTyping.str_list_property.name)
+    test_list.append(InterfaceTestTyping.str_list_signal.name)

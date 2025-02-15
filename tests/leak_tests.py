@@ -103,7 +103,6 @@ class LeakTests(IsolatedDbusTestCase):
         for _ in range(20_000):
             await TestProxy.test_method_kwargs(pseudo_test)
             await TestProxy.test_method(pseudo_test)
-            await TestProxy.test_subclass(pseudo_test)
             await TestProxy.test_properties(pseudo_test)
             await TestProxy.test_signal(pseudo_test)
             await TestProxy.test_exceptions(pseudo_test)

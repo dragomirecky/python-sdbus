@@ -48,6 +48,10 @@ if TYPE_CHECKING:
 
 
 class Message(Protocol):
+
+    @property
+    def sender(self) -> Optional[str]: ...
+
     def get_contents(self) -> Tuple[DbusCompleteType, ...]: ...
 
 
@@ -80,7 +84,7 @@ class Interface(Protocol):
         self,
         name: str,
         signature: str,
-        args_names: Tuple[str, ...],
+        args_names: Sequence[str],
         flags: int,
     ) -> None: ...
 
@@ -174,14 +178,24 @@ class SdBusInterfaceWrapper(Interface):
     ) -> None:
 
         def getter(message: SdBusMessage):
-            with _set_current_message(message):
-                data = get_function()
-                message.append_data(signature, data)
+            try:
+                with _set_current_message(message):
+                    data = get_function()
+                    message.append_data(signature, data)
+            except Exception as exc:
+                if not isinstance(exc, MethodCallError):
+                    logger.exception("Unhandled exception when handling a property get")
+                raise
 
         def setter(message: SdBusMessage):
-            assert set_function is not None
-            with _set_current_message(message):
-                set_function(message.get_contents())
+            try:
+                assert set_function is not None
+                with _set_current_message(message):
+                    set_function(message.get_contents())
+            except Exception as exc:
+                if not isinstance(exc, MethodCallError):
+                    logger.exception("Unhandled exception when handling a property set")
+                raise
 
         self._interface.add_property(
             name, signature, getter, setter if set_function is not None else None, flags
@@ -191,7 +205,7 @@ class SdBusInterfaceWrapper(Interface):
         self,
         name: str,
         signature: str,
-        args_names: Tuple[str, ...],
+        args_names: Sequence[str],
         flags: int,
     ):
         self._interface.add_signal(name, signature, args_names, flags)

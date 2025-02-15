@@ -8,10 +8,10 @@ class DbusPeerInterfaceAsync(
     serving_enabled=False,
 ):
 
-    @dbus_method(method_name="Ping")
+    @dbus_method(name="Ping")
     async def dbus_ping(self) -> None:
         raise NotImplementedError
 
-    @dbus_method(method_name="GetMachineId")
+    @dbus_method(name="GetMachineId")
     async def dbus_machine_id(self) -> str:
         raise NotImplementedError

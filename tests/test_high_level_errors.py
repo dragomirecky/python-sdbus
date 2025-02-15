@@ -53,7 +53,6 @@ class InterfaceWithErrors(
 
     @dbus_method(result_signature="s")
     async def hello_derrived_error(self) -> str:
-        print("called")
         raise DbusDeriveMethodError()
 
 

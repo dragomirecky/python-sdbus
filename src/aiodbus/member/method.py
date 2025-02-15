@@ -39,7 +39,6 @@ from typing import (
     cast,
     overload,
 )
-from weakref import ref as weak_ref
 
 from _sdbus import DbusNoReplyFlag
 from aiodbus.bus import Interface
@@ -47,7 +46,6 @@ from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
     DbusMember,
-    DbusMethodOverride,
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
@@ -78,7 +76,7 @@ class DbusMethod[**P, R](DbusMember):
 
     def __init__(
         self,
-        method_name: Optional[str],
+        name: Optional[str],
         input_signature: str,
         input_args_names: Optional[Sequence[str]],
         result_signature: str,
@@ -92,15 +90,15 @@ class DbusMethod[**P, R](DbusMember):
             " it in to a tuple ('string', ) ?"
         )
 
-        if method_name is None:
-            method_name = "".join(_method_name_converter(unbound_method.__name__))
+        if name is None:
+            name = "".join(_method_name_converter(unbound_method.__name__))
 
-        super().__init__(method_name)
+        super().__init__(name)
         self.unbound_method = unbound_method
         self.args_spec = getfullargspec(unbound_method)
         self.args_names = self.args_spec.args[1:]  # 1: because of self
 
-        self.method_name = method_name
+        self.method_name = name
         self.input_signature = input_signature
         self.input_args_names: Sequence[str] = ()
         if input_args_names is not None:
@@ -162,7 +160,8 @@ class DbusMethod[**P, R](DbusMember):
 
 
 class DbusBoundMethod[**P, R](DbusBoundMember, ABC):
-    def __init__(self, dbus_method: DbusMethod[P, R]) -> None:
+    def __init__(self, dbus_method: DbusMethod[P, R], **kwargs):
+        super().__init__(**kwargs)
         self.dbus_method = dbus_method
 
     @property
@@ -228,8 +227,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         dbus_method: DbusMethod[P, R],
         local_object: DbusInterfaceBase,
     ):
-        super().__init__(dbus_method)
-        self.bound_object_ref = weak_ref(local_object)
+        super().__init__(dbus_method=dbus_method, local_object=local_object)
         self.__doc__ = dbus_method.__doc__
 
     def _append_to_interface(self, interface: Interface, handle: DbusExportHandle):
@@ -247,11 +245,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         """
         Handle incoming dbus call to the method (from dbus).
         """
-        bound_object = self.bound_object_ref()
-        if bound_object is None:
-            raise RuntimeError("Local object no longer exists!")
-
-        bound_method = self.dbus_method.unbound_method.__get__(bound_object, None)
+        bound_method = self.dbus_method.unbound_method.__get__(self.local_object, None)
 
         return await call_with_middlewares(
             bound_method,
@@ -263,21 +257,19 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         """
         Call the method (locally).
         """
-        bound_object = self.bound_object_ref()
-        if bound_object is None:
-            raise RuntimeError("Local object no longer exists!")
-
         # no middlewares for local-only calls
-        return await self.dbus_method.unbound_method(bound_object, *args, **kwargs)
+        return await self.dbus_method.unbound_method(self.local_object, *args, **kwargs)
 
 
-def dbus_method[**P, R](
+def dbus_method[
+    **P, R
+](
     input_signature: str = "",
     result_signature: str = "",
     flags: int = 0,
     result_args_names: Optional[Sequence[str]] = None,
     input_args_names: Optional[Sequence[str]] = None,
-    method_name: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> Callable[[AnyAsyncMethod[Concatenate[Any, P], R]], DbusMethod[P, R]]:
 
     assert not isinstance(input_signature, FunctionType), (
@@ -294,7 +286,7 @@ def dbus_method[**P, R](
         )
         new_wrapper = DbusMethod[P, R](
             unbound_method=original_method,
-            method_name=method_name,
+            name=name,
             input_signature=input_signature,
             result_signature=result_signature,
             result_args_names=result_args_names,
@@ -307,23 +299,14 @@ def dbus_method[**P, R](
     return dbus_method_decorator
 
 
-def dbus_method_override() -> Callable[[T], T]:
-
-    def new_decorator(new_function: T) -> T:
-        return cast(T, DbusMethodOverride(new_function))
-
-    return new_decorator
-
-
-async def call_with_middlewares[**P, R](
+async def call_with_middlewares[
+    **P, R
+](
     func: AnyAsyncMethod[P, R],
     middlewares: List[DbusMethodMiddleware],
     *args: P.args,
     **kwargs: P.kwargs,
 ):
-    print(
-        f"call_with_middlewares func={func}, middlewares={middlewares}, args={args}, kwargs={kwargs}"
-    )
     if not middlewares:
         return await func(*args, **kwargs)
     else:

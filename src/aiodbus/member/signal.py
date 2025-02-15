@@ -20,7 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from asyncio import Queue
 from contextlib import closing
 from types import FunctionType
@@ -30,20 +30,19 @@ from typing import (
     AsyncIterable,
     AsyncIterator,
     Callable,
-    Generic,
     Optional,
     Sequence,
     Tuple,
     Type,
-    TypeVar,
     Union,
     cast,
     overload,
 )
 from weakref import WeakSet
 
-from _sdbus import SdBus, SdBusInterface, SdBusMessage
+from _sdbus import SdBusMessage
 from aiodbus import Dbus, get_default_bus
+from aiodbus.bus import Interface
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
@@ -51,34 +50,34 @@ from aiodbus.dbus_common_elements import (
     DbusMember,
     DbusProxyMember,
     DbusRemoteObjectMeta,
-    DbusSignalCommon,
 )
+from aiodbus.dbus_common_funcs import _method_name_converter
 from aiodbus.handle import Closeable
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 
-T = TypeVar("T")
-
-
-class DbusSignal(DbusSignalCommon, Generic[T]):
-
+class DbusSignal[T](DbusMember):
     def __init__(
         self,
-        signal_name: Optional[str],
-        signal_signature: str,
+        name: Optional[str],
+        signature: str,
         args_names: Sequence[str],
         flags: int,
         original_method: FunctionType,
     ):
-        super().__init__(
-            signal_name,
-            signal_signature,
-            args_names,
-            flags,
-            original_method,
-        )
+        if name is None:
+            name = "".join(_method_name_converter(original_method.__name__))
+
+        super().__init__(name=name)
+
+        self.signature = signature
+        self.args_names = args_names
+        self.flags = flags
+
+        self.__doc__ = original_method.__doc__
+        self.__annotations__ = original_method.__annotations__
 
         self.local_callbacks: WeakSet[Callable[[T], Any]] = WeakSet()
 
@@ -94,19 +93,19 @@ class DbusSignal(DbusSignalCommon, Generic[T]):
         self,
         obj: DbusInterfaceBase,
         obj_class: Type[DbusInterfaceBase],
-    ) -> DbusBoundSignalBase[T]: ...
+    ) -> DbusBoundSignal[T]: ...
 
     def __get__(
         self,
         obj: Optional[DbusInterfaceBase],
         obj_class: Optional[Type[DbusInterfaceBase]] = None,
-    ) -> Union[DbusBoundSignalBase[T], DbusSignal[T]]:
+    ) -> Union[DbusBoundSignal[T], DbusSignal[T]]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
                 return DbusProxySignal(self, dbus_meta)
             else:
-                return DbusLocalSignal(self, dbus_meta)
+                return DbusLocalSignal(self, obj, dbus_meta)
         else:
             return self
 
@@ -123,7 +122,7 @@ class DbusSignal(DbusSignalCommon, Generic[T]):
         match_slot = await bus.subscribe_signals(
             sender_filter=service_name,
             interface_filter=self.interface_name,
-            member_filter=self.signal_name,
+            member_filter=self.name,
             callback=message_queue.put_nowait,
         )
 
@@ -135,8 +134,9 @@ class DbusSignal(DbusSignalCommon, Generic[T]):
                 yield (signal_path, cast(T, next_signal_message.get_contents()))
 
 
-class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
-    def __init__(self, dbus_signal: DbusSignal[T]) -> None:
+class DbusBoundSignal[T](DbusBoundMember, AsyncIterable[T], ABC):
+    def __init__(self, dbus_signal: DbusSignal[T], **kwargs):
+        super().__init__(**kwargs)
         self.dbus_signal = dbus_signal
 
     @property
@@ -144,33 +144,31 @@ class DbusBoundSignalBase(DbusBoundMember, AsyncIterable[T], Generic[T]):
         return self.dbus_signal
 
     @abstractmethod
-    async def catch(self) -> AsyncIterator[T]:
-        raise NotImplementedError
-        yield cast(T, None)
+    def catch(self) -> AsyncIterator[T]: ...
 
-    __aiter__ = catch
+    def __aiter__(self) -> AsyncIterator[T]:
+        return self.catch()
 
-    async def catch_anywhere(
+    @abstractmethod
+    def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncIterable[Tuple[str, T]]:
-        raise NotImplementedError
-        yield "", cast(T, None)
+    ) -> AsyncIterable[Tuple[str, T]]: ...
 
-    def emit(self, args: T) -> None:
-        raise NotImplementedError
+    @abstractmethod
+    def emit(self, args: T) -> None: ...
 
 
-class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
+class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
     def __init__(
         self,
         dbus_signal: DbusSignal[T],
         proxy_meta: DbusRemoteObjectMeta,
+        **kwargs,
     ):
-        super().__init__(dbus_signal)
+        super().__init__(dbus_signal=dbus_signal, **kwargs)
         self.proxy_meta = proxy_meta
-
         self.__doc__ = dbus_signal.__doc__
 
     async def _register_match_slot(
@@ -182,11 +180,11 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
             sender_filter=self.proxy_meta.service_name,
             path_filter=self.proxy_meta.object_path,
             interface_filter=self.dbus_signal.interface_name,
-            member_filter=self.dbus_signal.signal_name,
+            member_filter=self.dbus_signal.name,
             callback=callback,
         )
 
-    async def catch(self) -> AsyncIterator[T]:
+    async def catch(self):
         message_queue: Queue[SdBusMessage] = Queue()
 
         handle = await self._register_match_slot(
@@ -198,8 +196,6 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
             while True:
                 next_signal_message = await message_queue.get()
                 yield cast(T, next_signal_message.get_contents())
-
-    __aiter__ = catch
 
     async def catch_anywhere(
         self,
@@ -217,7 +213,7 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
             interface_filter=self.dbus_signal.interface_name,
-            member_filter=self.dbus_signal.signal_name,
+            member_filter=self.dbus_signal.name,
             callback=message_queue.put_nowait,
         )
 
@@ -228,34 +224,30 @@ class DbusProxySignal(DbusBoundSignalBase[T], DbusProxyMember):
                 assert signal_path is not None
                 yield (signal_path, cast(T, next_signal_message.get_contents()))
 
-    def emit(self, args: T) -> None:
+    def emit(self, args: T):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
 
 
-class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
+class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
     def __init__(
         self,
         dbus_signal: DbusSignal[T],
+        local_object: DbusInterfaceBase,
         local_meta: DbusLocalObjectMeta,
     ):
-        super().__init__(dbus_signal)
+        super().__init__(dbus_signal=dbus_signal, local_object=local_object)
         self.local_meta = local_meta
-
         self.__doc__ = dbus_signal.__doc__
 
-    def _append_to_interface(
-        self,
-        interface: SdBusInterface,
-        handle: DbusExportHandle,
-    ) -> None:
+    def _append_to_interface(self, interface: Interface, handle: DbusExportHandle):
         interface.add_signal(
-            self.dbus_signal.signal_name,
-            self.dbus_signal.signal_signature,
+            self.dbus_signal.name,
+            self.dbus_signal.signature,
             self.dbus_signal.args_names,
             self.dbus_signal.flags,
         )
 
-    async def catch(self) -> AsyncIterator[T]:
+    async def catch(self):
         new_queue: Queue[T] = Queue()
 
         signal_callbacks = self.dbus_signal.local_callbacks
@@ -270,13 +262,12 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
 
     __aiter__ = catch
 
-    async def catch_anywhere(
+    def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
     ) -> AsyncIterable[Tuple[str, T]]:
-        raise NotImplementedError("TODO")
-        yield
+        raise NotImplementedError()
 
     def _emit_dbus_signal(self, args: T) -> None:
         attached_bus = self.local_meta.attached_bus
@@ -290,8 +281,8 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
         attached_bus.emit_signal(
             path=serving_object_path,
             interface=self.dbus_signal.interface_name,
-            member=self.dbus_signal.signal_name,
-            signature=self.dbus_signal.signal_signature,
+            member=self.dbus_signal.name,
+            signature=self.dbus_signal.signature,
             args=args,  # type: ignore
         )
 
@@ -302,13 +293,15 @@ class DbusLocalSignal(DbusBoundSignalBase[T], DbusLocalMember):
             callback(args)
 
 
-def dbus_signal(
-    signal_signature: str = "",
-    signal_args_names: Sequence[str] = (),
+def dbus_signal[
+    T
+](
+    signature: str = "",
+    arg_names: Sequence[str] = (),
     flags: int = 0,
-    signal_name: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> Callable[[Callable[[Any], T]], DbusSignal[T]]:
-    assert not isinstance(signal_signature, FunctionType), (
+    assert not isinstance(signature, FunctionType), (
         "Passed function to decorator directly. " "Did you forget () round brackets?"
     )
 
@@ -316,11 +309,11 @@ def dbus_signal(
 
         assert isinstance(pseudo_function, FunctionType)
         return DbusSignal(
-            signal_name,
-            signal_signature,
-            signal_args_names,
-            flags,
-            pseudo_function,
+            name=name,
+            signature=signature,
+            args_names=arg_names,
+            flags=flags,
+            original_method=pseudo_function,
         )
 
     return signal_decorator

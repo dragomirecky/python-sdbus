@@ -37,7 +37,7 @@ from _sdbus import SdBus, SdBusMessage, SdBusSlot
 from aiodbus.bus import Dbus, connect, set_default_bus
 from aiodbus.handle import Closeable
 from aiodbus.member.signal import (
-    DbusBoundSignalBase,
+    DbusBoundSignal,
     DbusLocalSignal,
     DbusProxySignal,
     DbusSignal,
@@ -220,7 +220,7 @@ class IsolatedDbusTestCase(IsolatedAsyncioTestCase):
 
     def assertDbusSignalEmits(
         self,
-        signal: DbusBoundSignalBase[Any],
+        signal: DbusBoundSignal[Any],
         timeout: Union[int, float] = 1,
     ) -> AsyncContextManager[DbusSignalRecorderBase]:
 

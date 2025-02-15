@@ -30,7 +30,6 @@ from aiodbus import (
     DbusPropertyConstFlag,
     DbusPropertyEmitsChangeFlag,
     dbus_method,
-    dbus_method_override,
     dbus_property,
     dbus_signal,
 )
@@ -73,7 +72,7 @@ class TestBadAsyncDbusClass(TestCase):
             ):
                 @dbus_method(
                     result_signature="s",
-                    method_name="🤫",
+                    name="🤫",
                 )
                 async def test(self) -> str:
                     return "test"
@@ -88,8 +87,8 @@ class TestBadAsyncDbusClass(TestCase):
                 interface_name="org.example",
             ):
                 @dbus_property(
-                    property_signature="s",
-                    property_name="🤫",
+                    signature="s",
+                    name="🤫",
                 )
                 def test(self) -> str:
                     return "test"
@@ -104,8 +103,8 @@ class TestBadAsyncDbusClass(TestCase):
                 interface_name="org.example",
             ):
                 @dbus_signal(
-                    signal_signature="s",
-                    signal_name="🤫",
+                    signature="s",
+                    name="🤫",
                 )
                 def test(self) -> str:
                     raise NotImplementedError
@@ -154,20 +153,6 @@ class TestBadAsyncDbusClass(TestCase):
                 )
                 def test_constant(self) -> str:
                     return "a"
-
-    def test_bad_subclass(self) -> None:
-        with self.assertRaises(ValueError):
-
-            class TestInheritence(SomeTestInterface):
-                async def test_int(self) -> int:  # type: ignore
-                    return 2
-
-        with self.assertRaises(ValueError):
-
-            class TestInheritence2(SomeTestInterface):
-                @dbus_method_override()
-                async def test_unrelated(self) -> int:
-                    return 2
 
     def test_dbus_elements_without_interface_name(self) -> None:
         with self.assertRaisesRegex(TypeError, "without interface name"):

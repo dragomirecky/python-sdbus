@@ -47,7 +47,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.
             bus,
         )
 
-    @dbus_method("s", method_name="GetConnectionUnixProcessID")
+    @dbus_method("s", name="GetConnectionUnixProcessID")
     async def get_connection_pid(self, service_name: str) -> int:
         """Get process ID that owns a specified name.
 
@@ -57,7 +57,7 @@ class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.
         """
         raise NotImplementedError
 
-    @dbus_method("s", method_name="GetConnectionUnixUser")
+    @dbus_method("s", name="GetConnectionUnixUser")
     async def get_connection_uid(self, service_name: str) -> int:
         """Get process user ID that owns a specified name.
 

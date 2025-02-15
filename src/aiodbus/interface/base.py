@@ -20,13 +20,10 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from copy import copy
 from inspect import getmembers
 from itertools import chain
-from types import FunctionType
 from typing import (
     Any,
-    Callable,
     Dict,
     Iterable,
     Iterator,
@@ -37,7 +34,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 from warnings import warn
 from weakref import WeakKeyDictionary, WeakValueDictionary
@@ -49,17 +45,12 @@ from aiodbus.dbus_common_elements import (
     DbusLocalMember,
     DbusLocalObjectMeta,
     DbusMember,
-    DbusMethodOverride,
-    DbusPropertyOverride,
     DbusRemoteObjectMeta,
 )
 from aiodbus.handle import DbusExportHandle
-from aiodbus.member.method import DbusMethod
-from aiodbus.member.property import DbusProperty
 
 T = TypeVar("T")
 Self = TypeVar("Self", bound="DbusInterfaceBase")
-DbusOverride = Union[DbusMethodOverride[T], DbusPropertyOverride[T]]
 
 
 DBUS_CLASS_TO_META: WeakKeyDictionary[type, DbusClassMeta] = WeakKeyDictionary()
@@ -67,54 +58,6 @@ DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[str, DbusInterfaceMeta] = Weak
 
 
 class DbusInterfaceMeta(DbusInterfaceMetaCommon):
-
-    @staticmethod
-    def _process_dbus_method_override(
-        override_attr_name: str,
-        override: DbusMethodOverride[T],
-        mro_dbus_elements: Dict[str, DbusMember],
-    ) -> DbusMethod:
-        try:
-            original_method = mro_dbus_elements[override_attr_name]
-        except KeyError:
-            raise ValueError(f"No D-Bus method {override_attr_name!r} found " f"to override.")
-
-        if not isinstance(original_method, DbusMethod):
-            raise TypeError(
-                f"Expected {DbusMethod!r} got {original_method!r} "
-                f"under name {override_attr_name!r}"
-            )
-
-        new_method = copy(original_method)
-        new_method.unbound_method = cast(FunctionType, override.override_method)
-        return new_method
-
-    @staticmethod
-    def _process_dbus_property_override(
-        override_attr_name: str,
-        override: DbusPropertyOverride[T],
-        mro_dbus_elements: Dict[str, DbusMember],
-    ) -> DbusProperty[Any]:
-        try:
-            original_property = mro_dbus_elements[override_attr_name]
-        except KeyError:
-            raise ValueError(f"No D-Bus property {override_attr_name!r} found " f"to override.")
-
-        if not isinstance(original_property, DbusProperty):
-            raise TypeError(
-                f"Expected {DbusMethod!r} got {original_property!r} "
-                f"under name {override_attr_name!r}"
-            )
-
-        new_property = copy(original_property)
-        new_property.property_getter = cast(
-            Callable[[DbusInterfaceBase], Any], override.getter_override
-        )
-        if override.setter_override is not None:
-            new_property.property_setter = override.setter_override
-            new_property.property_setter_is_public = override.is_setter_public
-
-        return new_property
 
     @classmethod
     def _check_collisions(
@@ -125,33 +68,12 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
     ) -> None:
 
         possible_collisions = namespace.keys() & mro_dbus_elements.keys()
-        new_overrides: Dict[str, DbusMember] = {}
-
-        for attr_name, attr in namespace.items():
-            if isinstance(attr, DbusMethodOverride):
-                new_overrides[attr_name] = cls._process_dbus_method_override(
-                    attr_name,
-                    attr,
-                    mro_dbus_elements,
-                )
-                possible_collisions.remove(attr_name)
-            elif isinstance(attr, DbusPropertyOverride):
-                new_overrides[attr_name] = cls._process_dbus_property_override(
-                    attr_name,
-                    attr,
-                    mro_dbus_elements,
-                )
-                possible_collisions.remove(attr_name)
-            else:
-                continue
 
         if possible_collisions:
             raise ValueError(
                 f"Interface {new_class_name!r} redefines reserved "
                 f"D-Bus attribute names: {possible_collisions!r}"
             )
-
-        namespace.update(new_overrides)
 
     @staticmethod
     def _extract_dbus_elements(
@@ -214,8 +136,8 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             return
 
         if isinstance(attr, DbusMember):
-            meta.dbus_member_to_python_attr[attr.member_name] = attr_name
-            meta.python_attr_to_dbus_member[attr_name] = attr.member_name
+            meta.dbus_member_to_python_attr[attr.name] = attr_name
+            meta.python_attr_to_dbus_member[attr_name] = attr.name
         else:
             raise TypeError(f"Unknown D-Bus element: {attr!r}")
 

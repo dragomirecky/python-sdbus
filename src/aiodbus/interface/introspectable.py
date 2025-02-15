@@ -8,6 +8,6 @@ class DbusIntrospectableAsync(
     serving_enabled=False,
 ):
 
-    @dbus_method(method_name="Introspect")
+    @dbus_method(name="Introspect")
     async def dbus_introspect(self) -> str:
         raise NotImplementedError

@@ -31,12 +31,6 @@ from _sdbus import (
     DbusUnprivilegedFlag,
     decode_object_path,
     encode_object_path,
-    sd_bus_open,
-    sd_bus_open_system,
-    sd_bus_open_system_machine,
-    sd_bus_open_system_remote,
-    sd_bus_open_user,
-    sd_bus_open_user_machine,
 )
 from aiodbus.bus import (
     Dbus,
@@ -47,8 +41,8 @@ from aiodbus.bus import (
 )
 from aiodbus.interface.common import DbusInterfaceCommonAsync
 from aiodbus.interface.object_manager import DbusObjectManagerInterfaceAsync
-from aiodbus.member.method import dbus_method, dbus_method_override
-from aiodbus.member.property import dbus_property, dbus_property_async_override
+from aiodbus.member.method import dbus_method
+from aiodbus.member.property import dbus_property
 from aiodbus.member.signal import dbus_signal
 
 from .exceptions import (
@@ -120,9 +114,7 @@ __all__ = (
     "DbusInterfaceCommonAsync",
     "DbusObjectManagerInterfaceAsync",
     "dbus_method",
-    "dbus_method_override",
     "dbus_property",
-    "dbus_property_async_override",
     "get_current_message",
     "dbus_signal",
     "DbusDeprecatedFlag",

@@ -28,14 +28,12 @@ from asyncio.subprocess import create_subprocess_exec
 from typing import Tuple
 from unittest import SkipTest
 
-from _sdbus import DbusPropertyEmitsChangeFlag, SdBusError, SdBusMethodError
+from _sdbus import DbusPropertyEmitsChangeFlag, SdBusError
 from aiodbus import (
     DbusInterfaceCommonAsync,
     DbusNoReplyFlag,
     dbus_method,
-    dbus_method_override,
     dbus_property,
-    dbus_property_async_override,
     dbus_signal,
     get_current_message,
 )
@@ -44,7 +42,6 @@ from aiodbus.exceptions import (
     FileExistsError,
     MethodCallError,
     NoReplyError,
-    PropertyReadOnlyError,
     UnknownObjectError,
 )
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -139,10 +136,6 @@ class SomeTestInterface(
     @dbus_property("x")
     def test_property_private(self) -> int:
         return self.property_private
-
-    @test_property_private.setter_private
-    def test_private_setter(self, new_value: int) -> None:
-        self.property_private = new_value
 
     @dbus_method("sb", "s")
     async def kwargs_function(self, input: str = "test", is_upper: bool = True) -> str:
@@ -306,90 +299,6 @@ class TestProxy(IsolatedDbusTestCase):
                 await test_object_connection.takes_struct_method((9, 8, 7, 6)),
                 3024,
             )
-
-    async def test_subclass(self) -> None:
-        test_object, test_object_connection = initialize_object()
-
-        test_var = ["asdasd"]
-
-        class TestInheritence(SomeTestInterface):
-            @dbus_method_override()
-            async def test_int(self) -> int:  # type: ignore
-                return 2
-
-            @dbus_property_async_override()
-            def test_property(self) -> str:
-                return test_var[0]
-
-            @test_property.setter
-            def test_property_setter(self, var: str) -> None:
-                nonlocal test_var
-                test_var.insert(0, var)
-
-        test_subclass = TestInheritence()
-
-        test_subclass.export_to_dbus("/subclass", self.bus)
-
-        self.assertEqual(await test_subclass.test_int(), 2)
-
-        test_subclass_connection = TestInheritence.new_proxy(
-            TEST_SERVICE_NAME, "/subclass", self.bus
-        )
-
-        self.assertEqual(await test_subclass_connection.test_int(), 2)
-
-        self.assertEqual(test_var[0], await test_subclass.test_property)
-
-        await test_subclass.test_property.set("12345")
-
-        self.assertEqual(test_var[0], await test_subclass.test_property)
-        self.assertEqual("12345", await test_subclass.test_property)
-
-        with self.subTest("Test dbus to python mapping"):
-            dbus_elements_map = {
-                interface_name: meta.dbus_member_to_python_attr
-                for interface_name, meta in SomeTestInterface._dbus_iter_interfaces_meta()
-            }
-            self.assertIn(
-                "TestInt",
-                dbus_elements_map[TEST_INTERFACE_NAME],
-            )
-
-            self.assertIn(
-                "TestInt",
-                dbus_elements_map[TEST_INTERFACE_NAME],
-            )
-
-            self.assertIn(
-                "TestProperty",
-                dbus_elements_map[TEST_INTERFACE_NAME],
-            )
-
-        with self.subTest("Tripple subclass"):
-
-            class TestInheritenceTri(TestInheritence):
-                @dbus_method_override()
-                async def test_int(self) -> int:
-                    return 3
-
-                @dbus_property_async_override()
-                def test_property(self) -> str:
-                    return "tri"
-
-            test_subclass_tri = TestInheritenceTri()
-
-            test_subclass_tri.export_to_dbus("/subclass/tri", self.bus)
-
-            self.assertEqual(await test_subclass_tri.test_int(), 3)
-
-            test_subclass_tri_connection = TestInheritenceTri.new_proxy(
-                TEST_SERVICE_NAME, "/subclass/tri", self.bus
-            )
-
-            self.assertEqual(await test_subclass_tri_connection.test_int(), 3)
-
-            self.assertEqual(await test_subclass_tri.test_property, "tri")
-            self.assertEqual(await test_subclass_tri_connection.test_property, "tri")
 
     async def test_properties(self) -> None:
         test_object, test_object_connection = initialize_object()
@@ -765,84 +674,6 @@ class TestProxy(IsolatedDbusTestCase):
             on_unknown_member="reuse",
         )
         self.assertIsNone(parsed_dict_with_invalidation["invalidated_property"])
-
-    async def test_property_private_setter(self) -> None:
-        test_object, test_object_connection = initialize_object()
-
-        new_value = 200
-        self.assertNotEqual(await test_object_connection.test_property_private, new_value)
-
-        with self.assertRaises(PropertyReadOnlyError):
-            await test_object_connection.test_property_private.set(new_value)
-
-        async with self.assertDbusSignalEmits(
-            test_object_connection.properties_changed
-        ) as properties_changed_catch:
-            await test_object.test_property_private.set(new_value)
-
-        changed_properties = properties_changed_catch.output[0]
-
-        self.assertEqual(await test_object_connection.test_property_private, new_value)
-
-        self.assertIn("TestPropertyPrivate", changed_properties[1])
-
-    async def test_property_override_setter_private(self) -> None:
-
-        test_int = 1
-
-        class TestInterfacePrivateSetter(SomeTestInterface):
-            @dbus_property_async_override()
-            def test_property_private(self) -> int:
-                return test_int
-
-            @test_property_private.setter_private
-            def _private_setter(self, new_value: int) -> None:
-                nonlocal test_int
-                test_int = new_value
-
-        test_object = TestInterfacePrivateSetter()
-        test_object.export_to_dbus("/")
-        test_object_connection = SomeTestInterface.new_proxy(TEST_SERVICE_NAME, "/")
-
-        self.assertEqual(
-            await test_object_connection.test_property_private,
-            test_int,
-        )
-
-        async def catch_properties_changed() -> int:
-            async for x in test_object_connection.properties_changed:
-                changed_attr = parse_properties_changed(SomeTestInterface, x)[
-                    "test_property_private"
-                ]
-
-                if not isinstance(changed_attr, int):
-                    raise TypeError
-
-                return changed_attr
-
-            raise RuntimeError
-
-        catch_changed_task = get_running_loop().create_task(catch_properties_changed())
-
-        with self.assertRaises(PropertyReadOnlyError):
-            await test_object_connection.test_property_private.set(10)
-
-        await test_object.test_property_private.set(10)
-
-        self.assertEqual(
-            await test_object_connection.test_property_private,
-            10,
-        )
-
-        self.assertEqual(
-            await test_object.test_property_private,
-            test_int,
-        )
-
-        self.assertEqual(
-            await wait_for(catch_changed_task, timeout=1),
-            10,
-        )
 
     async def test_interface_composition(self) -> None:
         class OneInterface(

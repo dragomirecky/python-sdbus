@@ -22,7 +22,7 @@ class DbusPropertiesInterfaceAsync(
     def properties_changed(self) -> DBUS_PROPERTIES_CHANGED_TYPING:
         raise NotImplementedError
 
-    @dbus_method("s", "a{sv}", method_name="GetAll")
+    @dbus_method("s", "a{sv}", name="GetAll")
     async def _properties_get_all(self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
         raise NotImplementedError
 

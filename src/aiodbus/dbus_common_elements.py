@@ -20,32 +20,18 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+import weakref
 from abc import ABC, abstractmethod
-from inspect import getfullargspec
-from types import FunctionType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, TypeVar
 
-from _sdbus import is_interface_name_valid, is_member_name_valid
+from _sdbus import is_interface_name_valid
 from aiodbus.bus import Dbus, Interface, get_default_bus
 from aiodbus.handle import DbusExportHandle
 from aiodbus.member.base import DbusMember
 
 if TYPE_CHECKING:
-    from aiodbus.member.method import DbusMethodMiddleware
+    from aiodbus.interface.base import DbusInterfaceBase
 
-from .dbus_common_funcs import _is_property_flags_correct, _method_name_converter
 
 SelfMeta = TypeVar("SelfMeta", bound="DbusInterfaceMetaCommon")
 
@@ -97,75 +83,32 @@ class DbusInterfaceMetaCommon(type):
         return new_cls
 
 
-MEMBER_NAME_REQUIREMENTS = (
-    "Member name must only contain ASCII characters, "
-    "cannot start with digit, "
-    "must not contain dot '.' and be between 1 "
-    "and 255 characters in length."
-)
-
-
-class DbusPropertyCommon(DbusMember):
-    def __init__(
-        self,
-        property_name: Optional[str],
-        property_signature: str,
-        flags: int,
-        original_method: FunctionType,
-    ):
-        if property_name is None:
-            property_name = "".join(_method_name_converter(original_method.__name__))
-
-        assert _is_property_flags_correct(flags), (
-            "Incorrect number of Property flags. "
-            "Only one of DbusPropertyConstFlag, DbusPropertyEmitsChangeFlag, "
-            "DbusPropertyEmitsInvalidationFlag or DbusPropertyExplicitFlag "
-            "is allowed."
-        )
-
-        super().__init__(property_name)
-        self.property_name: str = property_name
-        self.property_signature = property_signature
-        self.flags = flags
-
-    @property
-    def member_name(self) -> str:
-        return self.property_name
-
-
-class DbusSignalCommon(DbusMember):
-    def __init__(
-        self,
-        signal_name: Optional[str],
-        signal_signature: str,
-        args_names: Sequence[str],
-        flags: int,
-        original_method: FunctionType,
-    ):
-        if signal_name is None:
-            signal_name = "".join(_method_name_converter(original_method.__name__))
-
-        super().__init__(signal_name)
-        self.signal_name = signal_name
-        self.signal_signature = signal_signature
-        self.args_names = args_names
-        self.flags = flags
-
-        self.__doc__ = original_method.__doc__
-        self.__annotations__ = original_method.__annotations__
-
-    @property
-    def member_name(self) -> str:
-        return self.signal_name
-
-
 class DbusBoundMember(ABC):
+    """
+    Member of an interface that has been bound to a local object or proxy to a remote object.
+    """
+
     @property
     @abstractmethod
     def member(self) -> DbusMember: ...
 
 
 class DbusLocalMember(DbusBoundMember):
+    """
+    Base class identifying members bound to local objects.
+    """
+
+    def __init__(self, local_object: DbusInterfaceBase, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.local_object_ref = weakref.ref(local_object)
+
+    @property
+    def local_object(self) -> DbusInterfaceBase:
+        local_object = self.local_object_ref()
+        if local_object is None:
+            raise RuntimeError("Local object no longer exists")
+        return local_object
+
     @abstractmethod
     def _append_to_interface(
         self,
@@ -174,29 +117,12 @@ class DbusLocalMember(DbusBoundMember):
     ) -> None: ...
 
 
-class DbusProxyMember(DbusBoundMember): ...
+class DbusProxyMember(DbusBoundMember):
+    """
+    Base class identifying members bound to remote objects.
+    """
 
-
-class DbusMethodOverride(Generic[T]):
-    def __init__(self, override_method: T):
-        self.override_method = override_method
-
-
-class DbusPropertyOverride(Generic[T]):
-    def __init__(self, getter_override: Callable[[Any], T]):
-        self.getter_override = getter_override
-        self.setter_override: Optional[Callable[[Any, T], None]] = None
-        self.is_setter_public = True
-
-    def setter(self, new_setter: Optional[Callable[[Any, T], None]]) -> None:
-        self.setter_override = new_setter
-
-    def setter_private(
-        self,
-        new_setter: Optional[Callable[[Any, T], None]],
-    ) -> None:
-        self.setter_override = new_setter
-        self.is_setter_public = False
+    ...
 
 
 class DbusRemoteObjectMeta:
