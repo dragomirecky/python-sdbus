@@ -293,9 +293,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
             callback(args)
 
 
-def dbus_signal[
-    T
-](
+def dbus_signal[T](
     signature: str = "",
     arg_names: Sequence[str] = (),
     flags: int = 0,

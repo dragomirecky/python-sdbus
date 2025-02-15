@@ -249,15 +249,11 @@ class DbusLocalProperty(
             )
 
 
-def dbus_property[
-    T
-](
+def dbus_property[T](
     signature: str = "",
     flags: int = 0,
     name: Optional[str] = None,
-) -> Callable[
-    [Callable[[Any], T]], DbusProperty[T]
-]:
+) -> Callable[[Callable[[Any], T]], DbusProperty[T]]:
 
     assert not isinstance(signature, FunctionType), (
         "Passed function to decorator directly. " "Did you forget () round brackets?"

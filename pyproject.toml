@@ -20,6 +20,7 @@ dependencies = []
 dev = [
     "black>=25.1.0",
     "clang-format>=19.1.7",
+    "isort>=6.0.0",
     "jinja2>=3.1.5",
     "pyright>=1.1.393",
     "pytest>=8.3.4",

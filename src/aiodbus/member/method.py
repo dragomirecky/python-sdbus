@@ -261,9 +261,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         return await self.dbus_method.unbound_method(self.local_object, *args, **kwargs)
 
 
-def dbus_method[
-    **P, R
-](
+def dbus_method[**P, R](
     input_signature: str = "",
     result_signature: str = "",
     flags: int = 0,
@@ -299,9 +297,7 @@ def dbus_method[
     return dbus_method_decorator
 
 
-async def call_with_middlewares[
-    **P, R
-](
+async def call_with_middlewares[**P, R](
     func: AnyAsyncMethod[P, R],
     middlewares: List[DbusMethodMiddleware],
     *args: P.args,

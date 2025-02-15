@@ -3,17 +3,14 @@ repos:
     rev: v4.5.0
     hooks:
     -   id: check-yaml
-        exclude: modules/storage-manager/tests/data/managed_objects_with_drive.yaml
     -   id: end-of-file-fixer
-        exclude: '^modules/configurator/tests/existing_entries/.*json$'
     -   id: trailing-whitespace
 -   repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 25.1.0
     hooks:
     -   id: black
-        exclude: modules/honeybee-lib/src/honeybee/version/__init__.py
 -   repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
+    rev: 6.0.0
     hooks:
     -   id: isort
 -   repo: https://github.com/Lucas-C/pre-commit-hooks
