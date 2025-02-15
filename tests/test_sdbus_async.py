@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+import weakref
 from asyncio import Event, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import sleep, wait_for
@@ -566,8 +567,9 @@ class TestProxy(IsolatedDbusTestCase):
 
     async def test_interface_remove(self) -> None:
         test_object, test_object_connection = initialize_object()
+        test_object_ref = weakref.ref(test_object)
 
-        from gc import collect
+        from gc import collect, get_referents, get_referrers
 
         del test_object
 

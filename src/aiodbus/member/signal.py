@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class DbusSignal(DbusMember, DbusSignalCommon, Generic[T]):
+class DbusSignal(DbusSignalCommon, Generic[T]):
 
     def __init__(
         self,

@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import logging
+import weakref
+from contextlib import contextmanager
 from contextvars import ContextVar
+from functools import partial
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
+    Coroutine,
     Iterable,
     Literal,
     Optional,
     Protocol,
+    Sequence,
     Tuple,
     TypeAlias,
     Union,
@@ -19,12 +26,14 @@ from _sdbus import (
     NameReplaceExistingFlag,
     SdBus,
     SdBusError,
+    SdBusInterface,
     SdBusMessage,
     sd_bus_open_system,
     sd_bus_open_user,
 )
 from aiodbus.exceptions import (
     AlreadyOwner,
+    CallFailedError,
     DbusError,
     MethodCallError,
     NameExistsError,
@@ -32,12 +41,18 @@ from aiodbus.exceptions import (
 )
 from aiodbus.handle import Closeable
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
-    from _sdbus import DbusCompleteTypes
+    from _sdbus import DbusCompleteType, DbusCompleteTypes
 
 
 class Message(Protocol):
-    def get_contents(self) -> Tuple[DbusCompleteTypes, ...]: ...
+    def get_contents(self) -> Tuple[DbusCompleteType, ...]: ...
+
+
+class MethodCallable(Protocol):
+    def __call__(self, *args: DbusCompleteType) -> Coroutine[Any, Any, None]: ...
 
 
 class Interface(Protocol):
@@ -45,19 +60,19 @@ class Interface(Protocol):
         self,
         name: str,
         signature: str,
-        input_args_names: Tuple[str, ...],
+        input_args_names: Sequence[str],
         result_signature: str,
-        result_args_names: Tuple[str, ...],
+        result_args_names: Sequence[str],
         flags: int,
-        callback: Callable[[Message], None],
+        callback: MethodCallable,
     ) -> None: ...
 
     def add_property(
         self,
         name: str,
         signature: str,
-        get_function: Callable[[Message], DbusCompleteTypes],
-        set_function: Optional[Callable[[Message], None]],
+        get_function: Callable[[], DbusCompleteTypes],
+        set_function: Optional[Callable[[DbusCompleteTypes], None]],
         flags: int,
     ) -> None: ...
 
@@ -70,6 +85,118 @@ class Interface(Protocol):
     ) -> None: ...
 
 
+_current_message: ContextVar[SdBusMessage] = ContextVar("current_message")
+
+
+@contextmanager
+def _set_current_message(message: SdBusMessage):
+    token = _current_message.set(message)
+    try:
+        yield message
+    finally:
+        _current_message.reset(token)
+
+
+def get_current_message() -> Message:
+    return _current_message.get()
+
+
+class SdBusInterfaceWrapper(Interface):
+    def __init__(self, interface: SdBusInterface) -> None:
+        self._interface = interface
+
+    @staticmethod
+    async def _method_handler(
+        result_signature: str, callback: MethodCallable, message: SdBusMessage
+    ) -> None:
+        try:
+            with _set_current_message(message):
+                reply_data = await callback(*message.parse_to_tuple())
+
+            if not message.expect_reply:
+                return
+
+            reply = message.create_reply()
+            if isinstance(reply_data, tuple):
+                try:
+                    reply.append_data(result_signature, *reply_data)
+                except TypeError:
+                    # In case of single struct result type
+                    # We can't figure out if return is multiple values
+                    # or a tuple
+                    reply.append_data(result_signature, reply_data)
+            elif reply_data is not None:
+                reply.append_data(result_signature, reply_data)
+        except Exception as exc:
+            if isinstance(exc, MethodCallError):
+                error = exc
+            else:
+                logger.exception("Unhandled exception when handling a method call")
+                error = CallFailedError()
+
+            if not message.expect_reply:
+                return
+
+            reply = message.create_error_reply(
+                error.error_name,
+                str(error.args[0]) if error.args else "",
+            )
+
+        reply.send()
+
+    def add_method(
+        self,
+        name: str,
+        signature: str,
+        input_args_names: Sequence[str],
+        result_signature: str,
+        result_args_names: Sequence[str],
+        flags: int,
+        callback: MethodCallable,
+    ) -> None:
+        self._interface.add_method(
+            name,
+            signature,
+            input_args_names,
+            result_signature,
+            result_args_names,
+            flags,
+            partial(self._method_handler, result_signature, callback),
+        )
+
+    def add_property(
+        self,
+        name: str,
+        signature: str,
+        get_function: Callable[[], DbusCompleteTypes],
+        set_function: Optional[Callable[[DbusCompleteTypes], None]],
+        flags: int,
+    ) -> None:
+
+        def getter(message: SdBusMessage):
+            with _set_current_message(message):
+                data = get_function()
+                message.append_data(signature, data)
+
+        def setter(message: SdBusMessage):
+            assert set_function is not None
+            with _set_current_message(message):
+                set_function(message.get_contents())
+
+        self._interface.add_property(
+            name, signature, getter, setter if set_function is not None else None, flags
+        )
+
+    def add_signal(
+        self,
+        name: str,
+        signature: str,
+        args_names: Tuple[str, ...],
+        flags: int,
+    ):
+        self._interface.add_signal(name, signature, args_names, flags)
+
+
 class Dbus:
     def __init__(self, bus: SdBus) -> None:
         self._sdbus = bus
@@ -78,9 +205,14 @@ class Dbus:
     def address(self) -> Optional[str]:
         return self._sdbus.address
 
-    def create_interface(self) -> Interface: ...
+    def create_interface(self) -> Interface:
+        return SdBusInterfaceWrapper(SdBusInterface())
 
-    def export(self, path: str, name: str, interface: Interface) -> None: ...
+    def export(self, path: str, name: str, interface: Interface) -> Closeable:
+        assert isinstance(interface, SdBusInterfaceWrapper)
+        self._sdbus.add_interface(interface._interface, path, name)
+        assert interface._interface.slot is not None
+        return interface._interface.slot
 
     def _raise_on_error(self, reply: SdBusMessage) -> None:
         if error := reply.get_error():
@@ -95,9 +227,9 @@ class Dbus:
         interface: str,
         member: str,
         signature: str,
-        args: Iterable[DbusCompleteTypes],
+        args: Iterable[DbusCompleteType],
         no_reply: bool = False,
-    ) -> Tuple[DbusCompleteTypes, ...]:
+    ) -> Tuple[DbusCompleteType, ...]:
         message = self._sdbus.new_method_call_message(destination, path, interface, member)
         if args:
             message.append_data(signature, *args)
@@ -117,7 +249,7 @@ class Dbus:
         path: str,
         interface: str,
         member: str,
-    ) -> Tuple[DbusCompleteTypes, ...]:
+    ) -> Tuple[DbusCompleteType, ...]:
         message = self._sdbus.new_property_get_message(destination, path, interface, member)
         reply = await self._sdbus.call_async(message)
         self._raise_on_error(reply)
@@ -131,7 +263,7 @@ class Dbus:
         interface: str,
         member: str,
         signature: str,
-        args: Iterable[DbusCompleteTypes],
+        args: Iterable[DbusCompleteType],
     ) -> None:
         message = self._sdbus.new_property_set_message(destination, path, interface, member)
         message.append_data("v", (signature, *args))
@@ -144,7 +276,7 @@ class Dbus:
         interface: str,
         member: str,
         signature: str,
-        args: Iterable[DbusCompleteTypes],
+        args: Iterable[DbusCompleteType],
     ):
         message = self._sdbus.new_signal_message(path, interface, member)
         if not signature.startswith("(") and isinstance(args, tuple):

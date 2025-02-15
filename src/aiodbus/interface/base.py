@@ -42,7 +42,6 @@ from typing import (
 from warnings import warn
 from weakref import WeakKeyDictionary, WeakValueDictionary
 
-from _sdbus import SdBusInterface
 from aiodbus.bus import Dbus, get_default_bus
 from aiodbus.dbus_common_elements import (
     DbusClassMeta,
@@ -50,7 +49,6 @@ from aiodbus.dbus_common_elements import (
     DbusLocalMember,
     DbusLocalObjectMeta,
     DbusMember,
-    DbusMemberCommon,
     DbusMethodOverride,
     DbusPropertyOverride,
     DbusRemoteObjectMeta,
@@ -209,7 +207,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         meta: DbusClassMeta,
         interface_name: str,
     ) -> None:
-        if not isinstance(attr, DbusMemberCommon):
+        if not isinstance(attr, DbusMember):
             return
 
         if attr.interface_name != interface_name:
@@ -336,14 +334,12 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         export_handle = DbusExportHandle()
 
         for interface_name, member_list in interface_map.items():
-            new_interface = SdBusInterface()
+            new_interface = bus.create_interface()
             for dbus_something in member_list:
                 dbus_something._append_to_interface(new_interface, export_handle)
-            bus._sdbus.add_interface(new_interface, object_path, interface_name)
+            handle = bus.export(path=object_path, interface=new_interface, name=interface_name)
             local_object_meta.activated_interfaces.append(new_interface)
-
-            assert new_interface.slot is not None
-            export_handle.append(new_interface.slot)
+            export_handle.append(handle)
 
         return export_handle
 

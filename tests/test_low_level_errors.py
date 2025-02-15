@@ -23,8 +23,9 @@ from __future__ import annotations
 from asyncio import get_running_loop, wait_for
 from typing import Any
 
+from _sdbus import SdBusInterface
 from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property
-from aiodbus.bus import get_default_bus
+from aiodbus.bus import SdBusInterfaceWrapper, get_default_bus
 from aiodbus.dbus_common_elements import DbusLocalObjectMeta
 from aiodbus.exceptions import CallFailedError, MethodCallError
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -161,11 +162,16 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
         await self.test_object_connection.hello_world()
 
-    async def test_property_callback_error(self) -> None:
+    def get_sdbus_interface(self) -> SdBusInterface:
         dbus_local_meta = self.test_object._dbus
         if not isinstance(dbus_local_meta, DbusLocalObjectMeta):
             raise TypeError
         interface = dbus_local_meta.activated_interfaces[0]
+        assert isinstance(interface, SdBusInterfaceWrapper)
+        return interface._interface
+
+    async def test_property_callback_error(self) -> None:
+        interface = self.get_sdbus_interface()
         interface.property_get_dict.pop(b"DerriveErrSettable")
 
         with self.assertRaises(CallFailedError):
@@ -176,10 +182,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
 
     async def test_method_callback_error(self) -> None:
         TEST_KEY = b"HelloWorld"
-        dbus_local_meta = self.test_object._dbus
-        if not isinstance(dbus_local_meta, DbusLocalObjectMeta):
-            raise TypeError
-        interface = dbus_local_meta.activated_interfaces[0]
+        interface = self.get_sdbus_interface()
         interface.method_dict.pop(TEST_KEY)
 
         with self.assertRaises(CallFailedError):

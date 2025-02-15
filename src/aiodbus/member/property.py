@@ -30,6 +30,7 @@ from typing import (
     Generator,
     Generic,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -38,7 +39,7 @@ from typing import (
 )
 from weakref import ref as weak_ref
 
-from _sdbus import SdBusInterface, SdBusMessage
+from aiodbus.bus import Interface
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
     DbusLocalMember,
@@ -48,16 +49,16 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
-from aiodbus.exceptions import MethodCallError
 
 if TYPE_CHECKING:
+    from _sdbus import DbusCompleteType
     from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
 
 
 T = TypeVar("T")
 
 
-class DbusProperty(DbusMember, DbusPropertyCommon, Generic[T]):
+class DbusProperty(DbusPropertyCommon, Generic[T]):
     def __init__(
         self,
         property_name: Optional[str],
@@ -195,7 +196,7 @@ class DbusLocalProperty(
 
     def _append_to_interface(
         self,
-        interface: SdBusInterface,
+        interface: Interface,
         handle: DbusExportHandle,
     ) -> None:
         getter = self._dbus_reply_get
@@ -256,21 +257,19 @@ class DbusLocalProperty(
                 )
             )
 
-    def _dbus_reply_get(self, message: SdBusMessage) -> None:
+    def _dbus_reply_get(self) -> Tuple[DbusCompleteType, ...]:
         local_object = self.local_object_ref()
         if local_object is None:
             raise RuntimeError("Local object no longer exists!")
 
-        reply_data: Any = self.dbus_property.property_getter(local_object)
-        message.append_data(self.dbus_property.property_signature, reply_data)
+        return self.dbus_property.property_getter(local_object)  # type: ignore
 
-    def _dbus_reply_set(self, message: SdBusMessage) -> None:
+    def _dbus_reply_set(self, data_to_set_to: Tuple[DbusCompleteType, ...]) -> None:
         local_object = self.local_object_ref()
         if local_object is None:
             raise RuntimeError("Local object no longer exists!")
 
         assert self.dbus_property.property_setter is not None
-        data_to_set_to: Any = message.get_contents()
 
         self.dbus_property.property_setter(local_object, data_to_set_to)
 

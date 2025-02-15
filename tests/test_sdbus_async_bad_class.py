@@ -64,7 +64,7 @@ class TestBadAsyncDbusClass(TestCase):
 
         with self.assertRaisesRegex(
             AssertionError,
-            "^Invalid method name",
+            "^Invalid name",
         ):
 
             class BadMethodName(
@@ -80,7 +80,7 @@ class TestBadAsyncDbusClass(TestCase):
 
         with self.assertRaisesRegex(
             AssertionError,
-            "^Invalid property name",
+            "^Invalid name",
         ):
 
             class BadPropertyName(
@@ -96,7 +96,7 @@ class TestBadAsyncDbusClass(TestCase):
 
         with self.assertRaisesRegex(
             AssertionError,
-            "^Invalid signal name",
+            "^Invalid name",
         ):
 
             class BadSignalName(

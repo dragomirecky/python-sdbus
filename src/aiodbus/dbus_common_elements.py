@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from inspect import getfullargspec
 from types import FunctionType
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -36,9 +37,13 @@ from typing import (
     TypeVar,
 )
 
-from _sdbus import SdBusInterface, is_interface_name_valid, is_member_name_valid
-from aiodbus.bus import Dbus, get_default_bus
+from _sdbus import is_interface_name_valid, is_member_name_valid
+from aiodbus.bus import Dbus, Interface, get_default_bus
 from aiodbus.handle import DbusExportHandle
+from aiodbus.member.base import DbusMember
+
+if TYPE_CHECKING:
+    from aiodbus.member.method import DbusMethodMiddleware
 
 from .dbus_common_funcs import _is_property_flags_correct, _method_name_converter
 
@@ -46,18 +51,6 @@ SelfMeta = TypeVar("SelfMeta", bound="DbusInterfaceMetaCommon")
 
 
 T = TypeVar("T")
-
-
-class DbusMemberCommon(ABC):
-    interface_name: str
-    serving_enabled: bool
-
-    @property
-    @abstractmethod
-    def member_name(self) -> str: ...
-
-
-class DbusMember(DbusMemberCommon): ...
 
 
 class DbusInterfaceMetaCommon(type):
@@ -83,7 +76,7 @@ class DbusInterfaceMetaCommon(type):
                 ...
 
         for attr_name, attr in namespace.items():
-            if not isinstance(attr, DbusMemberCommon):
+            if not isinstance(attr, DbusMember):
                 continue
 
             # TODO: Fix async metaclass copying all methods
@@ -112,128 +105,7 @@ MEMBER_NAME_REQUIREMENTS = (
 )
 
 
-class DbusMethodCommon(DbusMemberCommon):
-
-    def __init__(
-        self,
-        original_method: FunctionType,
-        method_name: Optional[str],
-        input_signature: str,
-        input_args_names: Optional[Sequence[str]],
-        result_signature: str,
-        result_args_names: Optional[Sequence[str]],
-        flags: int,
-    ):
-
-        assert not isinstance(input_args_names, str), (
-            "Passed a string as input args"
-            " names. Did you forget to put"
-            " it in to a tuple ('string', ) ?"
-        )
-
-        if method_name is None:
-            method_name = "".join(_method_name_converter(original_method.__name__))
-
-        try:
-            assert is_member_name_valid(method_name), (
-                f'Invalid method name: "{method_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
-            )
-        except NotImplementedError:
-            ...
-
-        super().__init__()
-        self.original_method = original_method
-        self.args_spec = getfullargspec(original_method)
-        self.args_names = self.args_spec.args[1:]  # 1: because of self
-        self.num_of_args = len(self.args_names)
-        self.args_defaults = self.args_spec.defaults if self.args_spec.defaults is not None else ()
-        self.default_args_start_at = self.num_of_args - len(self.args_defaults)
-
-        self.method_name = method_name
-        self.input_signature = input_signature
-        self.input_args_names: Sequence[str] = ()
-        if input_args_names is not None:
-            assert not any(" " in x for x in input_args_names), (
-                "Can't have spaces in argument input names" f"Args: {input_args_names}"
-            )
-
-            self.input_args_names = input_args_names
-        elif result_args_names is not None:
-            self.input_args_names = self.args_names
-
-        self.result_signature = result_signature
-        self.result_args_names: Sequence[str] = ()
-        if result_args_names is not None:
-            assert not any(" " in x for x in result_args_names), (
-                "Can't have spaces in argument result names." f"Args: {result_args_names}"
-            )
-
-            self.result_args_names = result_args_names
-
-        self.flags = flags
-
-        self.to_dbus_middlewares: List[Callable[[Any], Any]] = []
-        self.from_dbus_middlewares: List[Callable[[Any], Any]] = []
-
-        self.__doc__ = original_method.__doc__
-
-    def _rebuild_args(
-        self, function: FunctionType, *args: Any, **kwargs: Dict[str, Any]
-    ) -> List[Any]:
-        # 3 types of arguments
-        # *args - should be passed directly
-        # **kwargs - should be put in a proper order
-        # defaults - should be retrieved and put in proper order
-
-        # Strategy:
-        # Iterate over arg names
-        # Use:
-        # 1. Arg
-        # 2. Kwarg
-        # 3. Default
-
-        # a, b, c, d, e
-        #       ^ defaults start here
-        # 5 - 3 = [2]
-        # ^ total args
-        #     ^ number of default args
-        # First arg that supports default is
-        # (total args - number of default args)
-        passed_args_iter = iter(args)
-        default_args_iter = iter(self.args_defaults)
-
-        new_args_list: List[Any] = []
-
-        for i, a_name in enumerate(self.args_spec.args[1:]):
-            try:
-                next_arg = next(passed_args_iter)
-            except StopIteration:
-                next_arg = None
-
-            if i >= self.default_args_start_at:
-                next_default_arg = next(default_args_iter)
-            else:
-                next_default_arg = None
-
-            next_kwarg = kwargs.get(a_name)
-
-            if next_arg is not None:
-                new_args_list.append(next_arg)
-            elif next_kwarg is not None:
-                new_args_list.append(next_kwarg)
-            elif next_default_arg is not None:
-                new_args_list.append(next_default_arg)
-            else:
-                raise TypeError("Could not flatten the args")
-
-        return new_args_list
-
-    @property
-    def member_name(self) -> str:
-        return self.method_name
-
-
-class DbusPropertyCommon(DbusMemberCommon):
+class DbusPropertyCommon(DbusMember):
     def __init__(
         self,
         property_name: Optional[str],
@@ -244,13 +116,6 @@ class DbusPropertyCommon(DbusMemberCommon):
         if property_name is None:
             property_name = "".join(_method_name_converter(original_method.__name__))
 
-        try:
-            assert is_member_name_valid(property_name), (
-                f'Invalid property name: "{property_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
-            )
-        except NotImplementedError:
-            ...
-
         assert _is_property_flags_correct(flags), (
             "Incorrect number of Property flags. "
             "Only one of DbusPropertyConstFlag, DbusPropertyEmitsChangeFlag, "
@@ -258,7 +123,7 @@ class DbusPropertyCommon(DbusMemberCommon):
             "is allowed."
         )
 
-        super().__init__()
+        super().__init__(property_name)
         self.property_name: str = property_name
         self.property_signature = property_signature
         self.flags = flags
@@ -268,7 +133,7 @@ class DbusPropertyCommon(DbusMemberCommon):
         return self.property_name
 
 
-class DbusSignalCommon(DbusMemberCommon):
+class DbusSignalCommon(DbusMember):
     def __init__(
         self,
         signal_name: Optional[str],
@@ -280,14 +145,7 @@ class DbusSignalCommon(DbusMemberCommon):
         if signal_name is None:
             signal_name = "".join(_method_name_converter(original_method.__name__))
 
-        try:
-            assert is_member_name_valid(signal_name), (
-                f'Invalid signal name: "{signal_name}"; ' f"{MEMBER_NAME_REQUIREMENTS}"
-            )
-        except NotImplementedError:
-            ...
-
-        super().__init__()
+        super().__init__(signal_name)
         self.signal_name = signal_name
         self.signal_signature = signal_signature
         self.args_names = args_names
@@ -304,14 +162,14 @@ class DbusSignalCommon(DbusMemberCommon):
 class DbusBoundMember(ABC):
     @property
     @abstractmethod
-    def member(self) -> DbusMemberCommon: ...
+    def member(self) -> DbusMember: ...
 
 
 class DbusLocalMember(DbusBoundMember):
     @abstractmethod
     def _append_to_interface(
         self,
-        interface: SdBusInterface,
+        interface: Interface,
         handle: DbusExportHandle,
     ) -> None: ...
 
@@ -355,7 +213,7 @@ class DbusRemoteObjectMeta:
 
 class DbusLocalObjectMeta:
     def __init__(self) -> None:
-        self.activated_interfaces: List[SdBusInterface] = []
+        self.activated_interfaces: List[Interface] = []
         self.serving_object_path: Optional[str] = None
         self.attached_bus: Optional[Dbus] = None
 

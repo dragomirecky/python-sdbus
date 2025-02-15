@@ -38,10 +38,16 @@ from _sdbus import (
     sd_bus_open_user,
     sd_bus_open_user_machine,
 )
-from aiodbus.bus import Dbus, connect, get_default_bus, set_default_bus
+from aiodbus.bus import (
+    Dbus,
+    connect,
+    get_current_message,
+    get_default_bus,
+    set_default_bus,
+)
 from aiodbus.interface.common import DbusInterfaceCommonAsync
 from aiodbus.interface.object_manager import DbusObjectManagerInterfaceAsync
-from aiodbus.member.method import dbus_method, dbus_method_override, get_current_message
+from aiodbus.member.method import dbus_method, dbus_method_override
 from aiodbus.member.property import dbus_property, dbus_property_async_override
 from aiodbus.member.signal import dbus_signal
 
