@@ -1,7 +1,6 @@
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Dict, List, Literal, Mapping, Tuple
 
-from aiodbus.dbus_common_funcs import _parse_properties_vardict
-from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.interface.base import DbusInterface
 from aiodbus.member.method import dbus_method
 from aiodbus.member.signal import dbus_signal
 
@@ -12,12 +11,11 @@ DBUS_PROPERTIES_CHANGED_TYPING = Tuple[
 ]
 
 
-class DbusPropertiesInterfaceAsync(
-    DbusInterfaceBase,
+class DbusPropertiesInterface(
+    DbusInterface,
     interface_name="org.freedesktop.DBus.Properties",
     serving_enabled=False,
 ):
-
     @dbus_signal("sa{sv}as")
     def properties_changed(self) -> DBUS_PROPERTIES_CHANGED_TYPING:
         raise NotImplementedError
@@ -48,3 +46,29 @@ class DbusPropertiesInterfaceAsync(
             )
 
         return properties
+
+
+def _parse_properties_vardict(
+    properties_name_map: Mapping[str, str],
+    properties_vardict: Dict[str, Tuple[str, Any]],
+    on_unknown_member: Literal["error", "ignore", "reuse"],
+) -> Dict[str, Any]:
+
+    properties_translated: Dict[str, Any] = {}
+
+    for member_name, variant in properties_vardict.items():
+        try:
+            python_name = properties_name_map[member_name]
+        except KeyError:
+            if on_unknown_member == "error":
+                raise
+            elif on_unknown_member == "ignore":
+                continue
+            elif on_unknown_member == "reuse":
+                python_name = member_name
+            else:
+                raise ValueError
+
+        properties_translated[python_name] = variant[1]
+
+    return properties_translated

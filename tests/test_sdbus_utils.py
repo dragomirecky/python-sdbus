@@ -20,7 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from aiodbus import DbusInterfaceCommonAsync
+from aiodbus import DbusInterfaceCommon
 from aiodbus.bus import connect
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.inspect import inspect_dbus_path
@@ -30,7 +30,7 @@ TEST_PATH = "/test"
 
 class TestSdbusUtilsInspect(IsolatedDbusTestCase):
     def test_inspect_dbus_path_async_proxy(self) -> None:
-        proxy = DbusInterfaceCommonAsync.new_proxy("example.org", TEST_PATH)
+        proxy = DbusInterfaceCommon.new_proxy("example.org", TEST_PATH)
 
         self.assertEqual(inspect_dbus_path(proxy), TEST_PATH)
 
@@ -40,7 +40,7 @@ class TestSdbusUtilsInspect(IsolatedDbusTestCase):
             inspect_dbus_path(proxy, new_bus)
 
     def test_inspect_dbus_path_async_local(self) -> None:
-        local_obj = DbusInterfaceCommonAsync()
+        local_obj = DbusInterfaceCommon()
 
         with self.assertRaisesRegex(
             LookupError,

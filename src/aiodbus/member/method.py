@@ -34,28 +34,24 @@ from typing import (
     Protocol,
     Sequence,
     Type,
-    TypeVar,
     Union,
+    Unpack,
     cast,
     overload,
 )
 
-from _sdbus import DbusNoReplyFlag
-from aiodbus.bus import Interface
-from aiodbus.dbus_common_elements import (
+from aiodbus.bus import Interface, MethodFlags
+from aiodbus.member.base import (
     DbusBoundMember,
     DbusLocalMember,
     DbusMember,
     DbusProxyMember,
-    DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_common_funcs import _method_name_converter
+from aiodbus.meta import DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
-    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
-
-T = TypeVar("T")
+    from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
 class AnyAsyncMethod[**P, R](Protocol):
@@ -81,8 +77,8 @@ class DbusMethod[**P, R](DbusMember):
         input_args_names: Optional[Sequence[str]],
         result_signature: str,
         result_args_names: Optional[Sequence[str]],
-        flags: int,
         unbound_method: AnyAsyncMethod[Concatenate[Any, P], R],
+        **flags: Unpack[MethodFlags],
     ):
         assert not isinstance(input_args_names, str), (
             "Passed a string as input args"
@@ -91,7 +87,7 @@ class DbusMethod[**P, R](DbusMember):
         )
 
         if name is None:
-            name = "".join(_method_name_converter(unbound_method.__name__))
+            name = DbusMethod.dbusify_name(unbound_method.__name__)
 
         super().__init__(name)
         self.unbound_method = unbound_method
@@ -134,20 +130,20 @@ class DbusMethod[**P, R](DbusMember):
     def __get__(
         self,
         obj: None,
-        obj_class: Type[DbusInterfaceBase],
+        obj_class: Type[DbusInterface],
     ) -> DbusMethod[P, R]: ...
 
     @overload
     def __get__(
         self,
-        obj: DbusInterfaceBase,
-        obj_class: Type[DbusInterfaceBase],
+        obj: DbusInterface,
+        obj_class: Type[DbusInterface],
     ) -> DbusBoundMethod[P, R]: ...
 
     def __get__(
         self,
-        obj: Optional[DbusInterfaceBase],
-        obj_class: Optional[Type[DbusInterfaceBase]] = None,
+        obj: Optional[DbusInterface],
+        obj_class: Optional[Type[DbusInterface]] = None,
     ) -> Union[DbusBoundMethod[P, R], DbusMethod[P, R]]:
         if obj is not None:
             dbus_meta = obj._dbus
@@ -201,7 +197,7 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
             member=self.dbus_method.method_name,
             signature=self.dbus_method.input_signature,
             args=self._flatten_args(*args, **kwargs),
-            no_reply=bool(self.dbus_method.flags & DbusNoReplyFlag),
+            no_reply=self.dbus_method.flags.get("no_reply", False),
         )
         return cast(R, result)  # we have to hope it's correct
 
@@ -225,7 +221,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
     def __init__(
         self,
         dbus_method: DbusMethod[P, R],
-        local_object: DbusInterfaceBase,
+        local_object: DbusInterface,
     ):
         super().__init__(dbus_method=dbus_method, local_object=local_object)
         self.__doc__ = dbus_method.__doc__
@@ -237,8 +233,8 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
             self.dbus_method.input_args_names,
             self.dbus_method.result_signature,
             self.dbus_method.result_args_names,
-            self.dbus_method.flags,
             self._handle_dbus_call,
+            **self.dbus_method.flags,
         )
 
     async def _handle_dbus_call(self, *args: DbusCompleteType):
@@ -264,10 +260,10 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
 def dbus_method[**P, R](
     input_signature: str = "",
     result_signature: str = "",
-    flags: int = 0,
     result_args_names: Optional[Sequence[str]] = None,
     input_args_names: Optional[Sequence[str]] = None,
     name: Optional[str] = None,
+    **flags: Unpack[MethodFlags],
 ) -> Callable[[AnyAsyncMethod[Concatenate[Any, P], R]], DbusMethod[P, R]]:
 
     assert not isinstance(input_signature, FunctionType), (
@@ -289,7 +285,7 @@ def dbus_method[**P, R](
             result_signature=result_signature,
             result_args_names=result_args_names,
             input_args_names=input_args_names,
-            flags=flags,
+            **flags,
         )
 
         return new_wrapper

@@ -33,23 +33,23 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    Unpack,
     cast,
     overload,
 )
 
-from aiodbus.bus import Interface
-from aiodbus.dbus_common_elements import (
+from aiodbus.bus import Interface, PropertyFlags
+from aiodbus.member.base import (
     DbusBoundMember,
     DbusLocalMember,
     DbusMember,
     DbusProxyMember,
-    DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_common_funcs import _is_property_flags_correct, _method_name_converter
+from aiodbus.meta import DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
-    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
+    from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
 T = TypeVar("T")
@@ -58,51 +58,39 @@ T = TypeVar("T")
 class DbusProperty[T](DbusMember):
     def __init__(
         self,
-        name: Optional[str],
-        signature: str,
-        getter: Callable[[DbusInterfaceBase], T],
-        setter: Optional[Callable[[DbusInterfaceBase, T], None]],
-        flags: int,
+        name: Optional[str] = None,
+        signature: str = "",
+        getter: Optional[Callable[[DbusInterface], T]] = None,
+        setter: Optional[Callable[[DbusInterface, T], None]] = None,
+        **flags: Unpack[PropertyFlags],
     ) -> None:
-        assert isinstance(getter, FunctionType)
-
-        if name is None:
-            name = "".join(_method_name_converter(getter.__name__))
-
-        assert _is_property_flags_correct(flags), (
-            "Incorrect number of Property flags. "
-            "Only one of DbusPropertyConstFlag, DbusPropertyEmitsChangeFlag, "
-            "DbusPropertyEmitsInvalidationFlag or DbusPropertyExplicitFlag "
-            "is allowed."
-        )
-
+        if name is None and getter:
+            name = DbusMember.dbusify_name(getter.__name__)
         super().__init__(name)
         self.signature = signature
+        self.property_getter = getter
+        self.property_setter = setter
         self.flags = flags
-
-        self.property_getter: Callable[[DbusInterfaceBase], T] = getter
-        self.property_setter: Optional[Callable[[DbusInterfaceBase, T], None]] = setter
-
         self.__doc__ = getter.__doc__
 
     @overload
     def __get__(
         self,
         obj: None,
-        obj_class: Type[DbusInterfaceBase],
+        obj_class: Type[DbusInterface],
     ) -> DbusProperty[T]: ...
 
     @overload
     def __get__(
         self,
-        obj: DbusInterfaceBase,
-        obj_class: Type[DbusInterfaceBase],
+        obj: DbusInterface,
+        obj_class: Type[DbusInterface],
     ) -> DbusBoundProperty[T]: ...
 
     def __get__(
         self,
-        obj: Optional[DbusInterfaceBase],
-        obj_class: Optional[Type[DbusInterfaceBase]] = None,
+        obj: Optional[DbusInterface],
+        obj_class: Optional[Type[DbusInterface]] = None,
     ) -> Union[DbusBoundProperty[T], DbusProperty[T]]:
         if obj is not None:
             dbus_meta = obj._dbus
@@ -182,7 +170,7 @@ class DbusLocalProperty(
     DbusBoundProperty[T],
     DbusLocalMember,
 ):
-    def __init__(self, dbus_property: DbusProperty[T], local_object: DbusInterfaceBase):
+    def __init__(self, dbus_property: DbusProperty[T], local_object: DbusInterface):
         super().__init__(dbus_property=dbus_property, local_object=local_object)
         self.__doc__ = dbus_property.__doc__
 
@@ -198,13 +186,19 @@ class DbusLocalProperty(
         interface.add_property(
             dbus_property.name,
             dbus_property.signature,
-            getter,
-            setter,
-            dbus_property.flags,
+            get_function=getter,
+            set_function=setter,
+            **dbus_property.flags,
         )
 
+    def _get_value(self) -> T:
+        getter = self.dbus_property.property_getter
+        if getter is None:
+            raise RuntimeError("Property has no getter available")
+        return getter(self.local_object)
+
     async def get(self) -> T:
-        return self.dbus_property.property_getter(self.local_object)
+        return self._get_value()
 
     async def set(self, new_value: T) -> None:
         if self.dbus_property.property_setter is None:
@@ -215,7 +209,7 @@ class DbusLocalProperty(
         self._emit_property_changed(local_object, new_value)
 
     def _dbus_reply_get(self) -> Tuple[DbusCompleteType, ...]:
-        result = self.dbus_property.property_getter(self.local_object)
+        result = self._get_value()
         return cast(Tuple["DbusCompleteType", ...], result)
 
     def _dbus_reply_set(self, data_to_set_to: Tuple[DbusCompleteType, ...]) -> None:
@@ -251,8 +245,8 @@ class DbusLocalProperty(
 
 def dbus_property[T](
     signature: str = "",
-    flags: int = 0,
     name: Optional[str] = None,
+    **flags: Unpack[PropertyFlags],
 ) -> Callable[[Callable[[Any], T]], DbusProperty[T]]:
 
     assert not isinstance(signature, FunctionType), (
@@ -267,8 +261,7 @@ def dbus_property[T](
             name=name,
             signature=signature,
             getter=function,
-            setter=None,
-            flags=flags,
+            **flags,
         )
 
         return new_wrapper

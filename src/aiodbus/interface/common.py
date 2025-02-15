@@ -1,8 +1,6 @@
-from aiodbus.interface.introspectable import DbusIntrospectableAsync
-from aiodbus.interface.peer import DbusPeerInterfaceAsync
-from aiodbus.interface.properties import DbusPropertiesInterfaceAsync
+from aiodbus.interface.introspectable import DbusIntrospectable
+from aiodbus.interface.peer import DbusPeerInterface
+from aiodbus.interface.properties import DbusPropertiesInterface
 
 
-class DbusInterfaceCommonAsync(
-    DbusPeerInterfaceAsync, DbusPropertiesInterfaceAsync, DbusIntrospectableAsync
-): ...
+class DbusInterfaceCommon(DbusPeerInterface, DbusPropertiesInterface, DbusIntrospectable): ...

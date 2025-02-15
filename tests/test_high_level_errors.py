@@ -25,7 +25,7 @@ from typing import Any
 
 import pytest
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method
+from aiodbus import DbusInterfaceCommon, dbus_method
 from aiodbus.bus import get_default_bus
 from aiodbus.exceptions import CallFailedError, MethodCallError
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -43,7 +43,7 @@ GOOD_STR = "Good"
 
 
 class InterfaceWithErrors(
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     interface_name="org.example.test",
 ):
 

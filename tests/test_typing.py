@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property, dbus_signal
+from aiodbus import DbusInterfaceCommon, dbus_method, dbus_property, dbus_signal
 
 if TYPE_CHECKING:
     from typing import List
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class InterfaceTestTyping(
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     interface_name="example.com",
 ):
 

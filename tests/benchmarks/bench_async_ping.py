@@ -26,13 +26,13 @@ from time import perf_counter
 
 import pyperf  # type: ignore
 
-from aiodbus import DbusInterfaceCommonAsync
+from aiodbus import DbusInterfaceCommon
 from aiodbus.unittest import _isolated_dbus
 
 
 def bench_async_ping_gather(loops: int) -> float:
     with _isolated_dbus() as bus:
-        dbus_interface = DbusInterfaceCommonAsync.new_proxy(
+        dbus_interface = DbusInterfaceCommon.new_proxy(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
             bus,
@@ -52,7 +52,7 @@ def bench_async_ping_gather(loops: int) -> float:
 
 def bench_async_ping(loops: int) -> float:
     with _isolated_dbus() as bus:
-        dbus_interface = DbusInterfaceCommonAsync.new_proxy(
+        dbus_interface = DbusInterfaceCommon.new_proxy(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
             bus,

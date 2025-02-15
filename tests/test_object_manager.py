@@ -21,8 +21,8 @@
 from __future__ import annotations
 
 from aiodbus import (
-    DbusInterfaceCommonAsync,
-    DbusObjectManagerInterfaceAsync,
+    DbusInterfaceCommon,
+    DbusObjectManagerInterface,
     dbus_method,
     dbus_property,
 )
@@ -39,7 +39,7 @@ TEST_NUMBER = 1000
 
 
 class ObjectManagerTestInterface(
-    DbusObjectManagerInterfaceAsync,
+    DbusObjectManagerInterface,
     interface_name="org.test.objectmanager",
 ):
     @dbus_method(
@@ -56,7 +56,7 @@ MANAGED_INTERFACE_NAME = "org.test.testing"
 
 
 class ManagedInterface(
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     interface_name=MANAGED_INTERFACE_NAME,
 ):
 
@@ -139,10 +139,10 @@ class TestObjectManager(IsolatedDbusTestCase):
 
         await self.bus.request_name(CONNECTION_NAME)
 
-        object_manager = DbusObjectManagerInterfaceAsync()
+        object_manager = DbusObjectManagerInterface()
         object_manager.export_to_dbus(OBJECT_MANAGER_PATH)
 
-        object_manager_connection = DbusObjectManagerInterfaceAsync.new_proxy(
+        object_manager_connection = DbusObjectManagerInterface.new_proxy(
             CONNECTION_NAME, OBJECT_MANAGER_PATH
         )
 

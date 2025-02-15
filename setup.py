@@ -98,22 +98,6 @@ if __name__ == "__main__":
         long_description = f.read()
 
     setup(
-        packages=[
-            "_sdbus",
-            "aiodbus",
-            "aiodbus.utils",
-        ],
-        package_dir={
-            "aiodbus": "src/aiodbus",
-            "_sdbus": "src/_sdbus",
-        },
-        package_data={
-            "_sdbus": [
-                "py.typed",
-                "__init__.pyi",
-                "_sdbus.h",
-            ],
-        },
         ext_modules=[
             Extension(
                 "_sdbus",

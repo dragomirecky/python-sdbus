@@ -25,7 +25,7 @@ from unittest import SkipTest, TestCase, main
 from unittest.mock import MagicMock, patch
 
 from aiodbus.__main__ import generator_main
-from aiodbus.interface_generator import (
+from aiodbus.generator import (
     DbusSigToTyping,
     camel_case_to_snake_case,
     generate_py_file,
@@ -193,8 +193,9 @@ class TestConverter(TestCase):
                     )
 
         generated = generate_py_file(interfaces_intro)
-        self.assertIn("flags=DbusPropertyEmitsInvalidationFlag", generated)
-        self.assertIn("flags=DbusPropertyConstFlag", generated)
+        print(generated)
+        self.assertIn("emits_invalidation=True", generated)
+        self.assertIn("const=True", generated)
 
 
 class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
@@ -229,34 +230,6 @@ class TestGeneratorAgainstDbus(IsolatedDbusTestCase):
             generated_interface,
         )
 
-    def test_generate_from_connection_blocking(self) -> None:
-        if find_spec("jinja2") is None:
-            raise SkipTest("Jinja2 not installed")
-
-        with patch("aiodbus.__main__.stdout") as stdout_mock:
-            generator_main(
-                [
-                    "gen-from-connection",
-                    "--block",
-                    "org.freedesktop.DBus",
-                    "/org/freedesktop/DBus",
-                ]
-            )
-
-        write_mock: MagicMock = stdout_mock.write
-        write_mock.assert_called_once()
-
-        generated_interface = write_mock.call_args.args[0]
-
-        self.assertNotIn(
-            "async",
-            generated_interface,
-        )
-        self.assertIn(
-            "dbus_property",
-            generated_interface,
-        )
-
 
 INTERFACE_NO_MEMBERS_XML = """
 <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
@@ -274,14 +247,12 @@ class TestGeneratorSyntaxCompile(TestCase):
     def test_syntax_compile_async(self) -> None:
         source_code = generate_py_file(
             interfaces_from_str(test_xml),
-            do_async=True,
         )
         compile(source_code, filename="<string>", mode="exec")
 
     def test_syntax_compile_block(self) -> None:
         source_code = generate_py_file(
             interfaces_from_str(test_xml),
-            do_async=False,
         )
         compile(source_code, filename="<string>", mode="exec")
 
@@ -295,35 +266,23 @@ class TestGeneratorSyntaxCompile(TestCase):
         self.assertFalse(no_members_interface[0].signals)
 
         compile(
-            generate_py_file(
-                regular_interface + no_members_interface,
-                do_async=True,
-            ),
+            generate_py_file(regular_interface + no_members_interface),
             filename="<string>",
             mode="exec",
         )
         compile(
-            generate_py_file(
-                no_members_interface + regular_interface,
-                do_async=True,
-            ),
+            generate_py_file(no_members_interface + regular_interface),
             filename="<string>",
             mode="exec",
         )
 
         compile(
-            generate_py_file(
-                regular_interface + no_members_interface,
-                do_async=False,
-            ),
+            generate_py_file(regular_interface + no_members_interface),
             filename="<string>",
             mode="exec",
         )
         compile(
-            generate_py_file(
-                no_members_interface + regular_interface,
-                do_async=False,
-            ),
+            generate_py_file(no_members_interface + regular_interface),
             filename="<string>",
             mode="exec",
         )

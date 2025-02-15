@@ -30,13 +30,14 @@ from unittest import SkipTest
 
 from _sdbus import DbusPropertyEmitsChangeFlag, SdBusError
 from aiodbus import (
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     DbusNoReplyFlag,
     dbus_method,
     dbus_property,
     dbus_signal,
     get_current_message,
 )
+from aiodbus.bus.sdbus import _SdBus
 from aiodbus.exceptions import (
     CallFailedError,
     FileExistsError,
@@ -68,6 +69,7 @@ class TestPing(IsolatedDbusTestCase):
         self.assertEqual(return_code, 0)
 
     async def test_ping(self) -> None:
+        assert isinstance(self.bus, _SdBus)
         m = self.bus._sdbus.new_method_call_message(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
@@ -87,7 +89,7 @@ TEST_INTERFACE_NAME = "org.test.test"
 
 
 class SomeTestInterface(
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     interface_name=TEST_INTERFACE_NAME,
 ):
 
@@ -119,7 +121,7 @@ class SomeTestInterface(
 
     @dbus_property(
         "s",
-        flags=DbusPropertyEmitsChangeFlag,
+        emits_change=True,
     )
     def test_property(self) -> str:
         """Test property"""
@@ -144,7 +146,7 @@ class SomeTestInterface(
         else:
             return input.lower()
 
-    @dbus_method("sb", "s", 0, ("string_result",))
+    @dbus_method("sb", "s", ("string_result",))
     async def kwargs_function_annotated(self, input: str = "test", is_upper: bool = True) -> str:
         if is_upper:
             return input.upper()
@@ -172,7 +174,7 @@ class SomeTestInterface(
     async def raise_and_unmap_error(self) -> None:
         raise DbusErrorUnmappedLater("Should be unmapped")
 
-    @dbus_method("s", flags=DbusNoReplyFlag)
+    @dbus_method("s", no_reply=True)
     async def no_reply_method(self, new_value: str) -> None:
         self.no_reply_sync.set()
 
@@ -556,6 +558,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_bus_timerfd(self) -> None:
         test_object, test_object_connection = initialize_object()
 
+        assert isinstance(self.bus, _SdBus)
         self.bus._sdbus.method_call_timeout_usec = 10_000  # 0.01 seconds
 
         loop = get_running_loop()
@@ -599,7 +602,7 @@ class TestProxy(IsolatedDbusTestCase):
             BAR = "/bar"
 
         class EnumedInterfaceAsync(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name=InterfaceNameEnum.BAR,
         ):
 
@@ -677,7 +680,7 @@ class TestProxy(IsolatedDbusTestCase):
 
     async def test_interface_composition(self) -> None:
         class OneInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.example.one",
         ):
             @dbus_method(result_signature="x")
@@ -685,7 +688,7 @@ class TestProxy(IsolatedDbusTestCase):
                 raise NotImplementedError
 
         class TwoInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.example.two",
         ):
             @dbus_method(result_signature="t")
@@ -740,7 +743,7 @@ class TestProxy(IsolatedDbusTestCase):
         bus = self.bus
 
         async def test() -> None:
-            dbus_object = DbusInterfaceCommonAsync.new_proxy(
+            dbus_object = DbusInterfaceCommon.new_proxy(
                 "org.freedesktop.DBus",
                 "/org/freedesktop/DBus",
                 bus,

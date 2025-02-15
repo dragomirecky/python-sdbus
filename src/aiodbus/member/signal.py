@@ -35,6 +35,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    Unpack,
     cast,
     overload,
 )
@@ -42,63 +43,52 @@ from weakref import WeakSet
 
 from _sdbus import SdBusMessage
 from aiodbus import Dbus, get_default_bus
-from aiodbus.bus import Interface
-from aiodbus.dbus_common_elements import (
+from aiodbus.bus import Interface, MemberFlags
+from aiodbus.handle import Closeable
+from aiodbus.member.base import (
     DbusBoundMember,
     DbusLocalMember,
-    DbusLocalObjectMeta,
     DbusMember,
     DbusProxyMember,
-    DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_common_funcs import _method_name_converter
-from aiodbus.handle import Closeable
+from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
-    from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
+    from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
 class DbusSignal[T](DbusMember):
     def __init__(
         self,
-        name: Optional[str],
-        signature: str,
-        args_names: Sequence[str],
-        flags: int,
-        original_method: FunctionType,
+        signature: str = "",
+        name: Optional[str] = None,
+        args_names: Sequence[str] = (),
+        **flags: Unpack[MemberFlags],
     ):
-        if name is None:
-            name = "".join(_method_name_converter(original_method.__name__))
-
         super().__init__(name=name)
-
         self.signature = signature
         self.args_names = args_names
         self.flags = flags
-
-        self.__doc__ = original_method.__doc__
-        self.__annotations__ = original_method.__annotations__
-
         self.local_callbacks: WeakSet[Callable[[T], Any]] = WeakSet()
 
     @overload
     def __get__(
         self,
         obj: None,
-        obj_class: Type[DbusInterfaceBase],
+        obj_class: Type[DbusInterface],
     ) -> DbusSignal[T]: ...
 
     @overload
     def __get__(
         self,
-        obj: DbusInterfaceBase,
-        obj_class: Type[DbusInterfaceBase],
+        obj: DbusInterface,
+        obj_class: Type[DbusInterface],
     ) -> DbusBoundSignal[T]: ...
 
     def __get__(
         self,
-        obj: Optional[DbusInterfaceBase],
-        obj_class: Optional[Type[DbusInterfaceBase]] = None,
+        obj: Optional[DbusInterface],
+        obj_class: Optional[Type[DbusInterface]] = None,
     ) -> Union[DbusBoundSignal[T], DbusSignal[T]]:
         if obj is not None:
             dbus_meta = obj._dbus
@@ -232,7 +222,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
     def __init__(
         self,
         dbus_signal: DbusSignal[T],
-        local_object: DbusInterfaceBase,
+        local_object: DbusInterface,
         local_meta: DbusLocalObjectMeta,
     ):
         super().__init__(dbus_signal=dbus_signal, local_object=local_object)
@@ -244,7 +234,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
             self.dbus_signal.name,
             self.dbus_signal.signature,
             self.dbus_signal.args_names,
-            self.dbus_signal.flags,
+            **self.dbus_signal.flags,
         )
 
     async def catch(self):
@@ -296,8 +286,8 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
 def dbus_signal[T](
     signature: str = "",
     arg_names: Sequence[str] = (),
-    flags: int = 0,
     name: Optional[str] = None,
+    **flags: Unpack[MemberFlags],
 ) -> Callable[[Callable[[Any], T]], DbusSignal[T]]:
     assert not isinstance(signature, FunctionType), (
         "Passed function to decorator directly. " "Did you forget () round brackets?"
@@ -306,12 +296,14 @@ def dbus_signal[T](
     def signal_decorator(pseudo_function: Callable[[Any], T]) -> DbusSignal[T]:
 
         assert isinstance(pseudo_function, FunctionType)
-        return DbusSignal(
+        signal = DbusSignal(
             name=name,
             signature=signature,
             args_names=arg_names,
-            flags=flags,
-            original_method=pseudo_function,
+            **flags,
         )
+        signal.__doc__ = pseudo_function.__doc__
+        signal.__annotations__ = pseudo_function.__annotations__
+        return signal
 
     return signal_decorator

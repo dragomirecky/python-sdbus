@@ -21,12 +21,14 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+from _sdbus import SdBus
 from aiodbus import get_default_bus
 from aiodbus.bus import Dbus
-from aiodbus.interface.base import DbusExportHandle, DbusInterfaceBase
-from aiodbus.interface.common import DbusInterfaceCommonAsync
+from aiodbus.bus.sdbus import _SdBus
+from aiodbus.interface.base import DbusExportHandle, DbusInterface
+from aiodbus.interface.common import DbusInterfaceCommon
 from aiodbus.member.method import dbus_method
 from aiodbus.member.signal import dbus_signal
 
@@ -41,15 +43,15 @@ class CloseableFromCallback:
         self.close = callback
 
 
-class DbusObjectManagerInterfaceAsync(
-    DbusInterfaceCommonAsync,
+class DbusObjectManagerInterface(
+    DbusInterfaceCommon,
     interface_name="org.freedesktop.DBus.ObjectManager",
     serving_enabled=False,
 ):
     def __init__(self) -> None:
         super().__init__()
         self._object_manager_slot: Optional[SdBusSlot] = None
-        self._managed_object_to_path: Dict[DbusInterfaceBase, str] = {}
+        self._managed_object_to_path: Dict[DbusInterface, str] = {}
 
     @dbus_method(result_signature="a{oa{sa{sv}}}")
     async def get_managed_objects(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
@@ -63,6 +65,12 @@ class DbusObjectManagerInterfaceAsync(
     def interfaces_removed(self) -> Tuple[str, List[str]]:
         raise NotImplementedError
 
+    def _get_sdbus(self, bus: Optional[Dbus] = None) -> SdBus:
+        # TODO: remove direct access to sdbus
+        if bus is None:
+            bus = get_default_bus()
+        return cast(_SdBus, bus)._sdbus
+
     def export_to_dbus(
         self,
         object_path: str,
@@ -75,7 +83,7 @@ class DbusObjectManagerInterfaceAsync(
             object_path,
             bus,
         )
-        slot = bus._sdbus.add_object_manager(object_path)
+        slot = self._get_sdbus(bus).add_object_manager(object_path)
         self._object_manager_slot = slot
         export_handle.append(slot)
         return export_handle
@@ -83,7 +91,7 @@ class DbusObjectManagerInterfaceAsync(
     def export_with_manager(
         self,
         object_path: str,
-        object_to_export: DbusInterfaceBase,
+        object_to_export: DbusInterface,
         bus: Optional[Dbus] = None,
     ) -> DbusExportHandle:
         if self._object_manager_slot is None:
@@ -101,13 +109,13 @@ class DbusObjectManagerInterfaceAsync(
                 partial(self.remove_managed_object, object_to_export),
             )
         )
-        bus._sdbus.emit_object_added(object_path)
+        self._get_sdbus(bus).emit_object_added(object_path)
         self._managed_object_to_path[object_to_export] = object_path
         return export_handle
 
-    def remove_managed_object(self, managed_object: DbusInterfaceBase) -> None:
+    def remove_managed_object(self, managed_object: DbusInterface) -> None:
         if self._dbus.attached_bus is None:
             raise RuntimeError("Object manager not exported")
 
         removed_path = self._managed_object_to_path.pop(managed_object)
-        self._dbus.attached_bus._sdbus.emit_object_removed(removed_path)
+        self._get_sdbus(self._dbus.attached_bus).emit_object_removed(removed_path)

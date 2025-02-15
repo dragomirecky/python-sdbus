@@ -1,9 +1,9 @@
-from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.interface.base import DbusInterface
 from aiodbus.member.method import dbus_method
 
 
-class DbusPeerInterfaceAsync(
-    DbusInterfaceBase,
+class DbusPeerInterface(
+    DbusInterface,
     interface_name="org.freedesktop.DBus.Peer",
     serving_enabled=False,
 ):

@@ -22,15 +22,15 @@ from __future__ import annotations
 
 from typing import Tuple, Type
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method
+from aiodbus import DbusInterfaceCommon, dbus_method
 from aiodbus.unittest import IsolatedDbusTestCase
 
 TEST_SERVICE_NAME = "org.example.test"
 
 
 def initialize_object(
-    interface_class: Type[DbusInterfaceCommonAsync],
-) -> Tuple[DbusInterfaceCommonAsync, DbusInterfaceCommonAsync]:
+    interface_class: Type[DbusInterfaceCommon],
+) -> Tuple[DbusInterfaceCommon, DbusInterfaceCommon]:
     test_object = interface_class()
     test_object.export_to_dbus("/")
 
@@ -47,7 +47,7 @@ class TestIntrospection(IsolatedDbusTestCase):
 
     async def test_method_arg_names_none(self) -> None:
         class TestInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.test.intro1",
         ):
             @dbus_method(
@@ -70,7 +70,7 @@ class TestIntrospection(IsolatedDbusTestCase):
 
     async def test_method_arg_names_result_names_only(self) -> None:
         class TestInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.test.intro2",
         ):
             @dbus_method(
@@ -94,7 +94,7 @@ class TestIntrospection(IsolatedDbusTestCase):
 
     async def test_method_arg_names_full(self) -> None:
         class TestInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.test.intro3",
         ):
             @dbus_method(
@@ -119,7 +119,7 @@ class TestIntrospection(IsolatedDbusTestCase):
 
     async def test_method_arg_names_no_return_args(self) -> None:
         class TestInterface(
-            DbusInterfaceCommonAsync,
+            DbusInterfaceCommon,
             interface_name="org.test.intro4",
         ):
             @dbus_method(

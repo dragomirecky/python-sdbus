@@ -269,16 +269,12 @@ class DbusMemberAbstract:
     def _can_use_unpivileged(self) -> bool:
         return True
 
-    def _flags_iter(self) -> Iterator[str]:
+    def flags_iter(self) -> Iterator[str]:
         if self.is_deprecated:
-            yield "DbusDeprecatedFlag"
+            yield "deprecated=True"
 
         if not self.is_priveledged and self._can_use_unpivileged():
-            yield "DbusUnprivilegedFlag"
-
-    @property
-    def flags_str(self) -> str:
-        return " | ".join(self._flags_iter())
+            yield "unprivileged=True"
 
     def _parse_arg(self, arg: Element) -> None:
         raise NotImplementedError("Member does not have arguments")
@@ -354,11 +350,11 @@ class DbusMethodInrospection(DbusMemberAbstract):
 
         super().__init__(element)
 
-    def _flags_iter(self) -> Iterator[str]:
+    def flags_iter(self) -> Iterator[str]:
         if self.is_no_reply:
-            yield "DbusNoReplyFlag"
+            yield "no_reply=True"
 
-        yield from super()._flags_iter()
+        yield from super().flags_iter()
 
     def _parse_arg(self, arg: Element) -> None:
         new_arg = DbusArgsIntrospection(arg)
@@ -413,9 +409,9 @@ class DbusMethodInrospection(DbusMemberAbstract):
 
 class DbusPropertyIntrospection(DbusMemberAbstract):
     _EMITS_CHANGED_MAP: Dict[Union[bool, Literal["const", "invalidates"]], str] = {
-        True: "DbusPropertyEmitsChangeFlag",
-        "invalidates": "DbusPropertyEmitsInvalidationFlag",
-        "const": "DbusPropertyConstFlag",
+        True: "emits_change=True",
+        "invalidates": "emits_invalidation=True",
+        "const": "const=True",
     }
 
     def __init__(self, element: Element):
@@ -443,12 +439,12 @@ class DbusPropertyIntrospection(DbusMemberAbstract):
         # setters.
         return False
 
-    def _flags_iter(self) -> Iterator[str]:
+    def flags_iter(self) -> Iterator[str]:
         emits_changed_str = self._EMITS_CHANGED_MAP.get(self.emits_changed)
         if emits_changed_str is not None:
             yield emits_changed_str
 
-        yield from super()._flags_iter()
+        yield from super().flags_iter()
 
     def _parse_annotation_data(self, annotation_name: str, annotation_value: str) -> None:
 
@@ -571,19 +567,19 @@ result_signature="{{ method.dbus_result_signature }}",
 {% if method.is_results_args_valid_names %}
 result_args_names={{method.result_args_names_repr}},
 {% endif %}
-{% if method.flags_str %}
-flags={{ method.flags_str }},
-{% endif %}
+{% for flag in method.flags_iter() %}
+{{ flag }},
+{% endfor %}
 """
     ),
     "generic_property_flags": (
         """\
 {% if a_property.dbus_signature %}
-property_signature="{{ a_property.dbus_signature }}",
+signature="{{ a_property.dbus_signature }}",
 {% endif %}
-{% if a_property.flags_str %}
-flags={{ a_property.flags_str }},
-{% endif %}
+{% for flag in a_property.flags_iter() %}
+    {{ flag }},
+{% endfor %}
 """
     ),
     "generic_header": """\
@@ -592,22 +588,15 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 """,
-    "async_imports_header": """from sdbus import (
-    DbusDeprecatedFlag,
-    DbusInterfaceCommonAsync,
-    DbusNoReplyFlag,
-    DbusPropertyConstFlag,
-    DbusPropertyEmitsChangeFlag,
-    DbusPropertyEmitsInvalidationFlag,
-    DbusPropertyExplicitFlag,
-    DbusUnprivilegedFlag,
-    dbus_method_async,
-    dbus_property_async,
-    dbus_signal_async,
+    "async_imports_header": """from aiodbus import (
+    DbusInterfaceCommon,
+    dbus_method,
+    dbus_property,
+    DbusSignal,
 )
 
 """,
-    "async_main": (
+    "main": (
         """\
 {% if include_import_header %}
     {% include 'generic_header' %}
@@ -624,7 +613,7 @@ from typing import Any, Dict, List, Tuple
     "async_interface": (
         """\
 class {{ interface.python_name }}(
-    DbusInterfaceCommonAsync,
+    DbusInterfaceCommon,
     interface_name="{{ interface.interface_name }}",
 ):
 {% filter indent(first=True) %}
@@ -650,7 +639,7 @@ class {{ interface.python_name }}(
     ),
     "async_method": (
         """\
-@dbus_method_async(
+@dbus_method(
 {% filter indent(first=True) %}
     {% include 'generic_method_flags' %}
 {% endfilter %}
@@ -667,7 +656,7 @@ async def {{ method.python_name }}(
     ),
     "async_property": (
         """\
-@dbus_property_async(
+@dbus_property(
 {% filter indent(first=True) %}
     {% include 'generic_property_flags' %}
 {% endfilter %}
@@ -679,102 +668,17 @@ def {{ a_property.python_name }}(self) -> {{ a_property.typing }}:
     ),
     "async_signal": (
         """\
-@dbus_signal_async(
+{{ signal.python_name }} = DbusSignal[{{ signal.typing }}](
 {% if signal.dbus_signature %}
-    signal_signature="{{ signal.dbus_signature }}",
+    signature="{{ signal.dbus_signature }}",
 {% endif %}
 {% if signal.is_args_valid_names %}
-    signal_args_names={{signal.args_names_repr}},
+    args_names={{signal.args_names_repr}},
 {% endif %}
-{% if signal.flags_str %}
-    flags={{ signal.flags_str }},
-{% endif %}
-)
-def {{ signal.python_name }}(self) -> {{ signal.typing }}:
-    raise NotImplementedError
-
-"""
-    ),
-    "blocking_imports_header": """\
-from sdbus import (
-    DbusDeprecatedFlag,
-    DbusInterfaceCommon,
-    DbusNoReplyFlag,
-    DbusPropertyConstFlag,
-    DbusPropertyEmitsChangeFlag,
-    DbusPropertyEmitsInvalidationFlag,
-    DbusPropertyExplicitFlag,
-    DbusUnprivilegedFlag,
-    dbus_method,
-    dbus_property,
-)
-
-""",
-    "blocking_main": (
-        """\
-{% if include_import_header %}
-    {% include 'generic_header' %}
-
-    {% include 'blocking_imports_header' %}
-{% endif %}
-
-{% for interface in interfaces %}
-
-    {% include 'blocking_interface' %}
+{% for flag in signal.flags_iter() %}
+    {{ flag }},
 {% endfor %}
-
-"""
-    ),
-    "blocking_interface": (
-        """\
-class {{ interface.python_name }}(
-    DbusInterfaceCommon,
-    interface_name="{{ interface.interface_name }}",
-):
-{% filter indent(first=True) %}
-    {% if interface.has_members %}
-        {% for method in interface.methods %}
-            {% include 'blocking_method' %}
-
-        {% endfor %}
-        {% for a_property in interface.properties %}
-            {% include 'blocking_property' %}
-
-        {% endfor %}
-    {% else %}
-        {% include 'generic_no_members' %}
-
-    {% endif %}
-{% endfilter %}
-"""
-    ),
-    "blocking_method": (
-        """\
-@dbus_method(
-{% filter indent(first=True) %}
-    {% include 'generic_method_flags' %}
-{% endfilter %}
 )
-def {{ method.python_name }}(
-    self,
-{% for arg_name, arg_type in method.args_names_and_typing %}
-    {{ arg_name }}: {{ arg_type }},
-{% endfor %}
-) -> {{ method.result_typing }}:
-    raise NotImplementedError
-
-"""
-    ),
-    "blocking_property": (
-        """\
-@dbus_property(
-{% filter indent(first=True) %}
-    {% include 'generic_property_flags' %}
-{% endfilter %}
-)
-def {{ a_property.python_name }}(self) -> {{ a_property.typing }}:
-    raise NotImplementedError
-
 """
     ),
 }
@@ -816,13 +720,10 @@ def interfaces_from_str(xml_str: str) -> List[DbusInterfaceIntrospection]:
 def generate_py_file(
     interfaces: List[DbusInterfaceIntrospection],
     include_import_header: bool = True,
-    do_async: bool = True,
 ) -> str:
 
     from jinja2 import DictLoader
     from jinja2 import Environment as JinjaEnv
-
-    template_name = "async_main" if do_async else "blocking_main"
 
     env = JinjaEnv(
         loader=DictLoader(INTERFACE_TEMPLATES),
@@ -830,7 +731,7 @@ def generate_py_file(
         lstrip_blocks=True,
         autoescape=False,
     )
-    return env.get_template(template_name).render(
+    return env.get_template("main").render(
         interfaces=interfaces,
         include_import_header=include_import_header,
     )

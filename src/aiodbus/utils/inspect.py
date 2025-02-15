@@ -22,10 +22,9 @@ from __future__ import annotations
 from typing import Optional
 
 import aiodbus
-from _sdbus import SdBus
 from aiodbus.bus import Dbus
-from aiodbus.dbus_common_elements import DbusLocalObjectMeta, DbusRemoteObjectMeta
-from aiodbus.interface.base import DbusInterfaceBase
+from aiodbus.interface.base import DbusInterface
+from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 
 def _inspect_dbus_path_proxy(
@@ -62,13 +61,13 @@ def _inspect_dbus_path_local(
 
 
 def inspect_dbus_path(
-    obj: DbusInterfaceBase,
+    obj: DbusInterface,
     bus: Optional[Dbus] = None,
 ) -> str:
     if bus is None:
         bus = aiodbus.get_default_bus()
 
-    if isinstance(obj, DbusInterfaceBase):
+    if isinstance(obj, DbusInterface):
         dbus_meta = obj._dbus
         if isinstance(dbus_meta, DbusRemoteObjectMeta):
             return _inspect_dbus_path_proxy(obj, dbus_meta, bus)

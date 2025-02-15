@@ -30,6 +30,7 @@ from _sdbus import (
     is_object_path_valid,
     is_service_name_valid,
 )
+from aiodbus.bus.sdbus import _SdBus
 from aiodbus.unittest import IsolatedDbusTestCase
 
 
@@ -42,6 +43,7 @@ class TestAsyncLowLevel(IsolatedDbusTestCase):
 
     async def test_bus_fd_unregister_close(self) -> None:
         await self.bus.request_name("org.example")
+        assert isinstance(self.bus, _SdBus)
         bus_fd = self.bus._sdbus.get_fd()
 
         self.bus.close()

@@ -39,11 +39,11 @@ from aiodbus.bus import (
     get_default_bus,
     set_default_bus,
 )
-from aiodbus.interface.common import DbusInterfaceCommonAsync
-from aiodbus.interface.object_manager import DbusObjectManagerInterfaceAsync
-from aiodbus.member.method import dbus_method
-from aiodbus.member.property import dbus_property
-from aiodbus.member.signal import dbus_signal
+from aiodbus.interface.common import DbusInterfaceCommon
+from aiodbus.interface.object_manager import DbusObjectManagerInterface
+from aiodbus.member.method import DbusMethod, dbus_method
+from aiodbus.member.property import DbusProperty, dbus_property
+from aiodbus.member.signal import DbusSignal, dbus_signal
 
 from .exceptions import (
     AccessDeniedError,
@@ -111,8 +111,8 @@ __all__ = (
     "UknownMethodError",
     "UnknownObjectError",
     "UnknownPropertyError",
-    "DbusInterfaceCommonAsync",
-    "DbusObjectManagerInterfaceAsync",
+    "DbusInterfaceCommon",
+    "DbusObjectManagerInterface",
     "dbus_method",
     "dbus_property",
     "get_current_message",
@@ -132,4 +132,7 @@ __all__ = (
     "get_default_bus",
     "set_default_bus",
     "Dbus",
+    "DbusMethod",
+    "DbusProperty",
+    "DbusSignal",
 )

@@ -1,26 +1,27 @@
 from __future__ import annotations
 
 import logging
-import weakref
-from contextlib import contextmanager
-from contextvars import ContextVar
 from functools import partial
 from typing import (
     TYPE_CHECKING,
-    Any,
     Callable,
-    Coroutine,
+    Dict,
     Iterable,
-    Literal,
     Optional,
-    Protocol,
     Sequence,
     Tuple,
-    TypeAlias,
-    Union,
+    Unpack,
 )
 
 from _sdbus import (
+    DbusDeprecatedFlag,
+    DbusHiddenFlag,
+    DbusNoReplyFlag,
+    DbusPropertyConstFlag,
+    DbusPropertyEmitsChangeFlag,
+    DbusPropertyEmitsInvalidationFlag,
+    DbusPropertyExplicitFlag,
+    DbusUnprivilegedFlag,
     NameAllowReplacementFlag,
     NameQueueFlag,
     NameReplaceExistingFlag,
@@ -31,6 +32,16 @@ from _sdbus import (
     sd_bus_open_system,
     sd_bus_open_user,
 )
+from aiodbus.bus.any import (
+    Dbus,
+    DbusAddress,
+    Interface,
+    MemberFlags,
+    MethodCallable,
+    MethodFlags,
+    PropertyFlags,
+)
+from aiodbus.bus.message import _set_current_message
 from aiodbus.exceptions import (
     AlreadyOwner,
     CallFailedError,
@@ -46,66 +57,40 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType, DbusCompleteTypes
 
-
-class Message(Protocol):
-
-    @property
-    def sender(self) -> Optional[str]: ...
-
-    def get_contents(self) -> Tuple[DbusCompleteType, ...]: ...
-
-
-class MethodCallable(Protocol):
-    async def __call__(self, *args: DbusCompleteType) -> Any: ...
+PROPERTY_FLAGS_MASK = (
+    DbusPropertyConstFlag
+    | DbusPropertyEmitsChangeFlag
+    | DbusPropertyEmitsInvalidationFlag
+    | DbusPropertyExplicitFlag
+)
 
 
-class Interface(Protocol):
-    def add_method(
-        self,
-        name: str,
-        signature: str,
-        input_args_names: Sequence[str],
-        result_signature: str,
-        result_args_names: Sequence[str],
-        flags: int,
-        callback: MethodCallable,
-    ) -> None: ...
-
-    def add_property(
-        self,
-        name: str,
-        signature: str,
-        get_function: Callable[[], DbusCompleteTypes],
-        set_function: Optional[Callable[[DbusCompleteTypes], None]],
-        flags: int,
-    ) -> None: ...
-
-    def add_signal(
-        self,
-        name: str,
-        signature: str,
-        args_names: Sequence[str],
-        flags: int,
-    ) -> None: ...
+def _is_property_flags_correct(flags: int) -> bool:
+    num_of_flag_bits = (PROPERTY_FLAGS_MASK & flags).bit_count()
+    return 0 <= num_of_flag_bits <= 1
 
 
-_current_message: ContextVar[SdBusMessage] = ContextVar("current_message")
+_flag_values: Dict[str, int] = {
+    "deprecated": DbusDeprecatedFlag,
+    "hidden": DbusHiddenFlag,
+    "unprivileged": DbusUnprivilegedFlag,
+    "no_reply": DbusNoReplyFlag,
+    "explicit": DbusPropertyExplicitFlag,
+    "emits_change": DbusPropertyEmitsChangeFlag,
+    "emits_invalidation": DbusPropertyEmitsInvalidationFlag,
+    "const": DbusPropertyConstFlag,
+}
 
 
-@contextmanager
-def _set_current_message(message: SdBusMessage):
-    token = _current_message.set(message)
-    try:
-        yield message
-    finally:
-        _current_message.reset(token)
+def _member_flags_to_int(flags) -> int:
+    result = 0
+    for flag_name, flag_value in flags.items():
+        if flag_value:
+            result |= _flag_values[flag_name]
+    return result
 
 
-def get_current_message() -> Message:
-    return _current_message.get()
-
-
-class SdBusInterfaceWrapper(Interface):
+class _SdBusInterface(Interface):
     def __init__(self, interface: SdBusInterface) -> None:
         self._interface = interface
 
@@ -155,16 +140,17 @@ class SdBusInterfaceWrapper(Interface):
         input_args_names: Sequence[str],
         result_signature: str,
         result_args_names: Sequence[str],
-        flags: int,
         callback: MethodCallable,
+        **flags: Unpack[MethodFlags],
     ) -> None:
+        flags_int = _member_flags_to_int(flags)
         self._interface.add_method(
             name,
             signature,
             input_args_names,
             result_signature,
             result_args_names,
-            flags,
+            flags_int,
             partial(self._method_handler, result_signature, callback),
         )
 
@@ -174,8 +160,14 @@ class SdBusInterfaceWrapper(Interface):
         signature: str,
         get_function: Callable[[], DbusCompleteTypes],
         set_function: Optional[Callable[[DbusCompleteTypes], None]],
-        flags: int,
+        **flags: Unpack[PropertyFlags],
     ) -> None:
+        flags_int = _member_flags_to_int(flags)
+        assert _is_property_flags_correct(flags_int), (
+            "Incorrect number of Property flags. "
+            "Only one of const, emits_change, emits_invalidation, explicit "
+            "is allowed."
+        )
 
         def getter(message: SdBusMessage):
             try:
@@ -198,7 +190,7 @@ class SdBusInterfaceWrapper(Interface):
                 raise
 
         self._interface.add_property(
-            name, signature, getter, setter if set_function is not None else None, flags
+            name, signature, getter, setter if set_function is not None else None, flags_int
         )
 
     def add_signal(
@@ -206,12 +198,13 @@ class SdBusInterfaceWrapper(Interface):
         name: str,
         signature: str,
         args_names: Sequence[str],
-        flags: int,
+        **flags: Unpack[MemberFlags],
     ):
-        self._interface.add_signal(name, signature, args_names, flags)
+        flags_int = _member_flags_to_int(flags)
+        self._interface.add_signal(name, signature, args_names, flags_int)
 
 
-class Dbus:
+class _SdBus(Dbus):
     def __init__(self, bus: SdBus) -> None:
         self._sdbus = bus
 
@@ -220,10 +213,10 @@ class Dbus:
         return self._sdbus.address
 
     def create_interface(self) -> Interface:
-        return SdBusInterfaceWrapper(SdBusInterface())
+        return _SdBusInterface(SdBusInterface())
 
     def export(self, path: str, name: str, interface: Interface) -> Closeable:
-        assert isinstance(interface, SdBusInterfaceWrapper)
+        assert isinstance(interface, _SdBusInterface)
         self._sdbus.add_interface(interface._interface, path, name)
         assert interface._interface.slot is not None
         return interface._interface.slot
@@ -356,33 +349,12 @@ class Dbus:
         self.close()
 
 
-DbusAddress: TypeAlias = Union[Literal["system"], Literal["session"], str]
-
-
-def connect(address: DbusAddress, *, make_default: bool = True) -> Dbus:
+def sdbus_connect(address: DbusAddress):
     match address:
         case "session":
-            bus = Dbus(sd_bus_open_user())
+            bus = _SdBus(sd_bus_open_user())
         case "system":
-            bus = Dbus(sd_bus_open_system())
+            bus = _SdBus(sd_bus_open_system())
         case _:
             raise NotImplementedError("Only 'session' and 'system' are supported")
-
-    if make_default:
-        set_default_bus(bus)
-
     return bus
-
-
-_default_bus: ContextVar[Dbus] = ContextVar("default_bus")
-
-
-def get_default_bus() -> Dbus:
-    try:
-        return _default_bus.get()
-    except LookupError:
-        return connect("session", make_default=True)
-
-
-def set_default_bus(new_default: Dbus) -> None:
-    _default_bus.set(new_default)

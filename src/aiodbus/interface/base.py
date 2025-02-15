@@ -29,45 +29,34 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Self,
     Set,
     Tuple,
     Type,
-    TypeVar,
     Union,
 )
-from warnings import warn
 from weakref import WeakKeyDictionary, WeakValueDictionary
 
+from _sdbus import is_interface_name_valid
 from aiodbus.bus import Dbus, get_default_bus
-from aiodbus.dbus_common_elements import (
-    DbusClassMeta,
-    DbusInterfaceMetaCommon,
-    DbusLocalMember,
-    DbusLocalObjectMeta,
-    DbusMember,
-    DbusRemoteObjectMeta,
-)
 from aiodbus.handle import DbusExportHandle
-
-T = TypeVar("T")
-Self = TypeVar("Self", bound="DbusInterfaceBase")
-
+from aiodbus.member.base import DbusLocalMember, DbusMember
+from aiodbus.meta import DbusClassMeta, DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 DBUS_CLASS_TO_META: WeakKeyDictionary[type, DbusClassMeta] = WeakKeyDictionary()
 DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[str, DbusInterfaceMeta] = WeakValueDictionary()
 
 
-class DbusInterfaceMeta(DbusInterfaceMetaCommon):
-
+class DbusInterfaceMeta(type):
     @classmethod
     def _check_collisions(
         cls,
         new_class_name: str,
         namespace: Dict[str, Any],
-        mro_dbus_elements: Dict[str, DbusMember],
+        mro_dbus_members: Dict[str, DbusMember],
     ) -> None:
 
-        possible_collisions = namespace.keys() & mro_dbus_elements.keys()
+        possible_collisions = namespace.keys() & mro_dbus_members.keys()
 
         if possible_collisions:
             raise ValueError(
@@ -76,26 +65,25 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             )
 
     @staticmethod
-    def _extract_dbus_elements(
+    def _extract_dbus_members(
         dbus_class: type,
         dbus_meta: DbusClassMeta,
     ) -> Dict[str, DbusMember]:
-        dbus_elements_map: Dict[str, DbusMember] = {}
+        dbus_members_map: Dict[str, DbusMember] = {}
 
         for attr_name in dbus_meta.python_attr_to_dbus_member.keys():
-            dbus_element = dbus_class.__dict__.get(attr_name)
-            if not isinstance(dbus_element, DbusMember):
+            dbus_member = dbus_class.__dict__.get(attr_name)
+            if not isinstance(dbus_member, DbusMember):
                 raise TypeError(
-                    f"Expected async D-Bus element, got {dbus_element!r} "
-                    f"in class {dbus_class!r}"
+                    f"Expected D-Bus member, got {dbus_member!r} " f"in class {dbus_class!r}"
                 )
 
-            dbus_elements_map[attr_name] = dbus_element
+            dbus_members_map[attr_name] = dbus_member
 
-        return dbus_elements_map
+        return dbus_members_map
 
     @classmethod
-    def _map_mro_dbus_elements(
+    def _map_mro_dbus_members(
         cls,
         new_class_name: str,
         base_classes: Iterable[type],
@@ -108,11 +96,11 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             if dbus_meta is None:
                 continue
 
-            base_dbus_elements = cls._extract_dbus_elements(c, dbus_meta)
+            base_dbus_members = cls._extract_dbus_members(c, dbus_meta)
 
-            possible_collisions.update(base_dbus_elements.keys() & all_python_dbus_map.keys())
+            possible_collisions.update(base_dbus_members.keys() & all_python_dbus_map.keys())
 
-            all_python_dbus_map.update(base_dbus_elements)
+            all_python_dbus_map.update(base_dbus_members)
 
         if possible_collisions:
             raise ValueError(
@@ -123,7 +111,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         return all_python_dbus_map
 
     @staticmethod
-    def _map_dbus_elements(
+    def _map_dbus_members(
         attr_name: str,
         attr: Any,
         meta: DbusClassMeta,
@@ -141,6 +129,44 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         else:
             raise TypeError(f"Unknown D-Bus element: {attr!r}")
 
+    @staticmethod
+    def _check_interface_name(interface_name: str):
+        try:
+            assert is_interface_name_valid(interface_name), (
+                f'Invalid interface name: "{interface_name}"; '
+                "Interface names must be composed of 2 or more elements "
+                "separated by a dot '.' character. All elements must "
+                "contain at least one character, consist of ASCII "
+                "characters, first character must not be digit and "
+                "length must not exceed 255 characters."
+            )
+        except NotImplementedError:
+            ...
+
+    @staticmethod
+    def _init_members(
+        name: str,
+        namespace: Dict[str, Any],
+        interface_name: Optional[str],
+        serving_enabled: bool,
+    ) -> None:
+        for attr_name, attr in namespace.items():
+            if not isinstance(attr, DbusMember):
+                continue
+
+            # TODO: Fix async metaclass copying all methods
+            if hasattr(attr, "interface_name"):
+                continue
+
+            if interface_name is None:
+                raise TypeError(
+                    f"Defined D-Bus element {attr_name!r} without "
+                    f"interface name in the class {name!r}."
+                )
+
+            attr.interface_name = interface_name
+            attr.serving_enabled = serving_enabled
+
     def __new__(
         cls,
         name: str,
@@ -156,20 +182,18 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             )
 
         all_mro_bases: Set[Type[Any]] = set(chain.from_iterable((c.__mro__ for c in bases)))
-        reserved_dbus_map = cls._map_mro_dbus_elements(
+        reserved_dbus_map = cls._map_mro_dbus_members(
             name,
             all_mro_bases,
         )
         cls._check_collisions(name, namespace, reserved_dbus_map)
 
-        new_cls = super().__new__(
-            cls,
-            name,
-            bases,
-            namespace,
-            interface_name,
-            serving_enabled,
-        )
+        if interface_name is not None:
+            cls._check_interface_name(interface_name)
+
+        cls._init_members(name, namespace, interface_name, serving_enabled)
+
+        new_cls = super().__new__(cls, name, bases, namespace)
 
         if interface_name is not None:
             dbus_class_meta = DbusClassMeta(interface_name, serving_enabled)
@@ -177,7 +201,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             DBUS_INTERFACE_NAME_TO_CLASS[interface_name] = new_cls
 
             for attr_name, attr in namespace.items():
-                cls._map_dbus_elements(
+                cls._map_dbus_members(
                     attr_name,
                     attr,
                     dbus_class_meta,
@@ -187,16 +211,12 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
         return new_cls
 
 
-class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
-
+class DbusInterface(metaclass=DbusInterfaceMeta):
     def __init__(self) -> None:
         self._dbus: Union[DbusRemoteObjectMeta, DbusLocalObjectMeta] = DbusLocalObjectMeta()
 
     @classmethod
-    def _dbus_iter_interfaces_meta(
-        cls,
-    ) -> Iterator[Tuple[str, DbusClassMeta]]:
-
+    def _dbus_iter_interfaces_meta(cls) -> Iterator[Tuple[str, DbusClassMeta]]:
         for base in cls.__mro__:
             meta = DBUS_CLASS_TO_META.get(base)
             if meta is None:
@@ -204,30 +224,13 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
 
             yield meta.interface_name, meta
 
-    async def start_serving(
-        self,
-        object_path: str,
-        bus: Optional[Dbus] = None,
-    ) -> None:
-
-        warn("start_serving is deprecated in favor of export_to_dbus", DeprecationWarning)
-        self.export_to_dbus(object_path, bus)
-
-    def export_to_dbus(
-        self,
-        object_path: str,
-        bus: Optional[Dbus] = None,
-    ) -> DbusExportHandle:
-
+    def export_to_dbus(self, object_path: str, bus: Optional[Dbus] = None) -> DbusExportHandle:
         local_object_meta = self._dbus
         if isinstance(local_object_meta, DbusRemoteObjectMeta):
             raise RuntimeError("Cannot export D-Bus proxies.")
 
-        # TODO: Being able to serve multiple buses and object
         if local_object_meta.attached_bus is not None:
-            raise RuntimeError(
-                "Object already exported. " "This limitation should be fixed in future version."
-            )
+            raise RuntimeError("Object already exported.")
 
         if bus is None:
             bus = get_default_bus()
@@ -265,48 +268,11 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
 
         return export_handle
 
-    def _connect(
-        self,
-        service_name: str,
-        object_path: str,
-        bus: Optional[Dbus] = None,
-    ) -> None:
-        self._proxify(
-            service_name,
-            object_path,
-            bus,
-        )
+    def _connect(self, service_name: str, object_path: str, bus: Optional[Dbus] = None) -> None:
+        self._proxify(service_name, object_path, bus)
 
-    def _proxify(
-        self,
-        service_name: str,
-        object_path: str,
-        bus: Optional[Dbus] = None,
-    ) -> None:
-
-        self._dbus = DbusRemoteObjectMeta(
-            service_name,
-            object_path,
-            bus,
-        )
-
-    @classmethod
-    def new_connect(
-        cls: Type[Self],
-        service_name: str,
-        object_path: str,
-        bus: Optional[Dbus] = None,
-    ) -> Self:
-        warn(
-            (
-                "new_connect is deprecated in favor of equivalent new_proxy."
-                "Will be removed in version 1.0.0"
-            ),
-            DeprecationWarning,
-        )
-        new_object = cls.__new__(cls)
-        new_object._proxify(service_name, object_path, bus)
-        return new_object
+    def _proxify(self, service_name: str, object_path: str, bus: Optional[Dbus] = None) -> None:
+        self._dbus = DbusRemoteObjectMeta(service_name, object_path, bus)
 
     @classmethod
     def new_proxy(
@@ -315,7 +281,6 @@ class DbusInterfaceBase(metaclass=DbusInterfaceMeta):
         object_path: str,
         bus: Optional[Dbus] = None,
     ) -> Self:
-
         new_object = cls.__new__(cls)
         new_object._proxify(service_name, object_path, bus)
         return new_object

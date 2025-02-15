@@ -22,11 +22,12 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from aiodbus import DbusInterfaceCommonAsync, dbus_method, dbus_property, dbus_signal
+from aiodbus import DbusInterfaceCommon, dbus_method, dbus_property
 from aiodbus.bus import Dbus
+from aiodbus.member.signal import DbusSignal
 
 
-class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.DBus"):
+class FreedesktopDbus(DbusInterfaceCommon, interface_name="org.freedesktop.DBus"):
     """D-Bus daemon."""
 
     def __init__(self, bus: Optional[Dbus] = None):
@@ -145,24 +146,18 @@ class FreedesktopDbus(DbusInterfaceCommonAsync, interface_name="org.freedesktop.
         """Extra D-Bus daemon interfaces"""
         raise NotImplementedError
 
-    @dbus_signal("s")
-    def name_acquired(self) -> str:
-        """Signal when current process acquires a bus name."""
-        raise NotImplementedError
+    name_acquired = DbusSignal[str](signature="s")
+    """Signal when current process acquires a bus name."""
 
-    @dbus_signal("s")
-    def name_lost(self) -> str:
-        """Signal when current process loses a bus name."""
-        raise NotImplementedError
+    name_lost = DbusSignal[str](signature="s")
+    """Signal when current process loses a bus name."""
 
-    @dbus_signal("sss")
-    def name_owner_changed(self) -> Tuple[str, str, str]:
-        """Signal when some name on a bus changes owner.
+    name_owner_changed = DbusSignal[Tuple[str, str, str]](signature="sss")
+    """Signal when some name on a bus changes owner.
 
-        Is a tuple of:
+    Is a tuple of:
 
-        * The name that acquired or lost
-        * Old owner (by unique bus name) or empty string if no one owned it
-        * New owner (by unique bus name) or empty string if no one owns it now
-        """
-        raise NotImplementedError
+    * The name that acquired or lost
+    * Old owner (by unique bus name) or empty string if no one owned it
+    * New owner (by unique bus name) or empty string if no one owns it now
+    """

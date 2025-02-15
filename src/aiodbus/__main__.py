@@ -27,7 +27,7 @@ from pathlib import Path
 from sys import stdout
 from typing import TYPE_CHECKING
 
-from .interface_generator import (
+from .generator import (
     generate_py_file,
     interfaces_from_file,
     interfaces_from_str,
@@ -36,7 +36,7 @@ from .interface_generator import (
 if TYPE_CHECKING:
     from typing import Dict, List, Optional
 
-    from aiodbus.interface_generator import DbusInterfaceIntrospection
+    from aiodbus.generator import DbusInterfaceIntrospection
 
 
 @dataclass
@@ -115,19 +115,18 @@ async def run_gen_from_connection(
     object_paths: List[str],
     system: bool,
     imports_header: bool,
-    do_async: bool,
 ) -> None:
     connection_name = connection_name
     object_paths = object_paths
 
     import aiodbus
-    from aiodbus.interface.common import DbusInterfaceCommonAsync
+    from aiodbus.interface.common import DbusInterfaceCommon
 
     bus = aiodbus.connect("system" if system else "session", make_default=True)
 
     interfaces: List[DbusInterfaceIntrospection] = []
     for object_path in object_paths:
-        connection = DbusInterfaceCommonAsync.new_proxy(connection_name, object_path)
+        connection = DbusInterfaceCommon.new_proxy(connection_name, object_path)
         itrospection = await connection.dbus_introspect()
         interfaces.extend(interfaces_from_str(itrospection))
 
@@ -137,7 +136,6 @@ async def run_gen_from_connection(
         generate_py_file(
             interfaces,
             imports_header,
-            do_async,
         )
     )
 
@@ -145,7 +143,6 @@ async def run_gen_from_connection(
 async def run_gen_from_file(
     filenames: List[str],
     imports_header: bool,
-    do_async: bool,
 ) -> None:
     interfaces: List[DbusInterfaceIntrospection] = []
 
@@ -158,7 +155,6 @@ async def run_gen_from_file(
         generate_py_file(
             interfaces,
             imports_header,
-            do_async,
         )
     )
 
@@ -310,20 +306,6 @@ def generator_main(args: Optional[List[str]] = None) -> None:
             default=True,
             dest="imports_header",
             help="Include 'import' header (default)",
-        )
-
-        subparser.add_argument(
-            "--async",
-            action="store_true",
-            default=True,
-            dest="do_async",
-            help="Generate async interfaces (default)",
-        )
-        subparser.add_argument(
-            "--block",
-            action="store_false",
-            dest="do_async",
-            help="Generate blocking interfaces",
         )
         subparser.add_argument(
             "--select-interface",
