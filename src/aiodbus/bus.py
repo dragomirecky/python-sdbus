@@ -52,7 +52,7 @@ class Message(Protocol):
 
 
 class MethodCallable(Protocol):
-    def __call__(self, *args: DbusCompleteType) -> Coroutine[Any, Any, None]: ...
+    async def __call__(self, *args: DbusCompleteType) -> Any: ...
 
 
 class Interface(Protocol):

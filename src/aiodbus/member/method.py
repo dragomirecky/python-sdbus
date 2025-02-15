@@ -20,12 +20,14 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from inspect import getfullargspec, iscoroutinefunction
 from types import FunctionType
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Concatenate,
     Dict,
     List,
     Optional,
@@ -58,18 +60,24 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class AnyAsyncFunc[**P, R](Protocol):
+class AnyAsyncMethod[**P, R](Protocol):
+    __name__: str
+
+    def __get__(self, obj: Any, obj_class: Type[Any] | None) -> AnyAsyncMethod[P, R]: ...
+
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
 class DbusMethodMiddleware[**P, R](Protocol):
-    async def __call__(self, func: AnyAsyncFunc[P, R], *args: P.args, **kwargs: P.kwargs) -> R: ...
+    async def __call__(
+        self, func: AnyAsyncMethod[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> R: ...
 
 
 async def call_with_middlewares[
     **P, R
 ](
-    func: AnyAsyncFunc[P, R],
+    func: AnyAsyncMethod[P, R],
     middlewares: List[DbusMethodMiddleware],
     *args: P.args,
     **kwargs: P.kwargs,
@@ -92,7 +100,7 @@ class DbusMethod[**P, R](DbusMember):
 
     def __init__(
         self,
-        unbound_method: FunctionType,
+        unbound_method: AnyAsyncMethod[Concatenate[Any, P], R],
         method_name: Optional[str],
         input_signature: str,
         input_args_names: Optional[Sequence[str]],
@@ -110,7 +118,7 @@ class DbusMethod[**P, R](DbusMember):
             method_name = "".join(_method_name_converter(unbound_method.__name__))
 
         super().__init__(method_name)
-        self.original_method = unbound_method
+        self.unbound_method = unbound_method
         self.args_spec = getfullargspec(unbound_method)
         self.args_names = self.args_spec.args[1:]  # 1: because of self
         self.num_of_args = len(self.args_names)
@@ -145,9 +153,7 @@ class DbusMethod[**P, R](DbusMember):
 
         self.__doc__ = unbound_method.__doc__
 
-    def _rebuild_args(
-        self, function: FunctionType, *args: Any, **kwargs: Dict[str, Any]
-    ) -> List[Any]:
+    def _rebuild_args(self, *args: P.args, **kwargs: P.kwargs) -> List[Any]:
         # 3 types of arguments
         # *args - should be passed directly
         # **kwargs - should be put in a proper order
@@ -229,7 +235,7 @@ class DbusMethod[**P, R](DbusMember):
             return self
 
 
-class DbusBoundMethod[**P, R](DbusBoundMember):
+class DbusBoundMethod[**P, R](DbusBoundMember, ABC):
     def __init__(self, dbus_method: DbusMethod[P, R]) -> None:
         self.dbus_method = dbus_method
 
@@ -237,8 +243,8 @@ class DbusBoundMethod[**P, R](DbusBoundMember):
     def member(self) -> DbusMember:
         return self.dbus_method
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError
+    @abstractmethod
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
 class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
@@ -259,7 +265,7 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
             assert not kwargs, "Passed more arguments than method supports" f"Extra args: {kwargs}"
             rebuilt_args: Sequence[Any] = args
         else:
-            rebuilt_args = dbus_method._rebuild_args(dbus_method.original_method, *args, **kwargs)
+            rebuilt_args = dbus_method._rebuild_args(*args, **kwargs)
 
         return await bus.call_method(
             destination=self.proxy_meta.service_name,
@@ -301,20 +307,20 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
             self._handle_dbus_call,
         )
 
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         bound_object = self.bound_object_ref()
         if bound_object is None:
             raise RuntimeError("Local object no longer exists!")
 
         # no middlewares for local-only calls
-        return self.dbus_method.original_method(bound_object, *args, **kwargs)
+        return await self.dbus_method.unbound_method(bound_object, *args, **kwargs)
 
     async def _handle_dbus_call(self, *args: DbusCompleteType):
         bound_object = self.bound_object_ref()
         if bound_object is None:
             raise RuntimeError("Local object no longer exists!")
 
-        bound_method = self.dbus_method.original_method.__get__(bound_object, None)
+        bound_method = self.dbus_method.unbound_method.__get__(bound_object, None)
 
         return await call_with_middlewares(
             bound_method,
@@ -332,13 +338,15 @@ def dbus_method[
     result_args_names: Optional[Sequence[str]] = None,
     input_args_names: Optional[Sequence[str]] = None,
     method_name: Optional[str] = None,
-) -> Callable[[Callable[P, R]], DbusMethod[P, R]]:
+) -> Callable[[AnyAsyncMethod[Concatenate[Any, P], R]], DbusMethod[P, R]]:
 
     assert not isinstance(input_signature, FunctionType), (
         "Passed function to decorator directly. " "Did you forget () round brackets?"
     )
 
-    def dbus_method_decorator(original_method: Callable[P, R]) -> DbusMethod[P, R]:
+    def dbus_method_decorator(
+        original_method: AnyAsyncMethod[Concatenate[Any, P], R],
+    ) -> DbusMethod[P, R]:
         assert isinstance(original_method, FunctionType)
         assert iscoroutinefunction(original_method), (
             "Expected coroutine function. ",

@@ -86,7 +86,7 @@ class DbusInterfaceMeta(DbusInterfaceMetaCommon):
             )
 
         new_method = copy(original_method)
-        new_method.original_method = cast(FunctionType, override.override_method)
+        new_method.unbound_method = cast(FunctionType, override.override_method)
         return new_method
 
     @staticmethod
