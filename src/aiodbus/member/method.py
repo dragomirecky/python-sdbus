@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
 from inspect import getfullargspec, iscoroutinefunction
 from types import FunctionType
@@ -74,9 +75,7 @@ class DbusMethodMiddleware[**P, R](Protocol):
     ) -> R: ...
 
 
-async def call_with_middlewares[
-    **P, R
-](
+async def call_with_middlewares[**P, R](
     func: AnyAsyncMethod[P, R],
     middlewares: List[DbusMethodMiddleware],
     *args: P.args,
@@ -153,55 +152,6 @@ class DbusMethod[**P, R](DbusMember):
 
         self.__doc__ = unbound_method.__doc__
 
-    def _rebuild_args(self, *args: P.args, **kwargs: P.kwargs) -> List[Any]:
-        # 3 types of arguments
-        # *args - should be passed directly
-        # **kwargs - should be put in a proper order
-        # defaults - should be retrieved and put in proper order
-
-        # Strategy:
-        # Iterate over arg names
-        # Use:
-        # 1. Arg
-        # 2. Kwarg
-        # 3. Default
-
-        # a, b, c, d, e
-        #       ^ defaults start here
-        # 5 - 3 = [2]
-        # ^ total args
-        #     ^ number of default args
-        # First arg that supports default is
-        # (total args - number of default args)
-        passed_args_iter = iter(args)
-        default_args_iter = iter(self.args_defaults)
-
-        new_args_list: List[Any] = []
-
-        for i, a_name in enumerate(self.args_spec.args[1:]):
-            try:
-                next_arg = next(passed_args_iter)
-            except StopIteration:
-                next_arg = None
-
-            if i >= self.default_args_start_at:
-                next_default_arg = next(default_args_iter)
-            else:
-                next_default_arg = None
-
-            next_kwarg = kwargs.get(a_name)
-
-            if next_arg is not None:
-                new_args_list.append(next_arg)
-            elif next_kwarg is not None:
-                new_args_list.append(next_kwarg)
-            elif next_default_arg is not None:
-                new_args_list.append(next_default_arg)
-            else:
-                raise TypeError("Could not flatten the args")
-
-        return new_args_list
-
     @property
     def member_name(self) -> str:
         return self.method_name
@@ -257,6 +207,12 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
         self.proxy_meta = proxy_meta
         self.__doc__ = dbus_method.__doc__
 
+    def _flatten_args(self, *args: P.args, **kwargs: P.kwargs) -> List[Any]:
+        signature = inspect.signature(self.dbus_method.unbound_method)
+        bound_args = signature.bind(None, *args, **kwargs)  # None for the first "self" arg
+        bound_args.apply_defaults()
+        return list(bound_args.arguments.values())[1:]  # drop "self" arg
+
     async def _make_dbus_call(self, *args: P.args, **kwargs: P.kwargs) -> R:
         bus = self.proxy_meta.attached_bus
         dbus_method = self.dbus_method
@@ -265,7 +221,7 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
             assert not kwargs, "Passed more arguments than method supports" f"Extra args: {kwargs}"
             rebuilt_args: Sequence[Any] = args
         else:
-            rebuilt_args = dbus_method._rebuild_args(*args, **kwargs)
+            rebuilt_args = self._flatten_args(*args, **kwargs)
 
         return await bus.call_method(
             destination=self.proxy_meta.service_name,
@@ -329,9 +285,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         )
 
 
-def dbus_method[
-    **P, R
-](
+def dbus_method[**P, R](
     input_signature: str = "",
     result_signature: str = "",
     flags: int = 0,
