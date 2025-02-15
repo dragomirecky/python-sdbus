@@ -29,7 +29,6 @@ from typing import (
     Any,
     Callable,
     Concatenate,
-    Dict,
     List,
     Optional,
     Protocol,
@@ -42,7 +41,7 @@ from typing import (
 )
 from weakref import ref as weak_ref
 
-from _sdbus import DbusNoReplyFlag, is_member_name_valid
+from _sdbus import DbusNoReplyFlag
 from aiodbus.bus import Interface
 from aiodbus.dbus_common_elements import (
     DbusBoundMember,
@@ -52,7 +51,7 @@ from aiodbus.dbus_common_elements import (
     DbusProxyMember,
     DbusRemoteObjectMeta,
 )
-from aiodbus.dbus_common_funcs import _is_property_flags_correct, _method_name_converter
+from aiodbus.dbus_common_funcs import _method_name_converter
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
@@ -75,37 +74,17 @@ class DbusMethodMiddleware[**P, R](Protocol):
     ) -> R: ...
 
 
-async def call_with_middlewares[**P, R](
-    func: AnyAsyncMethod[P, R],
-    middlewares: List[DbusMethodMiddleware],
-    *args: P.args,
-    **kwargs: P.kwargs,
-):
-    print(
-        f"call_with_middlewares func={func}, middlewares={middlewares}, args={args}, kwargs={kwargs}"
-    )
-    if not middlewares:
-        return await func(*args, **kwargs)
-    else:
-        middleware = middlewares.pop(-1)
-
-        async def call_next(*args: P.args, **kwargs: P.kwargs) -> R:
-            return await call_with_middlewares(func, middlewares, *args, **kwargs)
-
-        return await middleware(call_next, *args, **kwargs)
-
-
 class DbusMethod[**P, R](DbusMember):
 
     def __init__(
         self,
-        unbound_method: AnyAsyncMethod[Concatenate[Any, P], R],
         method_name: Optional[str],
         input_signature: str,
         input_args_names: Optional[Sequence[str]],
         result_signature: str,
         result_args_names: Optional[Sequence[str]],
         flags: int,
+        unbound_method: AnyAsyncMethod[Concatenate[Any, P], R],
     ):
         assert not isinstance(input_args_names, str), (
             "Passed a string as input args"
@@ -120,9 +99,6 @@ class DbusMethod[**P, R](DbusMember):
         self.unbound_method = unbound_method
         self.args_spec = getfullargspec(unbound_method)
         self.args_names = self.args_spec.args[1:]  # 1: because of self
-        self.num_of_args = len(self.args_names)
-        self.args_defaults = self.args_spec.defaults if self.args_spec.defaults is not None else ()
-        self.default_args_start_at = self.num_of_args - len(self.args_defaults)
 
         self.method_name = method_name
         self.input_signature = input_signature
@@ -198,6 +174,10 @@ class DbusBoundMethod[**P, R](DbusBoundMember, ABC):
 
 
 class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
+    """
+    Method bound to a remote dbus object.
+    """
+
     def __init__(
         self,
         dbus_method: DbusMethod[P, R],
@@ -215,25 +195,21 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
 
     async def _make_dbus_call(self, *args: P.args, **kwargs: P.kwargs) -> R:
         bus = self.proxy_meta.attached_bus
-        dbus_method = self.dbus_method
-
-        if len(args) == dbus_method.num_of_args:
-            assert not kwargs, "Passed more arguments than method supports" f"Extra args: {kwargs}"
-            rebuilt_args: Sequence[Any] = args
-        else:
-            rebuilt_args = self._flatten_args(*args, **kwargs)
-
-        return await bus.call_method(
+        result = await bus.call_method(
             destination=self.proxy_meta.service_name,
             path=self.proxy_meta.object_path,
             interface=self.dbus_method.interface_name,
             member=self.dbus_method.method_name,
             signature=self.dbus_method.input_signature,
-            args=rebuilt_args,
+            args=self._flatten_args(*args, **kwargs),
             no_reply=bool(self.dbus_method.flags & DbusNoReplyFlag),
         )
+        return cast(R, result)  # we have to hope it's correct
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        """
+        Call the method (over dbus).
+        """
         return await call_with_middlewares(
             self._make_dbus_call,
             self.dbus_method.to_dbus_middlewares.copy(),
@@ -243,6 +219,10 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
 
 
 class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
+    """
+    Method bound to a local dbus object.
+    """
+
     def __init__(
         self,
         dbus_method: DbusMethod[P, R],
@@ -263,15 +243,10 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
             self._handle_dbus_call,
         )
 
-    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        bound_object = self.bound_object_ref()
-        if bound_object is None:
-            raise RuntimeError("Local object no longer exists!")
-
-        # no middlewares for local-only calls
-        return await self.dbus_method.unbound_method(bound_object, *args, **kwargs)
-
     async def _handle_dbus_call(self, *args: DbusCompleteType):
+        """
+        Handle incoming dbus call to the method (from dbus).
+        """
         bound_object = self.bound_object_ref()
         if bound_object is None:
             raise RuntimeError("Local object no longer exists!")
@@ -281,8 +256,19 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         return await call_with_middlewares(
             bound_method,
             self.dbus_method.from_dbus_middlewares.copy(),
-            *args,
+            *args,  # type: ignore
         )
+
+    async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        """
+        Call the method (locally).
+        """
+        bound_object = self.bound_object_ref()
+        if bound_object is None:
+            raise RuntimeError("Local object no longer exists!")
+
+        # no middlewares for local-only calls
+        return await self.dbus_method.unbound_method(bound_object, *args, **kwargs)
 
 
 def dbus_method[**P, R](
@@ -327,3 +313,23 @@ def dbus_method_override() -> Callable[[T], T]:
         return cast(T, DbusMethodOverride(new_function))
 
     return new_decorator
+
+
+async def call_with_middlewares[**P, R](
+    func: AnyAsyncMethod[P, R],
+    middlewares: List[DbusMethodMiddleware],
+    *args: P.args,
+    **kwargs: P.kwargs,
+):
+    print(
+        f"call_with_middlewares func={func}, middlewares={middlewares}, args={args}, kwargs={kwargs}"
+    )
+    if not middlewares:
+        return await func(*args, **kwargs)
+    else:
+        middleware = middlewares.pop(-1)
+
+        async def call_next(*args: P.args, **kwargs: P.kwargs) -> R:
+            return await call_with_middlewares(func, middlewares, *args, **kwargs)
+
+        return await middleware(call_next, *args, **kwargs)
