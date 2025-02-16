@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Literal, Mapping, Tuple
 
 from aiodbus.interface.base import DbusInterface
 from aiodbus.member.method import dbus_method
-from aiodbus.member.signal import dbus_signal
+from aiodbus.member.signal import DbusSignal
 
 DBUS_PROPERTIES_CHANGED_TYPING = Tuple[
     str,
@@ -16,9 +16,7 @@ class DbusPropertiesInterface(
     interface_name="org.freedesktop.DBus.Properties",
     serving_enabled=False,
 ):
-    @dbus_signal("sa{sv}as")
-    def properties_changed(self) -> DBUS_PROPERTIES_CHANGED_TYPING:
-        raise NotImplementedError
+    properties_changed = DbusSignal[DBUS_PROPERTIES_CHANGED_TYPING](signature="sa{sv}as")
 
     @dbus_method("s", "a{sv}", name="GetAll")
     async def _properties_get_all(self, interface_name: str) -> Dict[str, Tuple[str, Any]]:

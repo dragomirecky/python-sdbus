@@ -54,7 +54,6 @@ from aiodbus.member.base import (
 from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
-    from _sdbus import DbusCompleteTypes
     from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 

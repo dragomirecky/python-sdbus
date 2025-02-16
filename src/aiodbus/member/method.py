@@ -54,23 +54,11 @@ if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
-type _AsyncFunction[**P, R] = Callable[P, Awaitable[R]]
 type AnyAsyncMethod[**P, R] = Callable[Concatenate[Any, P], Awaitable[R]]
 
 
 class AsyncFunction[**P, R](Protocol):
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-
-
-class _AnyAsyncMethod[**P, R](Protocol):
-    __name__: str
-
-    def __get__(self, obj: Any, obj_class: Type[Any] | None) -> AsyncFunction[P, R]: ...
-
-    async def __call__(self, any_self: Any, *args: P.args, **kwargs: P.kwargs) -> R: ...
-
-
-type _DbusMethodMiddleware[**P, R] = Callable[Concatenate[AsyncFunction[P, R], P], Awaitable[R]]
 
 
 class DbusMethodMiddleware[**P, R](Protocol):
