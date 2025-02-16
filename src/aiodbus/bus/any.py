@@ -11,16 +11,16 @@ from typing import (
     Protocol,
     Sequence,
     Tuple,
-    TypeAlias,
     TypedDict,
-    Union,
     Unpack,
+    overload,
 )
 
+from aiodbus.bus.message import Message
 from aiodbus.handle import Closeable
 
 if TYPE_CHECKING:
-    from _sdbus import DbusCompleteType, DbusCompleteTypes, SdBusMessage
+    from _sdbus import DbusCompleteType, DbusCompleteTypes
 
 
 class MemberFlags(TypedDict, total=False):
@@ -145,7 +145,7 @@ class Dbus(Protocol):
         path_filter: Optional[str] = None,
         interface_filter: Optional[str] = None,
         member_filter: Optional[str] = None,
-        callback: Callable[[SdBusMessage], None],
+        callback: Callable[[Message], None],
     ) -> Closeable: ...
 
     def create_interface(self) -> Interface:
@@ -174,13 +174,33 @@ class Dbus(Protocol):
     def __exit__(self, *_) -> None: ...
 
 
-DbusAddress: TypeAlias = Union[Literal["system"], Literal["session"], str]
+type DbusType = Literal["system"] | Literal["session"]
+type DbusAddress = str
 
 
-def connect(address: DbusAddress, *, make_default: bool = True) -> Dbus:
-    from aiodbus.bus.sdbus import sdbus_connect
+@overload
+def connect(bus_type: DbusType, /, *, make_default: bool = True) -> Dbus: ...
 
-    bus = sdbus_connect(address)
+
+@overload
+def connect(*, remote: str, make_default: bool = True) -> Dbus: ...
+
+
+def connect(
+    bus_type: DbusType | None = None,
+    /,
+    *,
+    remote: DbusAddress | None = None,
+    make_default: bool = True,
+) -> Dbus:
+    from aiodbus.bus.sdbus import sdbus_connect_local, sdbus_connect_remote
+
+    if bus_type is None:
+        if remote is None:
+            raise ValueError("Either bus_type or remote must be specified")
+        bus = sdbus_connect_remote(remote)
+    else:
+        bus = sdbus_connect_local(bus_type)
 
     if make_default:
         set_default_bus(bus)

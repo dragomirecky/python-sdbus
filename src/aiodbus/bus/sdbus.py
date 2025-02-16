@@ -30,18 +30,19 @@ from _sdbus import (
     SdBusInterface,
     SdBusMessage,
     sd_bus_open_system,
+    sd_bus_open_system_remote,
     sd_bus_open_user,
 )
 from aiodbus.bus.any import (
     Dbus,
-    DbusAddress,
+    DbusType,
     Interface,
     MemberFlags,
     MethodCallable,
     MethodFlags,
     PropertyFlags,
 )
-from aiodbus.bus.message import _set_current_message
+from aiodbus.bus.message import Message, _set_current_message
 from aiodbus.exceptions import (
     AlreadyOwner,
     CallFailedError,
@@ -128,7 +129,7 @@ class _SdBusInterface(Interface):
 
             reply = message.create_error_reply(
                 error.error_name,
-                str(error.args[0]) if error.args else "",
+                error.error_message or "",
             )
 
         reply.send()
@@ -326,6 +327,14 @@ class _SdBus(Dbus):
         else:
             raise DbusError(f"Unknown result code: {result}")
 
+    @staticmethod
+    def _signal_handler(callback: Callable[[Message], None], message: Message) -> None:
+        try:
+            with _set_current_message(message):
+                callback(message)
+        except Exception as exc:
+            logger.exception("Unhandled exception when handling a signal")
+
     async def subscribe_signals(
         self,
         *,
@@ -333,10 +342,15 @@ class _SdBus(Dbus):
         path_filter: Optional[str] = None,
         interface_filter: Optional[str] = None,
         member_filter: Optional[str] = None,
-        callback: Callable[[SdBusMessage], None],
+        callback: Callable[[Message], None],
     ) -> Closeable:
+
         return await self._sdbus.match_signal_async(
-            sender_filter, path_filter, interface_filter, member_filter, callback
+            sender_filter,
+            path_filter,
+            interface_filter,
+            member_filter,
+            partial(self._signal_handler, callback),
         )
 
     def close(self) -> None:
@@ -349,12 +363,13 @@ class _SdBus(Dbus):
         self.close()
 
 
-def sdbus_connect(address: DbusAddress):
+def sdbus_connect_local(address: DbusType):
     match address:
         case "session":
-            bus = _SdBus(sd_bus_open_user())
+            return _SdBus(sd_bus_open_user())
         case "system":
-            bus = _SdBus(sd_bus_open_system())
-        case _:
-            raise NotImplementedError("Only 'session' and 'system' are supported")
-    return bus
+            return _SdBus(sd_bus_open_system())
+
+
+def sdbus_connect_remote(address: str):
+    return _SdBus(sd_bus_open_system_remote(address))

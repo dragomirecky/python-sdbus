@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from _sdbus import SdBusError
+from aiodbus.exceptions import DbusError
+
 
 class Closeable(Protocol):
     def close(self) -> None: ...
@@ -15,8 +18,11 @@ class DbusExportHandle:
         self._items.append(item)
 
     def close(self) -> None:
-        while self._items:
-            self._items.pop().close()
+        try:
+            while self._items:
+                self._items.pop().close()
+        except SdBusError as e:
+            raise DbusError(str(e)) from e
 
     async def __aenter__(self) -> DbusExportHandle:
         return self

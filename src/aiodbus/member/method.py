@@ -23,10 +23,10 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from inspect import getfullargspec, iscoroutinefunction
-from types import FunctionType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Concatenate,
     List,
@@ -54,18 +54,27 @@ if TYPE_CHECKING:
     from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
-class AnyAsyncMethod[**P, R](Protocol):
-    __name__: str
+type _AsyncFunction[**P, R] = Callable[P, Awaitable[R]]
+type AnyAsyncMethod[**P, R] = Callable[Concatenate[Any, P], Awaitable[R]]
 
-    def __get__(self, obj: Any, obj_class: Type[Any] | None) -> AnyAsyncMethod[P, R]: ...
 
+class AsyncFunction[**P, R](Protocol):
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
+class _AnyAsyncMethod[**P, R](Protocol):
+    __name__: str
+
+    def __get__(self, obj: Any, obj_class: Type[Any] | None) -> AsyncFunction[P, R]: ...
+
+    async def __call__(self, any_self: Any, *args: P.args, **kwargs: P.kwargs) -> R: ...
+
+
+type _DbusMethodMiddleware[**P, R] = Callable[Concatenate[AsyncFunction[P, R], P], Awaitable[R]]
+
+
 class DbusMethodMiddleware[**P, R](Protocol):
-    async def __call__(
-        self, func: AnyAsyncMethod[P, R], *args: P.args, **kwargs: P.kwargs
-    ) -> R: ...
+    async def __call__(self, func: AsyncFunction[P, R], *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
 class DbusMethod[**P, R](DbusMember):
@@ -77,7 +86,7 @@ class DbusMethod[**P, R](DbusMember):
         input_args_names: Optional[Sequence[str]],
         result_signature: str,
         result_args_names: Optional[Sequence[str]],
-        unbound_method: AnyAsyncMethod[Concatenate[Any, P], R],
+        unbound_method: AnyAsyncMethod[P, R],
         **flags: Unpack[MethodFlags],
     ):
         assert not isinstance(input_args_names, str), (
@@ -264,16 +273,11 @@ def dbus_method[**P, R](
     input_args_names: Optional[Sequence[str]] = None,
     name: Optional[str] = None,
     **flags: Unpack[MethodFlags],
-) -> Callable[[AnyAsyncMethod[Concatenate[Any, P], R]], DbusMethod[P, R]]:
-
-    assert not isinstance(input_signature, FunctionType), (
-        "Passed function to decorator directly. " "Did you forget () round brackets?"
-    )
+) -> Callable[[AnyAsyncMethod[P, R]], DbusMethod[P, R]]:
 
     def dbus_method_decorator(
-        original_method: AnyAsyncMethod[Concatenate[Any, P], R],
+        original_method: AnyAsyncMethod[P, R],
     ) -> DbusMethod[P, R]:
-        assert isinstance(original_method, FunctionType)
         assert iscoroutinefunction(original_method), (
             "Expected coroutine function. ",
             "Maybe you forgot 'async' keyword?",
@@ -294,7 +298,7 @@ def dbus_method[**P, R](
 
 
 async def call_with_middlewares[**P, R](
-    func: AnyAsyncMethod[P, R],
+    func: AsyncFunction[P, R],
     middlewares: List[DbusMethodMiddleware],
     *args: P.args,
     **kwargs: P.kwargs,

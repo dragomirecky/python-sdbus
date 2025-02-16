@@ -24,7 +24,6 @@ from asyncio import get_running_loop, sleep, wait_for
 from unittest import main
 
 import aiodbus
-from _sdbus import NameAllowReplacementFlag, NameQueueFlag
 from aiodbus.bus import get_default_bus
 from aiodbus.exceptions import (
     AlreadyOwner,

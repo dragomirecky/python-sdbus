@@ -39,6 +39,9 @@ from aiodbus.bus import (
     get_default_bus,
     set_default_bus,
 )
+from aiodbus.bus.message import Message, get_current_message
+from aiodbus.handle import DbusExportHandle
+from aiodbus.interface.base import DbusInterface
 from aiodbus.interface.common import DbusInterfaceCommon
 from aiodbus.interface.object_manager import DbusObjectManagerInterface
 from aiodbus.member.method import DbusMethod, dbus_method
@@ -51,6 +54,7 @@ from .exceptions import (
     AuthFailedError,
     BadAddressError,
     CallFailedError,
+    DbusError,
     DisconnectedError,
     FileExistsError,
     FileNotFoundError,
@@ -63,6 +67,7 @@ from .exceptions import (
     LimitsExceededError,
     MatchRuleInvalidError,
     MatchRuleNotFoundError,
+    MethodCallError,
     NameHasNoOwnerError,
     NoMemoryError,
     NoNetworkError,
@@ -105,6 +110,7 @@ __all__ = (
     "NotSupportedError",
     "PropertyReadOnlyError",
     "ServiceUnknownError",
+    "MethodCallError",
     "TimeoutError",
     "UnixProcessIdUnknown",
     "UnknownInterfaceError",
@@ -135,4 +141,9 @@ __all__ = (
     "DbusMethod",
     "DbusProperty",
     "DbusSignal",
+    "DbusInterface",
+    "Message",
+    "get_current_message",
+    "DbusExportHandle",
+    "DbusError",
 )

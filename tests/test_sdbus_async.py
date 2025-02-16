@@ -28,10 +28,9 @@ from asyncio.subprocess import create_subprocess_exec
 from typing import Tuple
 from unittest import SkipTest
 
-from _sdbus import DbusPropertyEmitsChangeFlag, SdBusError
+from _sdbus import SdBusError
 from aiodbus import (
     DbusInterfaceCommon,
-    DbusNoReplyFlag,
     dbus_method,
     dbus_property,
     dbus_signal,

@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 
 
 class Message(Protocol):
+    @property
+    def path(self) -> Optional[str]: ...
 
     @property
     def sender(self) -> Optional[str]: ...

@@ -41,9 +41,9 @@ from typing import (
 )
 from weakref import WeakSet
 
-from _sdbus import SdBusMessage
 from aiodbus import Dbus, get_default_bus
 from aiodbus.bus import Interface, MemberFlags
+from aiodbus.bus.message import Message
 from aiodbus.handle import Closeable
 from aiodbus.member.base import (
     DbusBoundMember,
@@ -54,6 +54,7 @@ from aiodbus.member.base import (
 from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
+    from _sdbus import DbusCompleteTypes
     from aiodbus.interface.base import DbusExportHandle, DbusInterface
 
 
@@ -107,7 +108,7 @@ class DbusSignal[T](DbusMember):
         if bus is None:
             bus = get_default_bus()
 
-        message_queue: Queue[SdBusMessage] = Queue()
+        message_queue: Queue[Message] = Queue()
 
         match_slot = await bus.subscribe_signals(
             sender_filter=service_name,
@@ -118,10 +119,10 @@ class DbusSignal[T](DbusMember):
 
         with closing(match_slot):
             while True:
-                next_signal_message = await message_queue.get()
-                signal_path = next_signal_message.path
+                message = await message_queue.get()
+                signal_path = message.path
                 assert signal_path is not None
-                yield (signal_path, cast(T, next_signal_message.get_contents()))
+                yield (signal_path, cast(T, message.get_contents()))
 
 
 class DbusBoundSignal[T](DbusBoundMember, AsyncIterable[T], ABC):
@@ -164,7 +165,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
     async def _register_match_slot(
         self,
         bus: Dbus,
-        callback: Callable[[SdBusMessage], Any],
+        callback: Callable[[Message], Any],
     ) -> Closeable:
         return await bus.subscribe_signals(
             sender_filter=self.proxy_meta.service_name,
@@ -175,7 +176,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         )
 
     async def catch(self):
-        message_queue: Queue[SdBusMessage] = Queue()
+        message_queue: Queue[Message] = Queue()
 
         handle = await self._register_match_slot(
             self.proxy_meta.attached_bus,
@@ -198,7 +199,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         if service_name is None:
             service_name = self.proxy_meta.service_name
 
-        message_queue: Queue[SdBusMessage] = Queue()
+        message_queue: Queue[Message] = Queue()
 
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
