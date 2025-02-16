@@ -42,7 +42,7 @@ from weakref import WeakSet
 
 from aiodbus import Dbus, get_default_bus
 from aiodbus.bus import DbusInterfaceBuilder, MemberFlags
-from aiodbus.bus.message import Message
+from aiodbus.bus.message import DbusMessage
 from aiodbus.handle import Closeable
 from aiodbus.member.base import (
     DbusBoundMember,
@@ -103,11 +103,11 @@ class DbusSignal[T](DbusMember):
         self,
         service_name: str,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[Message[T]], None]:
+    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
         if bus is None:
             bus = get_default_bus()
 
-        message_queue: Queue[Message[T]] = Queue()
+        message_queue: Queue[DbusMessage[T]] = Queue()
 
         match_slot = await bus.subscribe_signals(
             sender_filter=service_name,
@@ -151,7 +151,7 @@ class DbusBoundSignal[T](DbusBoundMember, ABC):
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[Message[T]], None]: ...
+    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]: ...
 
     @abstractmethod
     def emit(self, args: T) -> None: ...
@@ -171,7 +171,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
     async def _register_match_slot(
         self,
         bus: Dbus,
-        callback: Callable[[Message[T]], Any],
+        callback: Callable[[DbusMessage[T]], Any],
     ) -> Closeable:
         return await bus.subscribe_signals(
             sender_filter=self.proxy_meta.service_name,
@@ -198,14 +198,14 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[Message[T]], None]:
+    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
         if bus is None:
             bus = self.proxy_meta.attached_bus
 
         if service_name is None:
             service_name = self.proxy_meta.service_name
 
-        message_queue: Queue[Message[T]] = Queue()
+        message_queue: Queue[DbusMessage[T]] = Queue()
 
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
@@ -215,7 +215,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         )
 
         with closing(handle):
-            yield Signals[Message[T]](message_queue)
+            yield Signals[DbusMessage[T]](message_queue)
 
     def emit(self, args: T):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
@@ -257,7 +257,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[Message[T]], None]:
+    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
         raise NotImplementedError()
 
     def _emit_dbus_signal(self, args: T) -> None:

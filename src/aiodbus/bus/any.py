@@ -13,7 +13,7 @@ from typing import (
     Unpack,
 )
 
-from aiodbus.bus.message import Message
+from aiodbus.bus.message import DbusMessage
 from aiodbus.handle import Closeable
 
 if TYPE_CHECKING:
@@ -142,7 +142,7 @@ class Dbus(Protocol):
         path_filter: Optional[str] = None,
         interface_filter: Optional[str] = None,
         member_filter: Optional[str] = None,
-        callback: Callable[[Message], None],
+        callback: Callable[[DbusMessage], None],
     ) -> Closeable: ...
 
     def create_interface(self) -> DbusInterfaceBuilder:

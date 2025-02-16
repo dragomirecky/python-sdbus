@@ -43,7 +43,7 @@ from aiodbus.bus.any import (
     PropertyFlags,
 )
 from aiodbus.bus.connection import DbusType
-from aiodbus.bus.message import Message, _set_current_message
+from aiodbus.bus.message import DbusMessage, _set_current_message
 from aiodbus.exceptions import (
     AlreadyOwner,
     CallFailedError,
@@ -332,7 +332,7 @@ class SdBus(Dbus):
             raise DbusError(f"Unknown result code: {result}")
 
     @staticmethod
-    def _signal_handler(callback: Callable[[Message], None], message: Message) -> None:
+    def _signal_handler(callback: Callable[[DbusMessage], None], message: DbusMessage) -> None:
         try:
             with _set_current_message(message):
                 callback(message)
@@ -346,7 +346,7 @@ class SdBus(Dbus):
         path_filter: Optional[str] = None,
         interface_filter: Optional[str] = None,
         member_filter: Optional[str] = None,
-        callback: Callable[[Message], None],
+        callback: Callable[[DbusMessage], None],
     ) -> Closeable:
 
         return await self._sdbus.match_signal_async(

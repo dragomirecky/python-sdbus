@@ -36,7 +36,7 @@ from aiodbus import (
     dbus_signal,
     get_current_message,
 )
-from aiodbus.bus.message import Message
+from aiodbus.bus.message import DbusMessage
 from aiodbus.bus.sdbus import SdBus
 from aiodbus.exceptions import (
     CallFailedError,
@@ -379,7 +379,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         with self.subTest("Catch anywhere over D-Bus class"):
 
-            async def catch_anywhere_oneshot_from_class() -> Message:
+            async def catch_anywhere_oneshot_from_class() -> DbusMessage:
                 async with SomeTestInterface.test_signal.catch_anywhere(
                     TEST_SERVICE_NAME, self.bus
                 ) as subscription:

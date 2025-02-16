@@ -26,7 +26,7 @@ from aiodbus.bus import (
     get_default_bus,
     set_default_bus,
 )
-from aiodbus.bus.message import Message, get_current_message
+from aiodbus.bus.message import DbusMessage, get_current_message
 from aiodbus.handle import DbusExportHandle
 from aiodbus.interface.base import DbusInterface
 from aiodbus.interface.common import DbusInterfaceCommon
@@ -118,7 +118,7 @@ __all__ = (
     "DbusProperty",
     "DbusSignal",
     "DbusInterface",
-    "Message",
+    "DbusMessage",
     "get_current_message",
     "DbusExportHandle",
     "DbusError",

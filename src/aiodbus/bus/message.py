@@ -5,7 +5,7 @@ from contextvars import ContextVar
 from typing import Optional, Protocol
 
 
-class Message[T](Protocol):
+class DbusMessage[T](Protocol):
     @property
     def path(self) -> Optional[str]: ...
 
@@ -15,11 +15,11 @@ class Message[T](Protocol):
     def get_contents(self) -> T: ...
 
 
-_current_message: ContextVar[Message] = ContextVar("current_message")
+_current_message: ContextVar[DbusMessage] = ContextVar("current_message")
 
 
 @contextmanager
-def _set_current_message(message: Message):
+def _set_current_message(message: DbusMessage):
     token = _current_message.set(message)
     try:
         yield message
@@ -27,5 +27,5 @@ def _set_current_message(message: Message):
         _current_message.reset(token)
 
 
-def get_current_message() -> Message:
+def get_current_message() -> DbusMessage:
     return _current_message.get()
