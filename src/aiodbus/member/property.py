@@ -129,10 +129,7 @@ class DbusBoundProperty[T](DbusBoundMember, ABC):
     async def set(self, new_value: T) -> None: ...
 
 
-class DbusProxyProperty(
-    DbusBoundProperty[T],
-    DbusProxyMember,
-):
+class DbusProxyProperty(DbusBoundProperty[T], DbusProxyMember):
     def __init__(
         self,
         dbus_property: DbusProperty[T],
@@ -166,10 +163,7 @@ class DbusProxyProperty(
         )
 
 
-class DbusLocalProperty(
-    DbusBoundProperty[T],
-    DbusLocalMember,
-):
+class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
     def __init__(self, dbus_property: DbusProperty[T], local_object: DbusInterface):
         super().__init__(dbus_property=dbus_property, local_object=local_object)
         self.__doc__ = dbus_property.__doc__
