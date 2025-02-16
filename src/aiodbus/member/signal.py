@@ -22,17 +22,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from asyncio import Queue
-from contextlib import closing
+from contextlib import asynccontextmanager, closing
 from types import FunctionType
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterable,
+    AsyncGenerator,
     AsyncIterator,
     Callable,
     Optional,
     Sequence,
-    Tuple,
     Type,
     Union,
     Unpack,
@@ -99,15 +98,16 @@ class DbusSignal[T](DbusMember):
         else:
             return self
 
+    @asynccontextmanager
     async def catch_anywhere(
         self,
         service_name: str,
         bus: Optional[Dbus] = None,
-    ) -> AsyncIterable[Tuple[str, T]]:
+    ) -> AsyncGenerator[Signals[Message[T]], None]:
         if bus is None:
             bus = get_default_bus()
 
-        message_queue: Queue[Message] = Queue()
+        message_queue: Queue[Message[T]] = Queue()
 
         match_slot = await bus.subscribe_signals(
             sender_filter=service_name,
@@ -117,14 +117,22 @@ class DbusSignal[T](DbusMember):
         )
 
         with closing(match_slot):
-            while True:
-                message = await message_queue.get()
-                signal_path = message.path
-                assert signal_path is not None
-                yield (signal_path, cast(T, message.get_contents()))
+            yield Signals(message_queue)
 
 
-class DbusBoundSignal[T](DbusBoundMember, AsyncIterable[T], ABC):
+class Signals[T]:
+    def __init__(self, queue: Queue[T]):
+        self.queue = queue
+
+    async def get(self) -> T:
+        return await self.queue.get()
+
+    async def __aiter__(self) -> AsyncIterator[T]:
+        while True:
+            yield await self.queue.get()
+
+
+class DbusBoundSignal[T](DbusBoundMember, ABC):
     def __init__(self, dbus_signal: DbusSignal[T], **kwargs):
         super().__init__(**kwargs)
         self.dbus_signal = dbus_signal
@@ -134,17 +142,16 @@ class DbusBoundSignal[T](DbusBoundMember, AsyncIterable[T], ABC):
         return self.dbus_signal
 
     @abstractmethod
-    def catch(self) -> AsyncIterator[T]: ...
-
-    def __aiter__(self) -> AsyncIterator[T]:
-        return self.catch()
+    @asynccontextmanager
+    async def catch(self) -> AsyncGenerator[Signals[T], None]: ...
 
     @abstractmethod
-    def catch_anywhere(
+    @asynccontextmanager
+    async def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncIterable[Tuple[str, T]]: ...
+    ) -> AsyncGenerator[Signals[Message[T]], None]: ...
 
     @abstractmethod
     def emit(self, args: T) -> None: ...
@@ -164,7 +171,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
     async def _register_match_slot(
         self,
         bus: Dbus,
-        callback: Callable[[Message], Any],
+        callback: Callable[[Message[T]], Any],
     ) -> Closeable:
         return await bus.subscribe_signals(
             sender_filter=self.proxy_meta.service_name,
@@ -174,31 +181,31 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
             callback=callback,
         )
 
-    async def catch(self):
-        message_queue: Queue[Message] = Queue()
+    @asynccontextmanager
+    async def catch(self) -> AsyncGenerator[Signals[T], None]:
+        message_queue: Queue[T] = Queue()
 
         handle = await self._register_match_slot(
             self.proxy_meta.attached_bus,
-            message_queue.put_nowait,
+            lambda message: message_queue.put_nowait(cast(T, message.get_contents())),
         )
 
         with closing(handle):
-            while True:
-                next_signal_message = await message_queue.get()
-                yield cast(T, next_signal_message.get_contents())
+            yield Signals(message_queue)
 
+    @asynccontextmanager
     async def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncIterable[Tuple[str, T]]:
+    ) -> AsyncGenerator[Signals[Message[T]], None]:
         if bus is None:
             bus = self.proxy_meta.attached_bus
 
         if service_name is None:
             service_name = self.proxy_meta.service_name
 
-        message_queue: Queue[Message] = Queue()
+        message_queue: Queue[Message[T]] = Queue()
 
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
@@ -208,11 +215,7 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         )
 
         with closing(handle):
-            while True:
-                next_signal_message = await message_queue.get()
-                signal_path = next_signal_message.path
-                assert signal_path is not None
-                yield (signal_path, cast(T, next_signal_message.get_contents()))
+            yield Signals[Message[T]](message_queue)
 
     def emit(self, args: T):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
@@ -237,26 +240,24 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
             **self.dbus_signal.flags,
         )
 
-    async def catch(self):
+    @asynccontextmanager
+    async def catch(self) -> AsyncGenerator[Signals[T], None]:
         new_queue: Queue[T] = Queue()
 
         signal_callbacks = self.dbus_signal.local_callbacks
         put_method = new_queue.put_nowait
         try:
             signal_callbacks.add(put_method)
-            while True:
-                next_data = await new_queue.get()
-                yield next_data
+            yield Signals(new_queue)
         finally:
             signal_callbacks.remove(put_method)
 
-    __aiter__ = catch
-
+    @asynccontextmanager
     def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncIterable[Tuple[str, T]]:
+    ) -> AsyncGenerator[Signals[Message[T]], None]:
         raise NotImplementedError()
 
     def _emit_dbus_signal(self, args: T) -> None:

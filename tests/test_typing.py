@@ -84,27 +84,39 @@ async def check_async_interface_signal_typing(
     test_interface: InterfaceTestTyping,
 ) -> None:
 
-    async for ls in test_interface.str_list_signal:
-        ls.append("test")
-        for x in ls:
-            x.capitalize()
+    async with test_interface.str_list_signal.catch() as signals:
+        async for ls in signals:
+            ls.append("test")
+            for x in ls:
+                x.capitalize()
 
-    async for ls2 in test_interface.str_list_signal.catch():
-        ls2.append("test")
-        for x2 in ls2:
-            x2.capitalize()
+    async with test_interface.str_list_signal.catch_anywhere() as signals:
+        async for message in signals:
+            ls2 = message.get_contents()
+            ls2.append("test")
+            for x2 in ls2:
+                x2.capitalize()
 
-    async for p1, ls3 in test_interface.str_list_signal.catch_anywhere():
-        p1.capitalize()
-        ls3.append("test")
-        for x3 in ls3:
-            x3.capitalize()
+    async with test_interface.str_list_signal.catch_anywhere() as signals:
+        async for message in signals:
+            p1 = message.path
+            assert p1 is not None
+            ls3 = message.get_contents()
 
-    async for p2, ls4 in InterfaceTestTyping.str_list_signal.catch_anywhere("org.example"):
-        p2.capitalize()
-        ls4.append("test")
-        for x4 in ls4:
-            x4.capitalize()
+            p1.capitalize()
+            ls3.append("test")
+            for x3 in ls3:
+                x3.capitalize()
+
+    async with test_interface.str_list_signal.catch_anywhere("org.example") as signals:
+        async for message in signals:
+            p2 = message.path
+            assert p2 is not None
+            ls4 = message.get_contents()
+            p2.capitalize()
+            ls4.append("test")
+            for x4 in ls4:
+                x4.capitalize()
 
     test_interface.str_list_signal.emit(["test", "foobar"])
 

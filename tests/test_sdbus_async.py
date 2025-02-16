@@ -36,6 +36,7 @@ from aiodbus import (
     dbus_signal,
     get_current_message,
 )
+from aiodbus.bus.message import Message
 from aiodbus.bus.sdbus import SdBus
 from aiodbus.exceptions import (
     CallFailedError,
@@ -358,10 +359,12 @@ class TestProxy(IsolatedDbusTestCase):
         with self.subTest("Catch anywhere over D-Bus object"):
 
             async def catch_anywhere_oneshot_dbus() -> Tuple[str, Tuple[str, str]]:
-                async for x in test_object_connection.test_signal.catch_anywhere():
-                    return x
+                async with test_object_connection.test_signal.catch_anywhere() as signals:
+                    async for message in signals:
+                        assert message.path is not None
+                        return message.path, message.get_contents()
 
-                raise RuntimeError
+                    raise RuntimeError
 
             catch_anywhere_over_dbus_task = loop.create_task(catch_anywhere_oneshot_dbus())
 
@@ -376,11 +379,12 @@ class TestProxy(IsolatedDbusTestCase):
 
         with self.subTest("Catch anywhere over D-Bus class"):
 
-            async def catch_anywhere_oneshot_from_class() -> Tuple[str, Tuple[str, str]]:
-                async for x in SomeTestInterface.test_signal.catch_anywhere(
+            async def catch_anywhere_oneshot_from_class() -> Message:
+                async with SomeTestInterface.test_signal.catch_anywhere(
                     TEST_SERVICE_NAME, self.bus
-                ):
-                    return x
+                ) as subscription:
+                    async for x in subscription:
+                        return x
 
                 raise RuntimeError
 
@@ -390,16 +394,16 @@ class TestProxy(IsolatedDbusTestCase):
 
             test_object.test_signal.emit(test_tuple)
 
-            self.assertEqual(
-                ("/", test_tuple),
-                await wait_for(catch_anywhere_from_class_task, timeout=1),
-            )
+            signal_message = await wait_for(catch_anywhere_from_class_task, timeout=1)
+            self.assertEqual(signal_message.path, "/")
+            self.assertEqual(signal_message.get_contents(), test_tuple)
 
         with self.subTest("Catch anywhere over local object"):
 
             async def catch_anywhere_oneshot_local() -> Tuple[str, Tuple[str, str]]:
-                async for x in test_object.test_signal.catch_anywhere():
-                    return x
+                async with test_object.test_signal.catch_anywhere() as signals:
+                    async for message in signals:
+                        return str(message.path), message.get_contents()
 
                 raise RuntimeError
 
@@ -419,14 +423,16 @@ class TestProxy(IsolatedDbusTestCase):
         test_tuple = ("sgfsretg", "asd")
 
         async def reader_one() -> Tuple[str, str]:
-            async for x in test_object_connection.test_signal.catch():
-                return test_tuple
+            async with test_object_connection.test_signal.catch() as signals:
+                async for x in signals:
+                    return x
 
             raise RuntimeError
 
         async def reader_two() -> Tuple[str, str]:
-            async for x in test_object_connection.test_signal.catch():
-                return test_tuple
+            async with test_object_connection.test_signal.catch() as signals:
+                async for x in signals:
+                    return x
 
             raise RuntimeError
 
@@ -513,24 +519,26 @@ class TestProxy(IsolatedDbusTestCase):
         loop = get_running_loop()
 
         async def catch_property_emit_connection() -> str:
-            async for x in test_object_connection.properties_changed.catch():
-                for v in x[1].values():
-                    probably_str = v[1]
-                    if isinstance(probably_str, str):
-                        return probably_str
-                    else:
-                        raise TypeError
-            raise ValueError
+            async with test_object_connection.properties_changed.catch() as signals:
+                async for x in signals:
+                    for v in x[1].values():
+                        probably_str = v[1]
+                        if isinstance(probably_str, str):
+                            return probably_str
+                        else:
+                            raise TypeError
+                raise ValueError
 
         async def catch_property_emit_local() -> str:
-            async for x in test_object.properties_changed.catch():
-                for v in x[1].values():
-                    probably_str = v[1]
-                    if isinstance(probably_str, str):
-                        return probably_str
-                    else:
-                        raise TypeError
-            raise ValueError
+            async with test_object.properties_changed.catch() as signals:
+                async for x in signals:
+                    for v in x[1].values():
+                        probably_str = v[1]
+                        if isinstance(probably_str, str):
+                            return probably_str
+                        else:
+                            raise TypeError
+                raise ValueError
 
         t1 = loop.create_task(catch_property_emit_connection())
         t2 = loop.create_task(catch_property_emit_local())

@@ -149,12 +149,12 @@ class TestRequestNameAsync(IsolatedDbusTestCase):
 
         async def catch_owner_changed() -> str:
             dbus = FreedesktopDbus()
-            async for name, old, new in dbus.name_owner_changed:
-                if name != TEST_BUS_NAME:
-                    continue
-
-                if old and new:
-                    return new
+            async with dbus.name_owner_changed.catch() as signals:
+                async for name, old, new in signals:
+                    if name != TEST_BUS_NAME:
+                        continue
+                    if old and new:
+                        return new
 
             raise RuntimeError
 
