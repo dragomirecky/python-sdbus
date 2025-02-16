@@ -23,14 +23,14 @@ from __future__ import annotations
 from typing import Dict, List, cast
 from unittest import main
 
-from _sdbus import SdBus, SdBusError, SdBusMessage
+from _sdbus import SdBusError, SdBusMessage, _SdBus
 from aiodbus.bus import Dbus
-from aiodbus.bus.sdbus import _SdBus
+from aiodbus.bus.sdbus import SdBus
 from aiodbus.unittest import IsolatedDbusTestCase
 
 
 def create_message(bus: Dbus) -> SdBusMessage:
-    assert isinstance(bus, _SdBus)
+    assert isinstance(bus, SdBus)
     return bus._sdbus.new_method_call_message(
         "org.freedesktop.systemd1",
         "/org/freedesktop/systemd1",

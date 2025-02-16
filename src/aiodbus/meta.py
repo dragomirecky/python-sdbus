@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from aiodbus.bus import Dbus, Interface, get_default_bus
+from aiodbus.bus import Dbus, DbusInterfaceBuilder, get_default_bus
 
 
 class DbusRemoteObjectMeta:
@@ -39,7 +39,7 @@ class DbusRemoteObjectMeta:
 
 class DbusLocalObjectMeta:
     def __init__(self) -> None:
-        self.activated_interfaces: List[Interface] = []
+        self.activated_interfaces: List[DbusInterfaceBuilder] = []
         self.serving_object_path: Optional[str] = None
         self.attached_bus: Optional[Dbus] = None
 

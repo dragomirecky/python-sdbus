@@ -23,10 +23,10 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, cast
 
-from _sdbus import SdBus
+from _sdbus import _SdBus
 from aiodbus import get_default_bus
 from aiodbus.bus import Dbus
-from aiodbus.bus.sdbus import _SdBus
+from aiodbus.bus.sdbus import SdBus, _SdBus
 from aiodbus.interface.base import DbusExportHandle, DbusInterface
 from aiodbus.interface.common import DbusInterfaceCommon
 from aiodbus.member.method import dbus_method
@@ -65,11 +65,11 @@ class DbusObjectManagerInterface(
     def interfaces_removed(self) -> Tuple[str, List[str]]:
         raise NotImplementedError
 
-    def _get_sdbus(self, bus: Optional[Dbus] = None) -> SdBus:
+    def _get_sdbus(self, bus: Optional[Dbus] = None) -> _SdBus:
         # TODO: remove direct access to sdbus
         if bus is None:
             bus = get_default_bus()
-        return cast(_SdBus, bus)._sdbus
+        return cast(SdBus, bus)._sdbus
 
     def export_to_dbus(
         self,

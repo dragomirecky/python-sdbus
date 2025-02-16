@@ -33,7 +33,7 @@ from aiodbus import (
     dbus_property,
     dbus_signal,
 )
-from aiodbus.bus.sdbus import PROPERTY_FLAGS_MASK
+from aiodbus.bus.sdbus import SdBusInterfaceBuilder
 from aiodbus.member.property import DbusProperty
 
 from .common_test_util import skip_if_no_asserts, skip_if_no_name_validations
@@ -111,16 +111,21 @@ class TestBadAsyncDbusClass(TestCase):
                     raise NotImplementedError
 
     def test_property_flags(self) -> None:
-        self.assertEqual(0, PROPERTY_FLAGS_MASK & DbusDeprecatedFlag)
+        self.assertEqual(0, SdBusInterfaceBuilder._isolate_property_flags(DbusDeprecatedFlag))
         self.assertEqual(
             1,
-            (PROPERTY_FLAGS_MASK & (DbusDeprecatedFlag | DbusPropertyEmitsChangeFlag)).bit_count(),
+            (
+                SdBusInterfaceBuilder._isolate_property_flags(
+                    DbusDeprecatedFlag | DbusPropertyEmitsChangeFlag
+                )
+            ).bit_count(),
         )
         self.assertEqual(
             2,
             (
-                PROPERTY_FLAGS_MASK
-                & (DbusDeprecatedFlag | DbusPropertyConstFlag | DbusPropertyEmitsChangeFlag)
+                SdBusInterfaceBuilder._isolate_property_flags(
+                    DbusDeprecatedFlag | DbusPropertyConstFlag | DbusPropertyEmitsChangeFlag
+                )
             ).bit_count(),
         )
 

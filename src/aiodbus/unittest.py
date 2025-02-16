@@ -33,9 +33,9 @@ from typing import Any, AsyncContextManager, Iterator, List, Optional, TypeVar, 
 from unittest import IsolatedAsyncioTestCase
 from weakref import ref as weak_ref
 
-from _sdbus import SdBus, SdBusMessage, SdBusSlot
+from _sdbus import SdBusMessage
 from aiodbus.bus import Dbus, connect, set_default_bus
-from aiodbus.bus.sdbus import _SdBus
+from aiodbus.bus.sdbus import SdBus, _SdBus
 from aiodbus.handle import Closeable
 from aiodbus.member.signal import (
     DbusBoundSignal,
@@ -213,7 +213,7 @@ class IsolatedDbusTestCase(IsolatedAsyncioTestCase):
         # TODO: Use enterContext from Python 3.11
         _isolated_dbus_cm = _isolated_dbus()
         self.bus = _isolated_dbus_cm.__enter__()
-        assert isinstance(self.bus, _SdBus)
+        assert isinstance(self.bus, SdBus)
         self.sdbus = self.bus._sdbus
         self.addCleanup(_isolated_dbus_cm.__exit__, None, None, None)
 

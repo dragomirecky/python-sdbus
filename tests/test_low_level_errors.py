@@ -26,7 +26,7 @@ from typing import Any
 from _sdbus import SdBusInterface
 from aiodbus import DbusInterfaceCommon, dbus_method, dbus_property
 from aiodbus.bus import get_default_bus
-from aiodbus.bus.sdbus import _SdBusInterface
+from aiodbus.bus.sdbus import SdBusInterfaceBuilder
 from aiodbus.exceptions import CallFailedError, MethodCallError
 from aiodbus.meta import DbusLocalObjectMeta
 from aiodbus.unittest import IsolatedDbusTestCase
@@ -168,7 +168,7 @@ class TestLowLevelErrors(IsolatedDbusTestCase):
         if not isinstance(dbus_local_meta, DbusLocalObjectMeta):
             raise TypeError
         interface = dbus_local_meta.activated_interfaces[0]
-        assert isinstance(interface, _SdBusInterface)
+        assert isinstance(interface, SdBusInterfaceBuilder)
         return interface._interface
 
     async def test_property_callback_error(self) -> None:

@@ -42,7 +42,7 @@ from typing import (
 from weakref import WeakSet
 
 from aiodbus import Dbus, get_default_bus
-from aiodbus.bus import Interface, MemberFlags
+from aiodbus.bus import DbusInterfaceBuilder, MemberFlags
 from aiodbus.bus.message import Message
 from aiodbus.handle import Closeable
 from aiodbus.member.base import (
@@ -230,7 +230,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
         self.local_meta = local_meta
         self.__doc__ = dbus_signal.__doc__
 
-    def _append_to_interface(self, interface: Interface, handle: DbusExportHandle):
+    def _append_to_interface(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
         interface.add_signal(
             self.dbus_signal.name,
             self.dbus_signal.signature,

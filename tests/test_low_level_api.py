@@ -24,26 +24,26 @@ from asyncio import get_running_loop
 from unittest import SkipTest, TestCase, main
 
 from _sdbus import (
-    SdBus,
+    _SdBus,
     is_interface_name_valid,
     is_member_name_valid,
     is_object_path_valid,
     is_service_name_valid,
 )
-from aiodbus.bus.sdbus import _SdBus
+from aiodbus.bus.sdbus import SdBus
 from aiodbus.unittest import IsolatedDbusTestCase
 
 
 class TestAsyncLowLevel(IsolatedDbusTestCase):
     def test_init_bus(self) -> None:
-        not_connected_bus = SdBus()
+        not_connected_bus = _SdBus()
         self.assertIsNone(not_connected_bus.address)
 
         self.assertIsNotNone(self.bus.address)
 
     async def test_bus_fd_unregister_close(self) -> None:
         await self.bus.request_name("org.example")
-        assert isinstance(self.bus, _SdBus)
+        assert isinstance(self.bus, SdBus)
         bus_fd = self.bus._sdbus.get_fd()
 
         self.bus.close()
@@ -77,7 +77,7 @@ class TestLowLeveApi(TestCase):
             )
 
     def test_bus_method_call_timeout(self) -> None:
-        bus = SdBus()
+        bus = _SdBus()
 
         self.assertIsNotNone(bus.method_call_timeout_usec)
 

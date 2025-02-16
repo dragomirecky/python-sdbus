@@ -11,6 +11,7 @@ from typing import (
     Sequence,
     Tuple,
     Unpack,
+    assert_never,
 )
 
 from _sdbus import (
@@ -25,23 +26,23 @@ from _sdbus import (
     NameAllowReplacementFlag,
     NameQueueFlag,
     NameReplaceExistingFlag,
-    SdBus,
     SdBusError,
     SdBusInterface,
     SdBusMessage,
+    _SdBus,
     sd_bus_open_system,
     sd_bus_open_system_remote,
     sd_bus_open_user,
 )
 from aiodbus.bus.any import (
     Dbus,
-    DbusType,
-    Interface,
+    DbusInterfaceBuilder,
     MemberFlags,
     MethodCallable,
     MethodFlags,
     PropertyFlags,
 )
+from aiodbus.bus.connection import DbusType
 from aiodbus.bus.message import Message, _set_current_message
 from aiodbus.exceptions import (
     AlreadyOwner,
@@ -58,40 +59,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType, DbusCompleteTypes
 
-PROPERTY_FLAGS_MASK = (
-    DbusPropertyConstFlag
-    | DbusPropertyEmitsChangeFlag
-    | DbusPropertyEmitsInvalidationFlag
-    | DbusPropertyExplicitFlag
-)
 
-
-def _is_property_flags_correct(flags: int) -> bool:
-    num_of_flag_bits = (PROPERTY_FLAGS_MASK & flags).bit_count()
-    return 0 <= num_of_flag_bits <= 1
-
-
-_flag_values: Dict[str, int] = {
-    "deprecated": DbusDeprecatedFlag,
-    "hidden": DbusHiddenFlag,
-    "unprivileged": DbusUnprivilegedFlag,
-    "no_reply": DbusNoReplyFlag,
-    "explicit": DbusPropertyExplicitFlag,
-    "emits_change": DbusPropertyEmitsChangeFlag,
-    "emits_invalidation": DbusPropertyEmitsInvalidationFlag,
-    "const": DbusPropertyConstFlag,
-}
-
-
-def _member_flags_to_int(flags) -> int:
-    result = 0
-    for flag_name, flag_value in flags.items():
-        if flag_value:
-            result |= _flag_values[flag_name]
-    return result
-
-
-class _SdBusInterface(Interface):
+class SdBusInterfaceBuilder(DbusInterfaceBuilder):
     def __init__(self, interface: SdBusInterface) -> None:
         self._interface = interface
 
@@ -134,6 +103,36 @@ class _SdBusInterface(Interface):
 
         reply.send()
 
+    _property_flags_mask = (
+        DbusPropertyConstFlag
+        | DbusPropertyEmitsChangeFlag
+        | DbusPropertyEmitsInvalidationFlag
+        | DbusPropertyExplicitFlag
+    )
+
+    @staticmethod
+    def _isolate_property_flags(flags: int) -> int:
+        return flags & SdBusInterfaceBuilder._property_flags_mask
+
+    _flag_to_sdbus: Dict[str, int] = {
+        "deprecated": DbusDeprecatedFlag,
+        "hidden": DbusHiddenFlag,
+        "unprivileged": DbusUnprivilegedFlag,
+        "no_reply": DbusNoReplyFlag,
+        "explicit": DbusPropertyExplicitFlag,
+        "emits_change": DbusPropertyEmitsChangeFlag,
+        "emits_invalidation": DbusPropertyEmitsInvalidationFlag,
+        "const": DbusPropertyConstFlag,
+    }
+
+    @staticmethod
+    def _member_flags_to_int(flags) -> int:
+        result = 0
+        for flag_name, flag_value in flags.items():
+            if flag_value:
+                result |= SdBusInterfaceBuilder._flag_to_sdbus[flag_name]
+        return result
+
     def add_method(
         self,
         name: str,
@@ -144,7 +143,7 @@ class _SdBusInterface(Interface):
         callback: MethodCallable,
         **flags: Unpack[MethodFlags],
     ) -> None:
-        flags_int = _member_flags_to_int(flags)
+        flags_int = self._member_flags_to_int(flags)
         self._interface.add_method(
             name,
             signature,
@@ -155,6 +154,11 @@ class _SdBusInterface(Interface):
             partial(self._method_handler, result_signature, callback),
         )
 
+    @staticmethod
+    def _is_property_flags_correct(flags: int) -> bool:
+        num_of_flag_bits = SdBusInterfaceBuilder._isolate_property_flags(flags).bit_count()
+        return 0 <= num_of_flag_bits <= 1
+
     def add_property(
         self,
         name: str,
@@ -163,8 +167,8 @@ class _SdBusInterface(Interface):
         set_function: Optional[Callable[[DbusCompleteTypes], None]],
         **flags: Unpack[PropertyFlags],
     ) -> None:
-        flags_int = _member_flags_to_int(flags)
-        assert _is_property_flags_correct(flags_int), (
+        flags_int = self._member_flags_to_int(flags)
+        assert self._is_property_flags_correct(flags_int), (
             "Incorrect number of Property flags. "
             "Only one of const, emits_change, emits_invalidation, explicit "
             "is allowed."
@@ -201,23 +205,23 @@ class _SdBusInterface(Interface):
         args_names: Sequence[str],
         **flags: Unpack[MemberFlags],
     ):
-        flags_int = _member_flags_to_int(flags)
+        flags_int = self._member_flags_to_int(flags)
         self._interface.add_signal(name, signature, args_names, flags_int)
 
 
-class _SdBus(Dbus):
-    def __init__(self, bus: SdBus) -> None:
+class SdBus(Dbus):
+    def __init__(self, bus: _SdBus) -> None:
         self._sdbus = bus
 
     @property
     def address(self) -> Optional[str]:
         return self._sdbus.address
 
-    def create_interface(self) -> Interface:
-        return _SdBusInterface(SdBusInterface())
+    def create_interface(self) -> DbusInterfaceBuilder:
+        return SdBusInterfaceBuilder(SdBusInterface())
 
-    def export(self, path: str, name: str, interface: Interface) -> Closeable:
-        assert isinstance(interface, _SdBusInterface)
+    def export(self, path: str, name: str, interface: DbusInterfaceBuilder) -> Closeable:
+        assert isinstance(interface, SdBusInterfaceBuilder)
         self._sdbus.add_interface(interface._interface, path, name)
         assert interface._interface.slot is not None
         return interface._interface.slot
@@ -332,7 +336,7 @@ class _SdBus(Dbus):
         try:
             with _set_current_message(message):
                 callback(message)
-        except Exception as exc:
+        except Exception:
             logger.exception("Unhandled exception when handling a signal")
 
     async def subscribe_signals(
@@ -366,10 +370,12 @@ class _SdBus(Dbus):
 def sdbus_connect_local(address: DbusType):
     match address:
         case "session":
-            return _SdBus(sd_bus_open_user())
+            return SdBus(sd_bus_open_user())
         case "system":
-            return _SdBus(sd_bus_open_system())
+            return SdBus(sd_bus_open_system())
+        case _:
+            assert_never(address)
 
 
 def sdbus_connect_remote(address: str):
-    return _SdBus(sd_bus_open_system_remote(address))
+    return SdBus(sd_bus_open_system_remote(address))

@@ -36,7 +36,7 @@ from aiodbus import (
     dbus_signal,
     get_current_message,
 )
-from aiodbus.bus.sdbus import _SdBus
+from aiodbus.bus.sdbus import SdBus
 from aiodbus.exceptions import (
     CallFailedError,
     FileExistsError,
@@ -68,7 +68,7 @@ class TestPing(IsolatedDbusTestCase):
         self.assertEqual(return_code, 0)
 
     async def test_ping(self) -> None:
-        assert isinstance(self.bus, _SdBus)
+        assert isinstance(self.bus, SdBus)
         m = self.bus._sdbus.new_method_call_message(
             "org.freedesktop.DBus",
             "/org/freedesktop/DBus",
@@ -557,7 +557,7 @@ class TestProxy(IsolatedDbusTestCase):
     async def test_bus_timerfd(self) -> None:
         test_object, test_object_connection = initialize_object()
 
-        assert isinstance(self.bus, _SdBus)
+        assert isinstance(self.bus, SdBus)
         self.bus._sdbus.method_call_timeout_usec = 10_000  # 0.01 seconds
 
         loop = get_running_loop()

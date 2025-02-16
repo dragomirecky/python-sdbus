@@ -105,7 +105,7 @@ PyMODINIT_FUNC PyInit__sdbus(void) {
     PyObject * m CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyModule_Create(&sd_bus_internals_module));
 
     SdBus_class = SD_BUS_PY_INIT_TYPE_READY(SdBusType);
-    SD_BUS_PY_INIT_ADD_OBJECT("SdBus", SdBus_class);
+    SD_BUS_PY_INIT_ADD_OBJECT("_SdBus", SdBus_class);
 
     SdBusMessage_class = SD_BUS_PY_INIT_TYPE_READY(SdBusMessageType);
     SD_BUS_PY_INIT_ADD_OBJECT("SdBusMessage", SdBusMessage_class);

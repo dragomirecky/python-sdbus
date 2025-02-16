@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from _sdbus import is_member_name_valid
-from aiodbus.bus import Interface
+from aiodbus.bus import DbusInterfaceBuilder
 
 if TYPE_CHECKING:
     from aiodbus.handle import DbusExportHandle
@@ -89,7 +89,9 @@ class DbusLocalMember(DbusBoundMember):
         return local_object
 
     @abstractmethod
-    def _append_to_interface(self, interface: Interface, handle: DbusExportHandle) -> None: ...
+    def _append_to_interface(
+        self, interface: DbusInterfaceBuilder, handle: DbusExportHandle
+    ) -> None: ...
 
 
 class DbusProxyMember(DbusBoundMember):

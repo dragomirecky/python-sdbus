@@ -38,7 +38,7 @@ from typing import (
     overload,
 )
 
-from aiodbus.bus import Interface, PropertyFlags
+from aiodbus.bus import DbusInterfaceBuilder, PropertyFlags
 from aiodbus.member.base import (
     DbusBoundMember,
     DbusLocalMember,
@@ -174,7 +174,7 @@ class DbusLocalProperty(
         super().__init__(dbus_property=dbus_property, local_object=local_object)
         self.__doc__ = dbus_property.__doc__
 
-    def _append_to_interface(self, interface: Interface, handle: DbusExportHandle):
+    def _append_to_interface(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
         getter = self._dbus_reply_get
         dbus_property = self.dbus_property
 

@@ -1,14 +1,11 @@
 from .any import (
     Dbus,
-    DbusAddress,
-    Interface,
+    DbusInterfaceBuilder,
     MemberFlags,
     MethodFlags,
     PropertyFlags,
-    connect,
-    get_default_bus,
-    set_default_bus,
 )
+from .connection import DbusAddress, connect, get_default_bus, set_default_bus
 from .message import get_current_message
 
 __all__ = (
@@ -17,7 +14,7 @@ __all__ = (
     "connect",
     "get_default_bus",
     "set_default_bus",
-    "Interface",
+    "DbusInterfaceBuilder",
     "MemberFlags",
     "MethodFlags",
     "PropertyFlags",
