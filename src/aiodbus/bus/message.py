@@ -19,7 +19,7 @@ _current_message: ContextVar[DbusMessage] = ContextVar("current_message")
 
 
 @contextmanager
-def _set_current_message(message: DbusMessage):
+def set_current_message(message: DbusMessage):
     token = _current_message.set(message)
     try:
         yield message

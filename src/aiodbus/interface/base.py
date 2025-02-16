@@ -261,7 +261,7 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
         for interface_name, member_list in interface_map.items():
             new_interface = bus.create_interface()
             for dbus_something in member_list:
-                dbus_something._append_to_interface(new_interface, export_handle)
+                dbus_something.export(new_interface, export_handle)
             handle = bus.export(path=object_path, interface=new_interface, name=interface_name)
             local_object_meta.activated_interfaces.append(new_interface)
             export_handle.append(handle)

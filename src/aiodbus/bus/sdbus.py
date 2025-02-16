@@ -43,7 +43,7 @@ from aiodbus.bus.any import (
     PropertyFlags,
 )
 from aiodbus.bus.connection import DbusType
-from aiodbus.bus.message import DbusMessage, _set_current_message
+from aiodbus.bus.message import DbusMessage, set_current_message
 from aiodbus.exceptions import (
     AlreadyOwner,
     CallFailedError,
@@ -69,7 +69,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
         result_signature: str, callback: MethodCallable, message: SdBusMessage
     ) -> None:
         try:
-            with _set_current_message(message):
+            with set_current_message(message):
                 reply_data = await callback(*message.parse_to_tuple())
 
             if not message.expect_reply:
@@ -176,7 +176,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
 
         def getter(message: SdBusMessage):
             try:
-                with _set_current_message(message):
+                with set_current_message(message):
                     data = get_function()
                     message.append_data(signature, data)
             except Exception as exc:
@@ -187,7 +187,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
         def setter(message: SdBusMessage):
             try:
                 assert set_function is not None
-                with _set_current_message(message):
+                with set_current_message(message):
                     set_function(message.get_contents())
             except Exception as exc:
                 if not isinstance(exc, MethodCallError):
@@ -334,7 +334,7 @@ class SdBus(Dbus):
     @staticmethod
     def _signal_handler(callback: Callable[[DbusMessage], None], message: DbusMessage) -> None:
         try:
-            with _set_current_message(message):
+            with set_current_message(message):
                 callback(message)
         except Exception:
             logger.exception("Unhandled exception when handling a signal")

@@ -223,7 +223,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         super().__init__(dbus_method=dbus_method, local_object=local_object)
         self.__doc__ = dbus_method.__doc__
 
-    def _append_to_interface(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    def export(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
         interface.add_method(
             self.dbus_method.method_name,
             self.dbus_method.input_signature,
