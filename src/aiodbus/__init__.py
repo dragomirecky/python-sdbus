@@ -19,19 +19,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 
-from _sdbus import (
-    DbusDeprecatedFlag,
-    DbusHiddenFlag,
-    DbusNoReplyFlag,
-    DbusPropertyConstFlag,
-    DbusPropertyEmitsChangeFlag,
-    DbusPropertyEmitsInvalidationFlag,
-    DbusPropertyExplicitFlag,
-    DbusSensitiveFlag,
-    DbusUnprivilegedFlag,
-    decode_object_path,
-    encode_object_path,
-)
 from aiodbus.bus import (
     Dbus,
     connect,
@@ -123,17 +110,6 @@ __all__ = (
     "dbus_property",
     "get_current_message",
     "dbus_signal",
-    "DbusDeprecatedFlag",
-    "DbusHiddenFlag",
-    "DbusNoReplyFlag",
-    "DbusPropertyConstFlag",
-    "DbusPropertyEmitsChangeFlag",
-    "DbusPropertyEmitsInvalidationFlag",
-    "DbusPropertyExplicitFlag",
-    "DbusSensitiveFlag",
-    "DbusUnprivilegedFlag",
-    "decode_object_path",
-    "encode_object_path",
     "connect",
     "get_default_bus",
     "set_default_bus",

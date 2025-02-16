@@ -24,17 +24,18 @@ from gc import collect
 from unittest import TestCase
 from unittest import main as unittest_main
 
-from aiodbus import (
+from _sdbus import (
     DbusDeprecatedFlag,
-    DbusInterfaceCommon,
     DbusPropertyConstFlag,
     DbusPropertyEmitsChangeFlag,
+)
+from aiodbus import (
+    DbusInterfaceCommon,
     dbus_method,
     dbus_property,
     dbus_signal,
 )
 from aiodbus.bus.sdbus import SdBusInterfaceBuilder
-from aiodbus.member.property import DbusProperty
 
 from .common_test_util import skip_if_no_asserts, skip_if_no_name_validations
 
