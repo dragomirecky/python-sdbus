@@ -29,7 +29,12 @@ class DbusPropertiesInterface(
 
         properties: Dict[str, Any] = {}
 
-        for interface_name, meta in self._dbus_iter_interfaces_meta():
+        for interface_name, interface_cls in self.dbus_interfaces.items():
+            meta = interface_cls.dbus_meta
+
+            if meta is None:
+                continue
+
             if not meta.serving_enabled:
                 continue
 
@@ -37,7 +42,7 @@ class DbusPropertiesInterface(
 
             properties.update(
                 _parse_properties_vardict(
-                    meta.dbus_member_to_python_attr,
+                    meta.member_to_attr,
                     dbus_properties_data,
                     on_unknown_member,
                 )

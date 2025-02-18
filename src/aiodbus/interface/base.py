@@ -20,22 +20,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+from collections import OrderedDict
 from inspect import getmembers
 from itertools import chain
 from typing import (
     Any,
     Dict,
-    Iterable,
-    Iterator,
     List,
     Optional,
     Self,
-    Set,
     Tuple,
     Type,
     Union,
 )
-from weakref import WeakKeyDictionary, WeakValueDictionary
 
 from _sdbus import is_interface_name_valid
 from aiodbus.bus import Dbus, get_default_bus
@@ -43,91 +40,12 @@ from aiodbus.handle import DbusExportHandle
 from aiodbus.member.base import DbusLocalMember, DbusMember
 from aiodbus.meta import DbusClassMeta, DbusLocalObjectMeta, DbusRemoteObjectMeta
 
-DBUS_CLASS_TO_META: WeakKeyDictionary[type, DbusClassMeta] = WeakKeyDictionary()
-DBUS_INTERFACE_NAME_TO_CLASS: WeakValueDictionary[str, DbusInterfaceMeta] = WeakValueDictionary()
-
 
 class DbusInterfaceMeta(type):
-    @classmethod
-    def _check_collisions(
-        cls,
-        new_class_name: str,
-        namespace: Dict[str, Any],
-        mro_dbus_members: Dict[str, DbusMember],
-    ) -> None:
 
-        possible_collisions = namespace.keys() & mro_dbus_members.keys()
+    dbus_interfaces: OrderedDict[str, DbusInterfaceMeta] = OrderedDict()
 
-        if possible_collisions:
-            raise ValueError(
-                f"Interface {new_class_name!r} redefines reserved "
-                f"D-Bus attribute names: {possible_collisions!r}"
-            )
-
-    @staticmethod
-    def _extract_dbus_members(
-        dbus_class: type,
-        dbus_meta: DbusClassMeta,
-    ) -> Dict[str, DbusMember]:
-        dbus_members_map: Dict[str, DbusMember] = {}
-
-        for attr_name in dbus_meta.python_attr_to_dbus_member.keys():
-            dbus_member = dbus_class.__dict__.get(attr_name)
-            if not isinstance(dbus_member, DbusMember):
-                raise TypeError(
-                    f"Expected D-Bus member, got {dbus_member!r} " f"in class {dbus_class!r}"
-                )
-
-            dbus_members_map[attr_name] = dbus_member
-
-        return dbus_members_map
-
-    @classmethod
-    def _map_mro_dbus_members(
-        cls,
-        new_class_name: str,
-        base_classes: Iterable[type],
-    ) -> Dict[str, DbusMember]:
-        all_python_dbus_map: Dict[str, DbusMember] = {}
-        possible_collisions: Set[str] = set()
-
-        for c in base_classes:
-            dbus_meta = DBUS_CLASS_TO_META.get(c)
-            if dbus_meta is None:
-                continue
-
-            base_dbus_members = cls._extract_dbus_members(c, dbus_meta)
-
-            possible_collisions.update(base_dbus_members.keys() & all_python_dbus_map.keys())
-
-            all_python_dbus_map.update(base_dbus_members)
-
-        if possible_collisions:
-            raise ValueError(
-                f"Interface {new_class_name!r} has a reserved D-Bus "
-                f"attribute name collision: {possible_collisions!r}"
-            )
-
-        return all_python_dbus_map
-
-    @staticmethod
-    def _map_dbus_members(
-        attr_name: str,
-        attr: Any,
-        meta: DbusClassMeta,
-        interface_name: str,
-    ) -> None:
-        if not isinstance(attr, DbusMember):
-            return
-
-        if attr.interface_name != interface_name:
-            return
-
-        if isinstance(attr, DbusMember):
-            meta.dbus_member_to_python_attr[attr.name] = attr_name
-            meta.python_attr_to_dbus_member[attr_name] = attr.name
-        else:
-            raise TypeError(f"Unknown D-Bus element: {attr!r}")
+    dbus_meta: DbusClassMeta | None = None
 
     @staticmethod
     def _check_interface_name(interface_name: str):
@@ -143,30 +61,6 @@ class DbusInterfaceMeta(type):
         except NotImplementedError:
             ...
 
-    @staticmethod
-    def _init_members(
-        name: str,
-        namespace: Dict[str, Any],
-        interface_name: Optional[str],
-        serving_enabled: bool,
-    ) -> None:
-        for attr_name, attr in namespace.items():
-            if not isinstance(attr, DbusMember):
-                continue
-
-            # TODO: Fix async metaclass copying all methods
-            if hasattr(attr, "interface_name"):
-                continue
-
-            if interface_name is None:
-                raise TypeError(
-                    f"Defined D-Bus element {attr_name!r} without "
-                    f"interface name in the class {name!r}."
-                )
-
-            attr.interface_name = interface_name
-            attr.serving_enabled = serving_enabled
-
     def __new__(
         cls,
         name: str,
@@ -175,37 +69,56 @@ class DbusInterfaceMeta(type):
         interface_name: Optional[str] = None,
         serving_enabled: bool = True,
     ) -> DbusInterfaceMeta:
-
-        if interface_name in DBUS_INTERFACE_NAME_TO_CLASS:
-            raise ValueError(
-                f"D-Bus interface of the name {interface_name!r} was " "already created."
-            )
-
-        all_mro_bases: Set[Type[Any]] = set(chain.from_iterable((c.__mro__ for c in bases)))
-        reserved_dbus_map = cls._map_mro_dbus_members(
-            name,
-            all_mro_bases,
+        # get parent interfaces
+        parent_interfaces: OrderedDict[str, DbusInterfaceMeta] = OrderedDict(
+            {
+                c.dbus_meta.interface_name: c
+                for c in chain.from_iterable((c.__mro__ for c in bases))
+                if (type(c) is DbusInterfaceMeta) and c.dbus_meta
+            }
         )
-        cls._check_collisions(name, namespace, reserved_dbus_map)
+
+        # get members of this new interface
+        new_members = {
+            attr: member for attr, member in namespace.items() if isinstance(member, DbusMember)
+        }
+
+        # check for collisions
+        used_attrs = set(new_members.keys())
+
+        for parent_interface in parent_interfaces.values():
+            assert parent_interface.dbus_meta is not None
+            other_members = parent_interface.dbus_meta.members
+            if not used_attrs.isdisjoint(other_members.keys()):
+                raise AssertionError(
+                    f"Attribute collision {used_attrs & other_members.keys()!r} "
+                    f"in interface {parent_interface.dbus_meta.interface_name!r}"
+                )
+            used_attrs |= set(other_members.keys())
+
+        # create new class
+        new_cls = super().__new__(cls, name, bases, namespace)
 
         if interface_name is not None:
             cls._check_interface_name(interface_name)
 
-        cls._init_members(name, namespace, interface_name, serving_enabled)
+            # init members
+            for member in new_members.values():
+                member.interface_name = interface_name
+                member.serving_enabled = serving_enabled
 
-        new_cls = super().__new__(cls, name, bases, namespace)
-
-        if interface_name is not None:
-            dbus_class_meta = DbusClassMeta(interface_name, serving_enabled)
-            DBUS_CLASS_TO_META[new_cls] = dbus_class_meta
-            DBUS_INTERFACE_NAME_TO_CLASS[interface_name] = new_cls
-
-            for attr_name, attr in namespace.items():
-                cls._map_dbus_members(
-                    attr_name,
-                    attr,
-                    dbus_class_meta,
-                    interface_name,
+            meta = DbusClassMeta(interface_name, serving_enabled, new_members)
+            meta.attr_to_member = {attr: member.name for attr, member in new_members.items()}
+            meta.member_to_attr = {member.name: attr for attr, member in new_members.items()}
+            new_cls.dbus_meta = meta
+            dbus_interfaces = parent_interfaces.copy()
+            dbus_interfaces[interface_name] = new_cls
+            new_cls.dbus_interfaces = dbus_interfaces
+        else:
+            if len(new_members) > 0:
+                raise TypeError(
+                    f"Defined D-Bus element {new_members.keys()!r} without "
+                    f"interface_name= in the class {name!r}."
                 )
 
         return new_cls
@@ -214,15 +127,6 @@ class DbusInterfaceMeta(type):
 class DbusInterface(metaclass=DbusInterfaceMeta):
     def __init__(self) -> None:
         self._dbus: Union[DbusRemoteObjectMeta, DbusLocalObjectMeta] = DbusLocalObjectMeta()
-
-    @classmethod
-    def _dbus_iter_interfaces_meta(cls) -> Iterator[Tuple[str, DbusClassMeta]]:
-        for base in cls.__mro__:
-            meta = DBUS_CLASS_TO_META.get(base)
-            if meta is None:
-                continue
-
-            yield meta.interface_name, meta
 
     def export_to_dbus(self, object_path: str, bus: Optional[Dbus] = None) -> DbusExportHandle:
         local_object_meta = self._dbus

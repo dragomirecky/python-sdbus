@@ -32,11 +32,7 @@ from typing import (
     Union,
 )
 
-from aiodbus.interface.base import (
-    DBUS_CLASS_TO_META,
-    DBUS_INTERFACE_NAME_TO_CLASS,
-    DbusInterface,
-)
+from aiodbus.interface.base import DbusInterface
 from aiodbus.interface.properties import (
     DBUS_PROPERTIES_CHANGED_TYPING,
     _parse_properties_vardict,
@@ -66,13 +62,15 @@ def parse_properties_changed(
 ) -> Dict[str, Any]:
     interface_name, changed_properties, invalidated_properties = properties_changed_data
 
-    meta = DBUS_CLASS_TO_META[DBUS_INTERFACE_NAME_TO_CLASS[interface_name]]
+    interface_cls = interface.dbus_interfaces[interface_name]
+    meta = interface_cls.dbus_meta
+    assert meta is not None
 
     for invalidated_property in invalidated_properties:
         changed_properties[invalidated_property] = ("0", None)
 
     return _parse_properties_vardict(
-        meta.dbus_member_to_python_attr,
+        meta.member_to_attr,
         properties_changed_data[1],
         on_unknown_member,
     )
@@ -102,7 +100,7 @@ def _create_interfaces_map(
     for interface in interfaces_iter:
         interface_names_set = frozenset(
             interface_name
-            for interface_name, _ in interface._dbus_iter_interfaces_meta()
+            for interface_name in interface.dbus_interfaces.keys()
             if interface_name not in SKIP_INTERFACES
         )
         interfaces_to_class_map[interface_names_set] = (
@@ -134,8 +132,9 @@ def _get_member_map_from_class(
         return {}
     else:
         return {
-            interface_name: meta.dbus_member_to_python_attr
-            for interface_name, meta in python_class._dbus_iter_interfaces_meta()
+            interface_cls.dbus_meta.interface_name: interface_cls.dbus_meta.member_to_attr
+            for interface_cls in python_class.dbus_interfaces.values()
+            if interface_cls.dbus_meta is not None
         }
 
 

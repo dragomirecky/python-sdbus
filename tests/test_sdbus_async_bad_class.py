@@ -165,14 +165,14 @@ class TestBadAsyncDbusClass(TestCase):
                     return "a"
 
     def test_dbus_elements_without_interface_name(self) -> None:
-        with self.assertRaisesRegex(TypeError, "without interface name"):
+        with self.assertRaisesRegex(TypeError, "without interface_name"):
 
             class NoInterfaceName(DbusInterfaceCommon):
                 @dbus_method()
                 async def example(self) -> None: ...
 
     def test_dbus_elements_without_interface_name_subclass(self) -> None:
-        with self.assertRaisesRegex(TypeError, "without interface name"):
+        with self.assertRaisesRegex(TypeError, "without interface_name"):
 
             class NoInterfaceName(SomeTestInterface):
                 @dbus_method()
@@ -201,30 +201,9 @@ class TestBadAsyncDbusClass(TestCase):
             @dbus_method()
             async def example(self) -> None: ...
 
-        with self.assertRaisesRegex(ValueError, "collision"):
+        with self.assertRaisesRegex(AssertionError, "collision"):
 
             class Combined(One, Two): ...
-
-    def test_class_cleanup(self) -> None:
-        class One(
-            DbusInterfaceCommon,
-            interface_name="org.example.foo1",
-        ): ...
-
-        with self.assertRaises(ValueError):
-
-            class Two(
-                DbusInterfaceCommon,
-                interface_name="org.example.foo1",
-            ): ...
-
-        del One
-        collect()  # Let weak refs be processed
-
-        class After(
-            DbusInterfaceCommon,
-            interface_name="org.example.foo1",
-        ): ...
 
 
 if __name__ == "__main__":

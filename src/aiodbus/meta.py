@@ -20,9 +20,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from aiodbus.bus import Dbus, DbusInterfaceBuilder, get_default_bus
+
+if TYPE_CHECKING:
+    from aiodbus.interface.base import DbusMember
 
 
 class DbusRemoteObjectMeta:
@@ -49,8 +52,10 @@ class DbusClassMeta:
         self,
         interface_name: str,
         serving_enabled: bool,
+        members: Dict[str, DbusMember],
     ) -> None:
         self.interface_name = interface_name
         self.serving_enabled = serving_enabled
-        self.dbus_member_to_python_attr: Dict[str, str] = {}
-        self.python_attr_to_dbus_member: Dict[str, str] = {}
+        self.members = members
+        self.member_to_attr: Dict[str, str] = {}
+        self.attr_to_member: Dict[str, str] = {}
