@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+import errno
 import logging
-from functools import partial
+from collections import defaultdict
+from functools import partial, wraps
 from typing import (
     TYPE_CHECKING,
     Callable,
     Dict,
     Iterable,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Unpack,
-    assert_never,
 )
 
 from _sdbus import (
@@ -29,6 +31,7 @@ from _sdbus import (
     SdBusError,
     SdBusInterface,
     SdBusMessage,
+    SdBusSlot,
     _SdBus,
     sd_bus_open_system,
     sd_bus_open_system_remote,
@@ -52,7 +55,7 @@ from aiodbus.exceptions import (
     NameExistsError,
     NameInQueueError,
 )
-from aiodbus.handle import Closeable
+from aiodbus.handle import Closeable, CloseableFromCallback
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +63,34 @@ if TYPE_CHECKING:
     from _sdbus import DbusCompleteType, DbusCompleteTypes
 
 
-class SdBusInterfaceBuilder(DbusInterfaceBuilder):
-    def __init__(self, interface: SdBusInterface) -> None:
+class SdBusAnyServingInterface(Protocol):
+    name: str
+    path: str
+    object_manager_advertised: bool
+
+    def close(self): ...
+
+
+def translate_sdbus_error[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return func(*args, **kwargs)
+        except SdBusError as e:
+            if len(e.args) > 1 and e.args[1] == errno.ESRCH:
+                raise RuntimeError("No object manager found for this path.") from e
+            else:
+                raise DbusError(e) from e
+
+    return wrapper
+
+
+class SdBusServingInterface(DbusInterfaceBuilder):
+    def __init__(self, interface: SdBusInterface, name: str, path: str) -> None:
         self._interface = interface
+        self.name = name
+        self.path = path
+        self.object_manager_advertised = False
 
     @staticmethod
     async def _method_handler(
@@ -90,6 +118,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
             if isinstance(exc, MethodCallError):
                 error = exc
             else:
+
                 logger.exception("Unhandled exception when handling a method call")
                 error = CallFailedError()
 
@@ -112,7 +141,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
 
     @staticmethod
     def _isolate_property_flags(flags: int) -> int:
-        return flags & SdBusInterfaceBuilder._property_flags_mask
+        return flags & SdBusServingInterface._property_flags_mask
 
     _flag_to_sdbus: Dict[str, int] = {
         "deprecated": DbusDeprecatedFlag,
@@ -130,7 +159,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
         result = 0
         for flag_name, flag_value in flags.items():
             if flag_value:
-                result |= SdBusInterfaceBuilder._flag_to_sdbus[flag_name]
+                result |= SdBusServingInterface._flag_to_sdbus[flag_name]
         return result
 
     def add_method(
@@ -156,7 +185,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
 
     @staticmethod
     def _is_property_flags_correct(flags: int) -> bool:
-        num_of_flag_bits = SdBusInterfaceBuilder._isolate_property_flags(flags).bit_count()
+        num_of_flag_bits = SdBusServingInterface._isolate_property_flags(flags).bit_count()
         return 0 <= num_of_flag_bits <= 1
 
     def add_property(
@@ -181,6 +210,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
                     message.append_data(signature, data)
             except Exception as exc:
                 if not isinstance(exc, MethodCallError):
+                    pass
                     logger.exception("Unhandled exception when handling a property get")
                 raise
 
@@ -191,6 +221,7 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
                     set_function(message.get_contents())
             except Exception as exc:
                 if not isinstance(exc, MethodCallError):
+                    pass
                     logger.exception("Unhandled exception when handling a property set")
                 raise
 
@@ -208,23 +239,32 @@ class SdBusInterfaceBuilder(DbusInterfaceBuilder):
         flags_int = self._member_flags_to_int(flags)
         self._interface.add_signal(name, signature, args_names, flags_int)
 
+    def close(self):
+        if slot := self._interface.slot:
+            slot.close()
 
-class SdBus(Dbus):
+
+class SdBusServiceObjectManagerInterface:
+    def __init__(self, bus: _SdBus, path: str, slot: SdBusSlot) -> None:
+        self.name = "org.freedesktop.DBus.ObjectManager"
+        self.path = path
+        self.object_manager_advertised = False
+        self._bus = bus
+        self._slot = slot
+
+    def close(self) -> None:
+        self._slot.close()
+
+
+class SdBus(Dbus[SdBusServingInterface]):
     def __init__(self, bus: _SdBus) -> None:
         self._sdbus = bus
+        self._exported: dict[str, dict[str, SdBusAnyServingInterface]] = defaultdict(dict)
+        self._closed = False
 
     @property
     def address(self) -> Optional[str]:
         return self._sdbus.address
-
-    def create_interface(self) -> DbusInterfaceBuilder:
-        return SdBusInterfaceBuilder(SdBusInterface())
-
-    def export(self, path: str, name: str, interface: DbusInterfaceBuilder) -> Closeable:
-        assert isinstance(interface, SdBusInterfaceBuilder)
-        self._sdbus.add_interface(interface._interface, path, name)
-        assert interface._interface.slot is not None
-        return interface._interface.slot
 
     def _raise_on_error(self, reply: SdBusMessage) -> None:
         if error := reply.get_error():
@@ -289,7 +329,7 @@ class SdBus(Dbus):
         member: str,
         signature: str,
         args: Iterable[DbusCompleteType],
-    ):
+    ) -> None:
         message = self._sdbus.new_signal_message(path, interface, member)
         if not signature.startswith("(") and isinstance(args, tuple):
             message.append_data(signature, *args)
@@ -324,9 +364,9 @@ class SdBus(Dbus):
             return
         elif result == 2:  # Reply In Queue
             raise NameInQueueError()
-        elif result == 3:
+        elif result == 3:  # Name exists
             raise NameExistsError()
-        elif result == 4:
+        elif result == 4:  # Already an owner
             raise AlreadyOwner()
         else:
             raise DbusError(f"Unknown result code: {result}")
@@ -348,7 +388,6 @@ class SdBus(Dbus):
         member_filter: Optional[str] = None,
         callback: Callable[[DbusMessage], None],
     ) -> Closeable:
-
         return await self._sdbus.match_signal_async(
             sender_filter,
             path_filter,
@@ -357,10 +396,73 @@ class SdBus(Dbus):
             partial(self._signal_handler, callback),
         )
 
-    def close(self) -> None:
-        self._sdbus.close()
+    def create_interface(self, name: str, path: str) -> SdBusServingInterface:
+        return SdBusServingInterface(SdBusInterface(), name, path)
 
-    def __enter__(self) -> "Dbus":
+    def export_interface(self, interface: SdBusServingInterface) -> Closeable:
+        assert interface.name not in self._exported[interface.path], "interface already exported"
+        self._sdbus.add_interface(interface._interface, interface.path, interface.name)
+        closeable = CloseableFromCallback(partial(self._unexport_interface, interface))
+        self._exported[interface.path][interface.name] = interface
+        return closeable
+
+    def _unexport_interface(self, interface: SdBusAnyServingInterface) -> None:
+        interface.close()
+        self._exported[interface.path].pop(interface.name)
+        if not self._exported[interface.path]:
+            self._exported.pop(interface.path)
+
+    def export_object_manager(self, path: str) -> Closeable:
+        slot = self._sdbus.add_object_manager(path)
+        interface = SdBusServiceObjectManagerInterface(bus=self._sdbus, path=path, slot=slot)
+        closeable = CloseableFromCallback(partial(self._unexport_interface, interface))
+        self._exported[interface.path][interface.name] = interface
+        return closeable
+
+    @translate_sdbus_error
+    def emit_interfaces_added(self, path: str, interfaces: list[str]) -> None:
+        exported_interfaces = self._exported[path]
+        any_interface_advertised = any(
+            i.object_manager_advertised for i in exported_interfaces.values()
+        )
+
+        if not any_interface_advertised:
+            self._sdbus.emit_object_added(path)
+        else:
+            self._sdbus.emit_interfaces_added(path, *interfaces)
+
+        for interface in exported_interfaces.values():
+            interface.object_manager_advertised = True
+
+    @translate_sdbus_error
+    def emit_interfaces_removed(self, path: str, interfaces: list[str]) -> None:
+        exported_interfaces = self._exported[path]
+        advertised_interfaces = set(i.name for i in exported_interfaces.values())
+        to_be_removed_interfaces = set(interfaces)
+        interfaces_that_will_remain = advertised_interfaces - to_be_removed_interfaces
+
+        if interfaces_that_will_remain:
+            self._sdbus.emit_interfaces_removed(path, *interfaces)
+        else:
+            self._sdbus.emit_object_removed(path)
+
+        for interface in exported_interfaces.values():
+            interface.object_manager_advertised = False
+
+    def _unexport_all_interfaces(self) -> None:
+        while len(self._exported):
+            path = next(iter(self._exported))
+            interfaces = self._exported[path]
+            name = next(iter(interfaces))
+            interface = interfaces[name]
+            self._unexport_interface(interface)
+
+    def close(self) -> None:
+        self._unexport_all_interfaces()
+        self._sdbus.close()
+        self._closed = True
+
+    def __enter__(self) -> Dbus:
         return self
 
     def __exit__(self, *_) -> None:
@@ -373,8 +475,6 @@ def sdbus_connect_local(address: DbusType):
             return SdBus(sd_bus_open_user())
         case "system":
             return SdBus(sd_bus_open_system())
-        case _:
-            assert_never(address)
 
 
 def sdbus_connect_remote(address: str):

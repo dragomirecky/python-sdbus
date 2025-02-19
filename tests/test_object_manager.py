@@ -86,7 +86,9 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with self.assertDbusSignalEmits(
             object_manager_connection.interfaces_added
         ) as added_interfaces_catch:
-            object_manager.export_with_manager(MANAGED_PATH, managed_object)
+            managed_object_export_handle = managed_object.export_to_dbus(
+                MANAGED_PATH, manager=object_manager
+            )
 
         caught_added = added_interfaces_catch.output[0]
 
@@ -105,7 +107,7 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with self.assertDbusSignalEmits(
             object_manager_connection.interfaces_removed
         ) as removed_interfaces_catch:
-            object_manager.remove_managed_object(managed_object)
+            managed_object_export_handle.close()
 
         path_removed, interfaces_removed = removed_interfaces_catch.output[0]
 
@@ -113,17 +115,24 @@ class TestObjectManager(IsolatedDbusTestCase):
 
         self.assertIn(MANAGED_INTERFACE_NAME, interfaces_removed)
 
-    def test_expot_with_no_manager(self) -> None:
+    def test_export_with_no_manager(self) -> None:
         object_manager = ObjectManagerTestInterface()
 
         managed_object = ManagedInterface()
 
         self.assertRaises(
             RuntimeError,
-            object_manager.export_with_manager,
+            managed_object.export_to_dbus,
             MANAGED_PATH,
-            managed_object,
+            manager=object_manager,
         )
+
+    async def test_closing_handle_of_object_manager(self) -> None:
+        await self.bus.request_name(CONNECTION_NAME)
+
+        object_manager = ObjectManagerTestInterface()
+        handle = object_manager.export_to_dbus(OBJECT_MANAGER_PATH)
+        handle.close()
 
     async def test_parse_interfaces_added_removed(self) -> None:
         MANAGED_TWO_INTERFACE_NAME = MANAGED_INTERFACE_NAME + "Two"
@@ -151,7 +160,9 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with self.assertDbusSignalEmits(
             object_manager_connection.interfaces_added
         ) as added_interfaces_catch:
-            object_manager.export_with_manager(MANAGED_PATH, managed_object)
+            managed_object_export_handle = managed_object.export_to_dbus(
+                MANAGED_PATH, manager=object_manager
+            )
 
         caught_added = added_interfaces_catch.output[0]
 
@@ -283,7 +294,7 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with self.assertDbusSignalEmits(
             object_manager_connection.interfaces_removed
         ) as removed_interfaces_catch:
-            object_manager.remove_managed_object(managed_object)
+            managed_object_export_handle.close()
 
         interfaces_removed_data = removed_interfaces_catch.output[0]
 
@@ -311,6 +322,62 @@ class TestObjectManager(IsolatedDbusTestCase):
 
             self.assertEqual(path, MANAGED_PATH)
             self.assertIsNone(python_class)
+
+    async def test_adding_additional_interfaces(self) -> None:
+        await self.bus.request_name(CONNECTION_NAME)
+
+        object_manager = ObjectManagerTestInterface()
+        object_manager.export_to_dbus(OBJECT_MANAGER_PATH)
+
+        object_manager_connection = ObjectManagerTestInterface.new_proxy(
+            CONNECTION_NAME, OBJECT_MANAGER_PATH
+        )
+
+        managed_object = ManagedInterface()
+        handle_first = managed_object.export_to_dbus(MANAGED_PATH, manager=object_manager)
+
+        class SecondaryManagedInterface(
+            DbusInterfaceCommon, interface_name="org.example.secondary"
+        ):
+            @dbus_property("x")
+            def some_int(self) -> int:
+                return TEST_NUMBER
+
+        second_managed_object = SecondaryManagedInterface()
+
+        with self.subTest("Emits notification on second interface added to the path"):
+            async with self.assertDbusSignalEmits(
+                object_manager_connection.interfaces_added
+            ) as added_interfaces_catch:
+                handle_second = second_managed_object.export_to_dbus(
+                    MANAGED_PATH, manager=object_manager
+                )
+
+            self.assertEqual(added_interfaces_catch.output[0][0], MANAGED_PATH)
+            self.assertIn("org.example.secondary", added_interfaces_catch.output[0][1])
+
+        with self.subTest("Emits notification on second interface removed from the path"):
+            async with self.assertDbusSignalEmits(
+                object_manager_connection.interfaces_removed
+            ) as removed_interfaces_catch:
+                handle_second.close()
+
+            self.assertEqual(removed_interfaces_catch.output[0][0], MANAGED_PATH)
+            self.assertIn("org.example.secondary", removed_interfaces_catch.output[0][1])
+
+        with self.subTest("Emits notification on builtin interfaces when removing last interface"):
+            async with self.assertDbusSignalEmits(
+                object_manager_connection.interfaces_removed
+            ) as removed_interfaces_catch:
+                handle_first.close()
+
+            self.assertEqual(removed_interfaces_catch.output[0][0], MANAGED_PATH)
+            self.assertIn("org.freedesktop.DBus.Peer", removed_interfaces_catch.output[0][1])
+            self.assertIn(
+                "org.freedesktop.DBus.Introspectable", removed_interfaces_catch.output[0][1]
+            )
+            self.assertIn("org.freedesktop.DBus.Properties", removed_interfaces_catch.output[0][1])
+            self.assertIn("org.test.testing", removed_interfaces_catch.output[0][1])
 
     async def test_main_export_handle(self) -> None:
         await self.bus.request_name(CONNECTION_NAME)
@@ -352,10 +419,7 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with (
             self.assertDbusSignalEmits(object_manager_connection.interfaces_added) as added,
             self.assertDbusSignalEmits(object_manager_connection.interfaces_removed) as removed,
-            object_manager.export_with_manager(
-                MANAGED_PATH,
-                managed_object,
-            ),
+            managed_object.export_to_dbus(MANAGED_PATH, manager=object_manager),
         ):
             self.assertEqual(
                 await managed_proxy.test_int,

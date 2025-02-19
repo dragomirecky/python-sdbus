@@ -27,6 +27,7 @@ from typing import Any, List, cast
 from unittest import SkipTest
 
 from aiodbus import get_default_bus
+from aiodbus.bus.sdbus import SdBus
 from aiodbus.exceptions import CallFailedError
 from aiodbus.unittest import IsolatedDbusTestCase
 
@@ -100,15 +101,26 @@ class LeakTests(IsolatedDbusTestCase):
 
         pseudo_test = cast(TestProxy, self)
 
+        def cleanup_bus():
+            cast(SdBus, self.bus)._unexport_all_interfaces()
+
         for _ in range(20_000):
             await TestProxy.test_method_kwargs(pseudo_test)
+            cleanup_bus()
             await TestProxy.test_method(pseudo_test)
+            cleanup_bus()
             await TestProxy.test_properties(pseudo_test)
+            cleanup_bus()
             await TestProxy.test_signal(pseudo_test)
+            cleanup_bus()
             await TestProxy.test_exceptions(pseudo_test)
+            cleanup_bus()
             await TestProxy.test_no_reply_method(pseudo_test)
-            await TestProxy.test_interface_remove(pseudo_test)
+            cleanup_bus()
+            await TestProxy.test_interface_stays_on_object_removal(pseudo_test)
+            cleanup_bus()
             TestProxy.test_docstring(pseudo_test)
+            cleanup_bus()
 
             self.check_memory()
 

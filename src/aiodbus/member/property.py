@@ -168,7 +168,7 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         super().__init__(dbus_property=dbus_property, local_object=local_object)
         self.__doc__ = dbus_property.__doc__
 
-    def export(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
         getter = self._dbus_reply_get
         dbus_property = self.dbus_property
 

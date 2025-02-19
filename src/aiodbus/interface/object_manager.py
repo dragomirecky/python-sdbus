@@ -20,27 +20,17 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from functools import partial
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, override
 
-from _sdbus import _SdBus
 from aiodbus import get_default_bus
 from aiodbus.bus import Dbus
-from aiodbus.bus.sdbus import SdBus, _SdBus
-from aiodbus.interface.base import DbusExportHandle, DbusInterface
+from aiodbus.handle import DbusExportHandle
 from aiodbus.interface.common import DbusInterfaceCommon
 from aiodbus.member.method import dbus_method
-from aiodbus.member.signal import dbus_signal
+from aiodbus.member.signal import DbusSignal, dbus_signal
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple
-
-    from _sdbus import SdBusSlot
-
-
-class CloseableFromCallback:
-    def __init__(self, callback: Callable[[], None]) -> None:
-        self.close = callback
+    from aiodbus.interface.base import DbusInterface
 
 
 class DbusObjectManagerInterface(
@@ -50,8 +40,9 @@ class DbusObjectManagerInterface(
 ):
     def __init__(self) -> None:
         super().__init__()
-        self._object_manager_slot: Optional[SdBusSlot] = None
-        self._managed_object_to_path: Dict[DbusInterface, str] = {}
+        self._managed_objects: Dict[str, DbusInterface] = {}
+
+    interfaces_removed = DbusSignal[Tuple[str, List[str]]]("oao")
 
     @dbus_method(result_signature="a{oa{sa{sv}}}")
     async def get_managed_objects(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
@@ -61,61 +52,20 @@ class DbusObjectManagerInterface(
     def interfaces_added(self) -> Tuple[str, Dict[str, Dict[str, Any]]]:
         raise NotImplementedError
 
-    @dbus_signal("oao")
-    def interfaces_removed(self) -> Tuple[str, List[str]]:
-        raise NotImplementedError
-
-    def _get_sdbus(self, bus: Optional[Dbus] = None) -> _SdBus:
-        # TODO: remove direct access to sdbus
-        if bus is None:
-            bus = get_default_bus()
-        return cast(SdBus, bus)._sdbus
-
+    @override
     def export_to_dbus(
         self,
         object_path: str,
         bus: Optional[Dbus] = None,
+        manager: Optional[DbusObjectManagerInterface] = None,
     ) -> DbusExportHandle:
         if bus is None:
             bus = get_default_bus()
-
         export_handle = super().export_to_dbus(
             object_path,
             bus,
         )
-        slot = self._get_sdbus(bus).add_object_manager(object_path)
-        self._object_manager_slot = slot
-        export_handle.append(slot)
-        return export_handle
-
-    def export_with_manager(
-        self,
-        object_path: str,
-        object_to_export: DbusInterface,
-        bus: Optional[Dbus] = None,
-    ) -> DbusExportHandle:
-        if self._object_manager_slot is None:
-            raise RuntimeError("ObjectManager not intitialized")
-
-        if bus is None:
-            bus = get_default_bus()
-
-        export_handle = object_to_export.export_to_dbus(
-            object_path,
-            bus,
+        export_handle.prepend(
+            bus.export_object_manager(path=object_path),
         )
-        export_handle.append(
-            CloseableFromCallback(
-                partial(self.remove_managed_object, object_to_export),
-            )
-        )
-        self._get_sdbus(bus).emit_object_added(object_path)
-        self._managed_object_to_path[object_to_export] = object_path
         return export_handle
-
-    def remove_managed_object(self, managed_object: DbusInterface) -> None:
-        if self._dbus.attached_bus is None:
-            raise RuntimeError("Object manager not exported")
-
-        removed_path = self._managed_object_to_path.pop(managed_object)
-        self._get_sdbus(self._dbus.attached_bus).emit_object_removed(removed_path)

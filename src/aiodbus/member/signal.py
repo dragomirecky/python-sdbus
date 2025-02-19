@@ -232,7 +232,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
         self.local_meta = local_meta
         self.__doc__ = dbus_signal.__doc__
 
-    def export(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
         interface.add_signal(
             self.dbus_signal.name,
             self.dbus_signal.signature,

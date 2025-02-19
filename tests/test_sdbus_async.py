@@ -481,18 +481,18 @@ class TestProxy(IsolatedDbusTestCase):
 
         await wait_for(test_object.no_reply_sync.wait(), timeout=1)
 
-    async def test_interface_remove(self) -> None:
+    async def test_interface_stays_on_object_removal(self) -> None:
         test_object, test_object_connection = initialize_object()
         test_object_ref = weakref.ref(test_object)
 
-        from gc import collect, get_referents, get_referrers
+        from gc import collect
 
         del test_object
 
         collect()
 
-        with self.assertRaises(UnknownObjectError):
-            await wait_for(test_object_connection.dbus_introspect(), timeout=0.2)
+        self.assertIsNone(test_object_ref())
+        await wait_for(test_object_connection.dbus_introspect(), timeout=0.2)
 
     def test_docstring(self) -> None:
         test_object, test_object_connection = initialize_object()

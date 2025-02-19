@@ -89,7 +89,7 @@ class DbusLocalMember(DbusBoundMember):
         return local_object
 
     @abstractmethod
-    def export(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle) -> None: ...
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle) -> None: ...
 
 
 class DbusProxyMember(DbusBoundMember):

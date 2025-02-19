@@ -496,6 +496,36 @@ static PyObject * SdBus_emit_object_removed(SdBusObject * self, PyObject * args)
     Py_RETURN_NONE;
 }
 
+static PyObject * SdBus_emit_interfaces_added(SdBusObject * self, PyObject * args) {
+    // signature: path: str, *interfaces: str
+    Py_ssize_t len = PyTuple_Size(args);
+    char ** c_args CLEANUP_STR_MALLOC_PTR = malloc(len * sizeof(char *) + 1);
+
+    for (Py_ssize_t i = 0; i < len; i++) {
+        PyObject * item = PyTuple_GetItem(args, i);
+        c_args[i] = (char *)SD_BUS_PY_UNICODE_AS_CHAR_PTR(item);
+    }
+
+    c_args[len] = NULL;
+    CALL_SD_BUS_AND_CHECK(sd_bus_emit_interfaces_added_strv(self->sd_bus_ref, c_args[0], &c_args[1]));
+    return Py_None;
+}
+
+static PyObject * SdBus_emit_interfaces_removed(SdBusObject * self, PyObject * args) {
+    // signature: path: str, *interfaces: str
+    Py_ssize_t len = PyTuple_Size(args);
+    char ** c_args CLEANUP_STR_MALLOC_PTR = malloc(len * sizeof(char *) + 1);
+
+    for (Py_ssize_t i = 0; i < len; i++) {
+        PyObject * item = PyTuple_GetItem(args, i);
+        c_args[i] = (char *)SD_BUS_PY_UNICODE_AS_CHAR_PTR(item);
+    }
+
+    c_args[len] = NULL;
+    CALL_SD_BUS_AND_CHECK(sd_bus_emit_interfaces_removed_strv(self->sd_bus_ref, c_args[0], &c_args[1]));
+    return Py_None;
+}
+
 static PyObject * SdBus_close(SdBusObject * self, PyObject * Py_UNUSED(args)) {
     sd_bus_close(self->sd_bus_ref);
     if (NULL != self->loop && NULL != self->bus_fd) {
@@ -603,6 +633,8 @@ static PyMethodDef SdBus_methods[] = {
     { "add_object_manager", (SD_BUS_PY_FUNC_TYPE)SdBus_add_object_manager, SD_BUS_PY_METH, PyDoc_STR("Add object manager at the path.") },
     { "emit_object_added", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_object_added, SD_BUS_PY_METH, PyDoc_STR("Emit signal that object was added.") },
     { "emit_object_removed", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_object_removed, SD_BUS_PY_METH, PyDoc_STR("Emit signal that object was removed.") },
+    { "emit_interfaces_added", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_interfaces_added, METH_VARARGS, PyDoc_STR("Emit signal that interfaces were added.") },
+    { "emit_interfaces_removed", (SD_BUS_PY_FUNC_TYPE)SdBus_emit_interfaces_removed, METH_VARARGS, PyDoc_STR("Emit signal that interfaces were removed.") },
     { "close", (PyCFunction)SdBus_close, METH_NOARGS, PyDoc_STR("Close connection.") },
     { "start", (PyCFunction)SdBus_start, METH_NOARGS, PyDoc_STR("Start connection.") },
     { NULL, NULL, 0, NULL },

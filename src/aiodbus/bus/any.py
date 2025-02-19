@@ -77,7 +77,7 @@ class DbusInterfaceBuilder(Protocol):
         ...
 
 
-class Dbus(Protocol):
+class Dbus[T: DbusInterfaceBuilder](Protocol):
     @property
     def address(self) -> Optional[str]: ...
 
@@ -145,7 +145,7 @@ class Dbus(Protocol):
         callback: Callable[[DbusMessage], None],
     ) -> Closeable: ...
 
-    def create_interface(self) -> DbusInterfaceBuilder:
+    def create_interface(self, name: str, path: str) -> T:
         """
         Create a new interface for this bus.
 
@@ -154,9 +154,27 @@ class Dbus(Protocol):
         """
         ...
 
-    def export(self, path: str, name: str, interface: DbusInterfaceBuilder) -> Closeable:
+    def export_interface(self, interface: T) -> Closeable:
         """
         Publish an interface to the dbus.
+        """
+        ...
+
+    def export_object_manager(self, path: str) -> Closeable:
+        """
+        Publish ObjectManager interface to the given path.
+        """
+        ...
+
+    def emit_interfaces_added(self, path: str, interfaces: list[str]) -> None:
+        """
+        Emits the `InterfacesAdded` signal.
+        """
+        ...
+
+    def emit_interfaces_removed(self, path: str, interfaces: list[str]) -> None:
+        """
+        Emits the `InterfacesRemoved` signal.
         """
         ...
 

@@ -85,12 +85,43 @@
         return NULL;        \
     }
 
-#define SDBUS_LIBRARY_ERROR_FORMAT(func_call) \
-    PyErr_Format(sdbus_exception,             \
-        "File: %s Line: %d. " #func_call      \
-        " in function %s returned "           \
-        "error number: %i",                   \
-        __FILE__, __LINE__, __FUNCTION__, -return_int)
+#define SDBUS_LIBRARY_ERROR_FORMAT(func_call)                                      \
+    do {                                                                           \
+        /* Create the error message string */                                      \
+        PyObject * py_err_msg = PyUnicode_FromFormat(                              \
+            "File: %s Line: %d. " #func_call " in function %s returned "           \
+            "error number: %i (%s)",                                               \
+            __FILE__, __LINE__, __FUNCTION__, -return_int, strerror(-return_int)); \
+        if (!py_err_msg) {                                                         \
+            PyErr_NoMemory();                                                      \
+        } else {                                                                   \
+            /* Create the error code as an integer */                              \
+            PyObject * py_err_code = PyLong_FromLong(-return_int);                 \
+            if (!py_err_code) {                                                    \
+                Py_DECREF(py_err_msg);                                             \
+                PyErr_NoMemory();                                                  \
+            } else {                                                               \
+                /* Create an instance of the exception with two arguments */       \
+                PyObject * py_exc_instance = PyObject_CallFunctionObjArgs(         \
+                    sdbus_exception, py_err_msg, py_err_code, NULL);               \
+                /* Clean up our temporary objects */                               \
+                Py_DECREF(py_err_msg);                                             \
+                Py_DECREF(py_err_code);                                            \
+                if (py_exc_instance) {                                             \
+                    /* Set the exception (py_exc_instance is a new reference) */   \
+                    PyErr_SetObject(sdbus_exception, py_exc_instance);             \
+                    Py_DECREF(py_exc_instance);                                    \
+                } else {                                                           \
+                    /* Fall back if creating the instance failed */                \
+                    PyErr_Format(sdbus_exception,                                  \
+                        "File: %s Line: %d. " #func_call                           \
+                        " in function %s returned error number: %i (%s)",          \
+                        __FILE__, __LINE__, __FUNCTION__, -return_int,             \
+                        strerror(-return_int));                                    \
+                }                                                                  \
+            }                                                                      \
+        }                                                                          \
+    } while (0)
 
 #define CALL_SD_BUS_AND_CHECK(sd_bus_function)           \
     ({                                                   \
@@ -266,6 +297,14 @@ __attribute__((used)) static inline void _cleanup_char_ptr(const char ** ptr) {
 }
 
 #define CLEANUP_STR_MALLOC __attribute__((cleanup(_cleanup_char_ptr)))
+
+__attribute__((used)) static inline void _cleanup_char_ptr_ptr(char *** ptr) {
+    if (*ptr != NULL) {
+        free((char *)*ptr);
+    }
+}
+
+#define CLEANUP_STR_MALLOC_PTR __attribute__((cleanup(_cleanup_char_ptr_ptr)))
 
 __attribute__((used)) static inline void PyObject_cleanup(PyObject ** object) {
     Py_XDECREF(*object);
