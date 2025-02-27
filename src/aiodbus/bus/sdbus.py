@@ -400,7 +400,12 @@ class SdBus(Dbus[SdBusServingInterface]):
         return SdBusServingInterface(SdBusInterface(), name, path)
 
     def export_interface(self, interface: SdBusServingInterface) -> Closeable:
-        assert interface.name not in self._exported[interface.path], "interface already exported"
+        assert (
+            interface.name not in self._exported[interface.path]
+        ), "interface %s at %s already exported" % (
+            interface.name,
+            interface.path,
+        )
         self._sdbus.add_interface(interface._interface, interface.path, interface.name)
         closeable = CloseableFromCallback(partial(self._unexport_interface, interface))
         self._exported[interface.path][interface.name] = interface
@@ -448,6 +453,10 @@ class SdBus(Dbus[SdBusServingInterface]):
 
         for interface in exported_interfaces.values():
             interface.object_manager_advertised = False
+
+    @translate_sdbus_error
+    def emit_properties_changed(self, path: str, interface: str, properties: list[str]) -> None:
+        return self._sdbus.emit_properties_changed(path, interface, *properties)
 
     def _unexport_all_interfaces(self) -> None:
         while len(self._exported):

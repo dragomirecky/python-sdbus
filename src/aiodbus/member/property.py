@@ -50,6 +50,7 @@ from aiodbus.meta import DbusRemoteObjectMeta
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
     from aiodbus.interface.base import DbusExportHandle, DbusInterface
+    from aiodbus.interface.properties import BoundPropertiesChangedSignal
 
 
 T = TypeVar("T")
@@ -71,6 +72,9 @@ class DbusProperty[T](DbusMember):
         self.property_getter = getter
         self.property_setter = setter
         self.flags = flags
+        self.emits_on_property_change = flags.get("emits_invalidation", False) or flags.get(
+            "emits_change", False
+        )
         self.__doc__ = getter.__doc__
 
     @overload
@@ -215,26 +219,17 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         self._emit_property_changed(local_object, new_value)
 
     def _emit_property_changed(self, local_object: Any, new_value: T) -> None:
+        if not self.dbus_property.emits_on_property_change:
+            return
         try:
-            properties_changed = getattr(
+            properties_changed: BoundPropertiesChangedSignal = getattr(
                 local_object,
                 "properties_changed",
             )
         except AttributeError:
             ...
         else:
-            properties_changed.emit(
-                (
-                    self.dbus_property.interface_name,
-                    {
-                        self.dbus_property.name: (
-                            self.dbus_property.signature,
-                            new_value,
-                        ),
-                    },
-                    [],
-                )
-            )
+            properties_changed.emit_property_changed(self)
 
 
 def dbus_property[T](

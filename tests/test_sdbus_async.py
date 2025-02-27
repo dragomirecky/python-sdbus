@@ -127,6 +127,10 @@ class SomeTestInterface(
         """Test property"""
         return self.test_string
 
+    @dbus_property("s", emits_invalidation=True)
+    def test_property_invalidation(self) -> str:
+        return self.test_string
+
     @test_property.setter
     def test_property_set(self, new_property: str) -> None:
         self.test_string = new_property
@@ -178,7 +182,7 @@ class SomeTestInterface(
     async def no_reply_method(self, new_value: str) -> None:
         self.no_reply_sync.set()
 
-    @dbus_property("s")
+    @dbus_property("s", const=True)
     def test_constant_property(self) -> str:
         return "a"
 
@@ -684,6 +688,44 @@ class TestProxy(IsolatedDbusTestCase):
             on_unknown_member="reuse",
         )
         self.assertIsNone(parsed_dict_with_invalidation["invalidated_property"])
+
+    async def test_properties_changed_with_explicit_api(self):
+        test_object, test_object_connection = initialize_object()
+
+        test_str = "should_be_emited"
+
+        async with self.assertDbusSignalEmits(test_object_connection.properties_changed) as emitted:
+            test_object.test_string = test_str
+            test_object.properties_changed.emit_property_changed(test_object.test_property)
+
+        self.assertEqual(len(emitted.output), 1)
+        self.assertEqual(
+            emitted.output[0], ("org.test.test", {"TestProperty": ("s", test_str)}, [])
+        )
+
+        with self.subTest("coalesce multiple emits"):
+            async with self.assertDbusSignalEmits(
+                test_object_connection.properties_changed
+            ) as emitted:
+                with test_object.properties_changed.grouped_changes():
+                    test_object.test_string = test_str
+                    test_object.properties_changed.emit_property_changed(test_object.test_property)
+                    test_object.properties_changed.emit_property_changed(test_object.test_property)
+            self.assertEqual(len(emitted.output), 1)
+
+    async def test_properties_changed_with_invalidation(self):
+        test_object, test_object_connection = initialize_object()
+
+        test_str = "should_be_emited"
+
+        async with self.assertDbusSignalEmits(test_object_connection.properties_changed) as emitted:
+            test_object.test_string = test_str
+            test_object.properties_changed.emit_property_changed(
+                test_object.test_property_invalidation
+            )
+
+        self.assertEqual(len(emitted.output), 1)
+        self.assertEqual(emitted.output[0], ("org.test.test", {}, ["TestPropertyInvalidation"]))
 
     async def test_interface_composition(self) -> None:
         class OneInterface(

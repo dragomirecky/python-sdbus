@@ -178,6 +178,12 @@ class Dbus[T: DbusInterfaceBuilder](Protocol):
         """
         ...
 
+    def emit_properties_changed(self, path: str, interface: str, properties: list[str]) -> None:
+        """
+        Emits the `PropertiesChanged` signal.
+        """
+        ...
+
     def close(self) -> None:
         """
         Close connection to the dbus.
