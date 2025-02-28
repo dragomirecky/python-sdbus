@@ -1,0 +1,23 @@
+Service {
+    padding-left: 2;
+    height: 1;
+}
+
+Service #service_name.disabled {
+    color: $text-disabled;
+}
+
+TabbedContent {
+    height: 100%;
+}
+
+TabbedContent > ContentSwitcher {
+    height: 100%;
+}
+
+TabbedContent > ContentSwitcher > TabPane {
+    height: 100%;
+}
+
+Services {
+}

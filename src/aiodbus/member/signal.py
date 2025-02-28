@@ -143,11 +143,11 @@ class DbusBoundSignal[T](DbusBoundMember, ABC):
 
     @abstractmethod
     @asynccontextmanager
-    async def catch(self) -> AsyncGenerator[Signals[T], None]: ...
+    def catch(self) -> AsyncGenerator[Signals[T], None]: ...
 
     @abstractmethod
     @asynccontextmanager
-    async def catch_anywhere(
+    def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
