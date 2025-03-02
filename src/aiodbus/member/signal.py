@@ -19,19 +19,19 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from asyncio import Queue
-from contextlib import asynccontextmanager, closing
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, closing
 from types import FunctionType
 from typing import (
-    TYPE_CHECKING,
     Any,
+    AsyncContextManager,
     AsyncGenerator,
     AsyncIterator,
     Callable,
     Optional,
     Sequence,
+    TYPE_CHECKING,
     Type,
     Union,
     Unpack,
@@ -142,16 +142,14 @@ class DbusBoundSignal[T](DbusBoundMember, ABC):
         return self.dbus_signal
 
     @abstractmethod
-    @asynccontextmanager
-    async def catch(self) -> AsyncGenerator[Signals[T], None]: ...
+    def catch(self) -> AbstractAsyncContextManager[Signals[T]]: ...
 
     @abstractmethod
-    @asynccontextmanager
-    async def catch_anywhere(
+    def catch_anywhere(
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]: ...
+    ) -> AbstractAsyncContextManager[Signals[DbusMessage[T]]]: ...
 
     @abstractmethod
     def emit(self, args: T) -> None: ...
