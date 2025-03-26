@@ -79,7 +79,7 @@ class DbusLocalMember(DbusBoundMember):
 
     def __init__(self, local_object: DbusInterface, **kwargs):
         super().__init__(**kwargs)
-        self.local_object_ref = weakref.ref(local_object)
+        self.local_object_ref = lambda: local_object
 
     @property
     def local_object(self) -> DbusInterface:
