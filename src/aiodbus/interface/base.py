@@ -169,7 +169,7 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
             interface_member_list.append(value)
 
         export_handle = DbusExportHandle()
-        export_handle.append(self) # add exported interface to avoid garbage collection while it is exported
+        export_handle.append(CloseableFromCallback(lambda: self)) # just store reference to exported interface, to avoid garbage collection
         exported_interfaces = list[str]()
 
         for interface_name, member_list in interface_map.items():
@@ -207,7 +207,3 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
         new_object = cls.__new__(cls)
         new_object._proxify(service_name, object_path, bus)
         return new_object
-
-    def close(self):
-        # Called when interface export ends
-        pass
