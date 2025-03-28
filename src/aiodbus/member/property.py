@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import ExitStack
 from inspect import iscoroutinefunction
 from types import FunctionType
 from typing import (
@@ -36,6 +37,7 @@ from typing import (
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from aiodbus.bus import DbusInterfaceBuilder, PropertyFlags
@@ -49,7 +51,7 @@ from aiodbus.meta import DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
-    from aiodbus.interface.base import DbusExportHandle, DbusInterface
+    from aiodbus.interface.base import DbusInterface
     from aiodbus.interface.properties import BoundPropertiesChangedSignal
 
 
@@ -172,7 +174,8 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         super().__init__(dbus_property=dbus_property, local_object=local_object)
         self.__doc__ = dbus_property.__doc__
 
-    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    @override
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         getter = self._dbus_reply_get
         dbus_property = self.dbus_property
 

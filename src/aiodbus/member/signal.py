@@ -19,19 +19,24 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from asyncio import Queue
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, closing
+from contextlib import (
+    AbstractAsyncContextManager,
+    ExitStack,
+    asynccontextmanager,
+    closing,
+)
 from types import FunctionType
 from typing import (
+    TYPE_CHECKING,
     Any,
-    AsyncContextManager,
     AsyncGenerator,
     AsyncIterator,
     Callable,
     Optional,
     Sequence,
-    TYPE_CHECKING,
     Type,
     Union,
     Unpack,
@@ -43,7 +48,7 @@ from weakref import WeakSet
 from aiodbus import Dbus, get_default_bus
 from aiodbus.bus import DbusInterfaceBuilder, MemberFlags
 from aiodbus.bus.message import DbusMessage
-from aiodbus.handle import Closeable
+from aiodbus.closeable import Closeable
 from aiodbus.member.base import (
     DbusBoundMember,
     DbusLocalMember,
@@ -53,7 +58,7 @@ from aiodbus.member.base import (
 from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
-    from aiodbus.interface.base import DbusExportHandle, DbusInterface
+    from aiodbus.interface.base import DbusInterface
 
 
 class DbusSignal[T](DbusMember):
@@ -230,7 +235,7 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
         self.local_meta = local_meta
         self.__doc__ = dbus_signal.__doc__
 
-    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         interface.add_signal(
             self.dbus_signal.name,
             self.dbus_signal.signature,

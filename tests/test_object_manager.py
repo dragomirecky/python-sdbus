@@ -419,12 +419,12 @@ class TestObjectManager(IsolatedDbusTestCase):
         async with (
             self.assertDbusSignalEmits(object_manager_connection.interfaces_added) as added,
             self.assertDbusSignalEmits(object_manager_connection.interfaces_removed) as removed,
-            managed_object.export_to_dbus(MANAGED_PATH, manager=object_manager),
         ):
-            self.assertEqual(
-                await managed_proxy.test_int,
-                TEST_NUMBER,
-            )
+            with managed_object.export_to_dbus(MANAGED_PATH, manager=object_manager):
+                self.assertEqual(
+                    await managed_proxy.test_int,
+                    TEST_NUMBER,
+                )
 
         self.assertEqual(added.output[0][0], MANAGED_PATH)
         self.assertEqual(removed.output[0][0], MANAGED_PATH)

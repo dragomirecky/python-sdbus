@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
+from contextlib import ExitStack
 from inspect import getfullargspec, iscoroutinefunction
 from typing import (
     TYPE_CHECKING,
@@ -38,6 +39,7 @@ from typing import (
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from aiodbus.bus import DbusInterfaceBuilder, MethodFlags
@@ -51,7 +53,7 @@ from aiodbus.meta import DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType
-    from aiodbus.interface.base import DbusExportHandle, DbusInterface
+    from aiodbus.interface.base import DbusInterface
 
 
 type AnyAsyncMethod[**P, R] = Callable[Concatenate[Any, P], Awaitable[R]]
@@ -223,7 +225,8 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         super().__init__(dbus_method=dbus_method, local_object=local_object)
         self.__doc__ = dbus_method.__doc__
 
-    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle):
+    @override
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         interface.add_method(
             self.dbus_method.method_name,
             self.dbus_method.input_signature,

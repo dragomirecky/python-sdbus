@@ -14,7 +14,7 @@ from typing import (
 )
 
 from aiodbus.bus.message import DbusMessage
-from aiodbus.handle import Closeable
+from aiodbus.closeable import Closeable
 
 if TYPE_CHECKING:
     from _sdbus import DbusCompleteType, DbusCompleteTypes

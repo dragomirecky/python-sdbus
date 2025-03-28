@@ -47,6 +47,7 @@ from aiodbus.bus.any import (
 )
 from aiodbus.bus.connection import DbusType
 from aiodbus.bus.message import DbusMessage, set_current_message
+from aiodbus.closeable import Closeable, CloseableFromCallback
 from aiodbus.exceptions import (
     AlreadyOwner,
     CallFailedError,
@@ -55,7 +56,6 @@ from aiodbus.exceptions import (
     NameExistsError,
     NameInQueueError,
 )
-from aiodbus.handle import Closeable, CloseableFromCallback
 
 logger = logging.getLogger(__name__)
 

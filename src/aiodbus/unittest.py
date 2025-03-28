@@ -36,7 +36,7 @@ from weakref import ref as weak_ref
 from _sdbus import SdBusMessage
 from aiodbus.bus import Dbus, connect, set_default_bus
 from aiodbus.bus.sdbus import SdBus
-from aiodbus.handle import Closeable
+from aiodbus.closeable import Closeable
 from aiodbus.member.signal import (
     DbusBoundSignal,
     DbusLocalSignal,

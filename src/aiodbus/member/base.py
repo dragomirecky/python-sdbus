@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import weakref
 from abc import ABC, abstractmethod
+from contextlib import ExitStack
 from typing import TYPE_CHECKING
 
 from _sdbus import is_member_name_valid
 from aiodbus.bus import DbusInterfaceBuilder
 
 if TYPE_CHECKING:
-    from aiodbus.handle import DbusExportHandle
     from aiodbus.interface.base import DbusInterface
 
 
@@ -89,7 +89,7 @@ class DbusLocalMember(DbusBoundMember):
         return local_object
 
     @abstractmethod
-    def export_to_dbus(self, interface: DbusInterfaceBuilder, handle: DbusExportHandle) -> None: ...
+    def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack) -> None: ...
 
 
 class DbusProxyMember(DbusBoundMember):

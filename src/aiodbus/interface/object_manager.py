@@ -20,11 +20,11 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
+from contextlib import ExitStack
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, override
 
 from aiodbus import get_default_bus
 from aiodbus.bus import Dbus
-from aiodbus.handle import DbusExportHandle
 from aiodbus.interface.common import DbusInterfaceCommon
 from aiodbus.member.method import dbus_method
 from aiodbus.member.signal import DbusSignal, dbus_signal
@@ -58,14 +58,12 @@ class DbusObjectManagerInterface(
         object_path: str,
         bus: Optional[Dbus] = None,
         manager: Optional[DbusObjectManagerInterface] = None,
-    ) -> DbusExportHandle:
+    ) -> ExitStack:
         if bus is None:
             bus = get_default_bus()
-        export_handle = super().export_to_dbus(
+        with super().export_to_dbus(
             object_path,
             bus,
-        )
-        export_handle.prepend(
-            bus.export_object_manager(path=object_path),
-        )
-        return export_handle
+        ) as exit_stack:
+            exit_stack.callback(bus.export_object_manager(path=object_path).close)
+            return exit_stack.pop_all()

@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from contextlib import ExitStack
 from inspect import getmembers
 from itertools import chain
 from typing import (
@@ -37,7 +38,6 @@ from typing import (
 
 from _sdbus import is_interface_name_valid
 from aiodbus.bus import Dbus, get_default_bus
-from aiodbus.handle import CloseableFromCallback, DbusExportHandle
 from aiodbus.member.base import DbusLocalMember, DbusMember
 from aiodbus.meta import DbusClassMeta, DbusLocalObjectMeta, DbusRemoteObjectMeta
 
@@ -137,7 +137,7 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
         object_path: str,
         bus: Optional[Dbus] = None,
         manager: Optional[DbusObjectManagerInterface] = None,
-    ) -> DbusExportHandle:
+    ) -> ExitStack:
         local_object_meta = self._dbus
         if isinstance(local_object_meta, DbusRemoteObjectMeta):
             raise RuntimeError("Cannot export D-Bus proxies.")
@@ -168,28 +168,24 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
 
             interface_member_list.append(value)
 
-        export_handle = DbusExportHandle()
-        export_handle.append(CloseableFromCallback(lambda: self)) # just store reference to exported interface, to avoid garbage collection
-        exported_interfaces = list[str]()
+        with ExitStack() as exit_stack:
+            exit_stack.callback(lambda: self) # just store reference to exported interface, to avoid garbage collection
+            exported_interfaces = list[str]()
 
-        for interface_name, member_list in interface_map.items():
-            new_interface = bus.create_interface(interface_name, object_path)
-            for dbus_something in member_list:
-                dbus_something.export_to_dbus(new_interface, export_handle)
-            handle = bus.export_interface(new_interface)
-            local_object_meta.activated_interfaces.append(new_interface)
-            export_handle.append(handle)
-            exported_interfaces.append(interface_name)
+            for interface_name, member_list in interface_map.items():
+                new_interface = bus.create_interface(interface_name, object_path)
+                for dbus_something in member_list:
+                    dbus_something.export_to_dbus(new_interface, exit_stack)
+                closable = bus.export_interface(new_interface)
+                local_object_meta.activated_interfaces.append(new_interface)
+                exit_stack.callback(closable.close)
+                exported_interfaces.append(interface_name)
 
-        if manager is not None:
-            bus.emit_interfaces_added(object_path, exported_interfaces)
-            export_handle.prepend(
-                CloseableFromCallback(
-                    lambda: bus.emit_interfaces_removed(object_path, exported_interfaces)
-                )
-            )
+            if manager is not None:
+                bus.emit_interfaces_added(object_path, exported_interfaces)
+                exit_stack.callback(lambda: bus.emit_interfaces_removed(object_path, exported_interfaces))
 
-        return export_handle
+            return exit_stack.pop_all()
 
     def _connect(self, service_name: str, object_path: str, bus: Optional[Dbus] = None) -> None:
         self._proxify(service_name, object_path, bus)
