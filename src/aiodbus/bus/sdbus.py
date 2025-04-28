@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import errno
 import logging
 from collections import defaultdict
@@ -97,8 +99,14 @@ class SdBusServingInterface(DbusInterfaceBuilder):
         result_signature: str, callback: MethodCallable, message: SdBusMessage
     ) -> None:
         try:
-            with set_current_message(message):
-                reply_data = await callback(*message.parse_to_tuple())
+
+            async def wrapped():
+                with set_current_message(message):
+                    await callback(*message.parse_to_tuple())
+
+            ctx = contextvars.copy_context()
+            task = asyncio.create_task(wrapped(), context=ctx)
+            reply_data = await task
 
             if not message.expect_reply:
                 return

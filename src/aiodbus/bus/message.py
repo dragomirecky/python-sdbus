@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio.tasks
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Optional, Protocol
@@ -21,10 +22,9 @@ _current_message: ContextVar[DbusMessage] = ContextVar("current_message")
 @contextmanager
 def set_current_message(message: DbusMessage):
     token = _current_message.set(message)
-    try:
-        yield message
-    finally:
-        _current_message.reset(token)
+    yield message
+    # Using try..finally would result in task destroy runing finally and crashing on variable from different context.
+    _current_message.reset(token)
 
 
 def get_current_message() -> DbusMessage:
