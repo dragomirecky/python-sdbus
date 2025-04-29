@@ -102,7 +102,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
 
             async def wrapped():
                 with set_current_message(message):
-                    await callback(*message.parse_to_tuple())
+                    return await callback(*message.parse_to_tuple())
 
             ctx = contextvars.copy_context()
             task = asyncio.create_task(wrapped(), context=ctx)
