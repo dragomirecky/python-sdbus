@@ -51,6 +51,7 @@ from aiodbus.bus.message import DbusMessage
 from aiodbus.closeable import Closeable
 from aiodbus.member.base import (
     DbusBoundMember,
+    DbusClassMember,
     DbusLocalMember,
     DbusMember,
     DbusProxyMember,
@@ -76,53 +77,33 @@ class DbusSignal[T](DbusMember):
         self.local_callbacks: WeakSet[Callable[[T], Any]] = WeakSet()
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
         obj: None,
-        obj_class: Type[DbusInterface],
-    ) -> DbusSignal[T]: ...
+        obj_class: Type[I],
+    ) -> DbusClassSignal[I, T]: ...
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: DbusInterface,
-        obj_class: Type[DbusInterface],
-    ) -> DbusBoundSignal[T]: ...
+        obj: I,
+        obj_class: Type[I],
+    ) -> DbusBoundSignal[I, T]: ...
 
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: Optional[DbusInterface],
-        obj_class: Optional[Type[DbusInterface]] = None,
-    ) -> Union[DbusBoundSignal[T], DbusSignal[T]]:
+        obj: Optional[I],
+        obj_class: Optional[Type[I]] = None,
+    ) -> Union[DbusBoundSignal[I, T], DbusClassMember[I, DbusSignal[T]]]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return DbusProxySignal(self, dbus_meta)
+                return DbusProxySignal(member=self, local_object=obj, proxy_meta=dbus_meta)
             else:
-                return DbusLocalSignal(self, obj, dbus_meta)
+                return DbusLocalSignal(member=self, local_object=obj, local_meta=dbus_meta)
         else:
-            return self
-
-    @asynccontextmanager
-    async def catch_anywhere(
-        self,
-        service_name: str,
-        bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
-        if bus is None:
-            bus = get_default_bus()
-
-        message_queue: Queue[DbusMessage[T]] = Queue()
-
-        match_slot = await bus.subscribe_signals(
-            sender_filter=service_name,
-            interface_filter=self.interface_name,
-            member_filter=self.name,
-            callback=message_queue.put_nowait,
-        )
-
-        with closing(match_slot):
-            yield Signals(message_queue)
+            assert obj_class is not None
+            return DbusClassSignal(local_object_cls=obj_class, member=self)
 
 
 class Signals[T]:
@@ -137,15 +118,30 @@ class Signals[T]:
             yield await self.queue.get()
 
 
-class DbusBoundSignal[T](DbusBoundMember, ABC):
-    def __init__(self, dbus_signal: DbusSignal[T], **kwargs):
-        super().__init__(**kwargs)
-        self.dbus_signal = dbus_signal
+class DbusClassSignal[I: DbusInterface, T](DbusClassMember[I, DbusSignal[T]]):
+    @asynccontextmanager
+    async def catch_anywhere(
+        self,
+        service_name: str,
+        bus: Optional[Dbus] = None,
+    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
+        if bus is None:
+            bus = get_default_bus()
 
-    @property
-    def member(self) -> DbusMember:
-        return self.dbus_signal
+        message_queue: Queue[DbusMessage[T]] = Queue()
 
+        match_slot = await bus.subscribe_signals(
+            sender_filter=service_name,
+            interface_filter=self.member.interface_name,
+            member_filter=self.member.name,
+            callback=message_queue.put_nowait,
+        )
+
+        with closing(match_slot):
+            yield Signals(message_queue)
+
+
+class DbusBoundSignal[I: DbusInterface, T](DbusBoundMember[I, DbusSignal[T]], ABC):
     @abstractmethod
     def catch(self) -> AbstractAsyncContextManager[Signals[T]]: ...
 
@@ -160,16 +156,10 @@ class DbusBoundSignal[T](DbusBoundMember, ABC):
     def emit(self, args: T) -> None: ...
 
 
-class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
-    def __init__(
-        self,
-        dbus_signal: DbusSignal[T],
-        proxy_meta: DbusRemoteObjectMeta,
-        **kwargs,
-    ):
-        super().__init__(dbus_signal=dbus_signal, **kwargs)
+class DbusProxySignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusProxyMember):
+    def __init__(self, proxy_meta: DbusRemoteObjectMeta, **kwargs):
+        super().__init__(**kwargs)
         self.proxy_meta = proxy_meta
-        self.__doc__ = dbus_signal.__doc__
 
     async def _register_match_slot(
         self,
@@ -179,8 +169,8 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         return await bus.subscribe_signals(
             sender_filter=self.proxy_meta.service_name,
             path_filter=self.proxy_meta.object_path,
-            interface_filter=self.dbus_signal.interface_name,
-            member_filter=self.dbus_signal.name,
+            interface_filter=self.member.interface_name,
+            member_filter=self.member.name,
             callback=callback,
         )
 
@@ -212,8 +202,8 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
 
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
-            interface_filter=self.dbus_signal.interface_name,
-            member_filter=self.dbus_signal.name,
+            interface_filter=self.member.interface_name,
+            member_filter=self.member.name,
             callback=message_queue.put_nowait,
         )
 
@@ -224,30 +214,24 @@ class DbusProxySignal[T](DbusBoundSignal[T], DbusProxyMember):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
 
 
-class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
-    def __init__(
-        self,
-        dbus_signal: DbusSignal[T],
-        local_object: DbusInterface,
-        local_meta: DbusLocalObjectMeta,
-    ):
-        super().__init__(dbus_signal=dbus_signal, local_object=local_object)
+class DbusLocalSignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusLocalMember):
+    def __init__(self, local_meta: DbusLocalObjectMeta, **kwargs):
+        super().__init__(**kwargs)
         self.local_meta = local_meta
-        self.__doc__ = dbus_signal.__doc__
 
     def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         interface.add_signal(
-            self.dbus_signal.name,
-            self.dbus_signal.signature,
-            self.dbus_signal.args_names,
-            **self.dbus_signal.flags,
+            self.member.name,
+            self.member.signature,
+            self.member.args_names,
+            **self.member.flags,
         )
 
     @asynccontextmanager
     async def catch(self) -> AsyncGenerator[Signals[T], None]:
         new_queue: Queue[T] = Queue()
 
-        signal_callbacks = self.dbus_signal.local_callbacks
+        signal_callbacks = self.member.local_callbacks
         put_method = new_queue.put_nowait
         try:
             signal_callbacks.add(put_method)
@@ -274,16 +258,16 @@ class DbusLocalSignal[T](DbusBoundSignal[T], DbusLocalMember):
 
         attached_bus.emit_signal(
             path=serving_object_path,
-            interface=self.dbus_signal.interface_name,
-            member=self.dbus_signal.name,
-            signature=self.dbus_signal.signature,
+            interface=self.member.interface_name,
+            member=self.member.name,
+            signature=self.member.signature,
             args=args,  # type: ignore
         )
 
     def emit(self, args: T) -> None:
         self._emit_dbus_signal(args)
 
-        for callback in self.dbus_signal.local_callbacks:
+        for callback in self.member.local_callbacks:
             callback(args)
 
 

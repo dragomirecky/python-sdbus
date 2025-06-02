@@ -21,16 +21,46 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, override
 
 from aiodbus import get_default_bus
 from aiodbus.bus import Dbus
 from aiodbus.interface.common import DbusInterfaceCommon
+from aiodbus.interface.properties import PropertiesDict
 from aiodbus.member.method import dbus_method
 from aiodbus.member.signal import DbusSignal, dbus_signal
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusInterface
+
+
+@dataclass(frozen=True)
+class InterfacesAddedData:
+    path: str
+    interfaces: Dict[str, PropertiesDict]
+
+
+def parse_interfaces_added(data: Tuple[str, Dict[str, Dict[str, Any]]]) -> InterfacesAddedData:
+    path, interfaces_and_properties = data
+    interfaces: Dict[str, PropertiesDict] = {}
+    for interface_name, properties_raw in interfaces_and_properties.items():
+        properties = PropertiesDict()
+        for member_name, variant in properties_raw.items():
+            properties[(interface_name, member_name)] = variant[1]
+        interfaces[interface_name] = properties
+    return InterfacesAddedData(path, interfaces)
+
+
+@dataclass(frozen=True)
+class InterfacesRemovedData:
+    path: str
+    interfaces: List[str]
+
+
+def parse_interfaces_removed(data: Tuple[str, List[str]]) -> InterfacesRemovedData:
+    path, interfaces = data
+    return InterfacesRemovedData(path, interfaces)
 
 
 class DbusObjectManagerInterface(

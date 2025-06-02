@@ -37,6 +37,7 @@ from _sdbus import SdBusMessage
 from aiodbus.bus import Dbus, connect, set_default_bus
 from aiodbus.bus.sdbus import SdBus
 from aiodbus.closeable import Closeable
+from aiodbus.interface.base import DbusInterface
 from aiodbus.member.signal import (
     DbusBoundSignal,
     DbusLocalSignal,
@@ -107,12 +108,12 @@ class DbusSignalRecorderBase:
         return self._captured_data.copy()
 
 
-class DbusSignalRecorderRemote(DbusSignalRecorderBase):
+class DbusSignalRecorderRemote[I: DbusInterface](DbusSignalRecorderBase):
     def __init__(
         self,
         timeout: Union[int, float],
         bus: Dbus,
-        remote_signal: DbusProxySignal[Any],
+        remote_signal: DbusProxySignal[I, Any],
     ):
         super().__init__(timeout)
         self._bus = bus
@@ -140,14 +141,14 @@ class DbusSignalRecorderRemote(DbusSignalRecorderBase):
                 self._handle.close()
 
 
-class DbusSignalRecorderLocal(DbusSignalRecorderBase):
+class DbusSignalRecorderLocal[I: DbusInterface](DbusSignalRecorderBase):
     def __init__(
         self,
         timeout: Union[int, float],
-        local_signal: DbusLocalSignal[Any],
+        local_signal: DbusLocalSignal[I, Any],
     ):
         super().__init__(timeout)
-        self._local_signal_ref: weak_ref[DbusSignal[Any]] = weak_ref(local_signal.dbus_signal)
+        self._local_signal_ref: weak_ref[DbusSignal[Any]] = weak_ref(local_signal.member)
 
     async def __aenter__(self) -> DbusSignalRecorderBase:
         local_signal = self._local_signal_ref()
@@ -220,9 +221,9 @@ class IsolatedDbusTestCase(IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         set_default_bus(self.bus)
 
-    def assertDbusSignalEmits(
+    def assertDbusSignalEmits[I: DbusInterface](
         self,
-        signal: DbusBoundSignal[Any],
+        signal: DbusBoundSignal[I, Any],
         timeout: Union[int, float] = 1,
     ) -> AsyncContextManager[DbusSignalRecorderBase]:
 

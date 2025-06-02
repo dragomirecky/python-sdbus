@@ -4,14 +4,15 @@ import logging
 from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import (
     Any,
     ContextManager,
     Dict,
+    Iterable,
     List,
-    Literal,
-    Mapping,
     Optional,
+    Self,
     Tuple,
     Type,
     Union,
@@ -20,8 +21,9 @@ from typing import (
 )
 
 from aiodbus.interface.base import DbusInterface
+from aiodbus.member.base import DbusClassMember
 from aiodbus.member.method import dbus_method
-from aiodbus.member.property import DbusBoundProperty, DbusLocalProperty
+from aiodbus.member.property import DbusBoundProperty, DbusLocalProperty, DbusProperty
 from aiodbus.member.signal import (
     DbusBoundSignal,
     DbusLocalSignal,
@@ -41,35 +43,41 @@ logger = logging.getLogger(__name__)
 
 class PropertiesChangedSignal(DbusSignal[DBUS_PROPERTIES_CHANGED_TYPING]):
     @overload
-    def __get__(
-        self,
-        obj: None,
-        obj_class: Type[DbusInterface],
-    ) -> PropertiesChangedSignal: ...
+    def __get__[I: DbusInterface](
+        self, obj: None, obj_class: Type[I]
+    ) -> DbusClassMember[I, DbusSignal[DBUS_PROPERTIES_CHANGED_TYPING]]: ...
 
     @overload
-    def __get__(
-        self,
-        obj: DbusInterface,
-        obj_class: Type[DbusInterface],
-    ) -> BoundPropertiesChangedSignal: ...
+    def __get__[I: DbusInterface](
+        self, obj: I, obj_class: Type[I]
+    ) -> BoundPropertiesChangedSignal[I]: ...
 
-    def __get__(
-        self,
-        obj: Optional[DbusInterface],
-        obj_class: Optional[Type[DbusInterface]] = None,
-    ) -> Union[BoundPropertiesChangedSignal, PropertiesChangedSignal]:
+    def __get__[I: DbusInterface](  # type: ignore[override]
+        self, obj: Optional[I], obj_class: Optional[Type[I]] = None
+    ) -> Union[
+        BoundPropertiesChangedSignal[I],
+        DbusClassMember[I, DbusSignal[DBUS_PROPERTIES_CHANGED_TYPING]],
+    ]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return ProxyPropertiesChangedSignal(self, dbus_meta)
+                return ProxyPropertiesChangedSignal(
+                    member=self, local_object=obj, proxy_meta=dbus_meta
+                )
             else:
-                return LocalPropertiesChangedSignal(self, obj, dbus_meta)
+                return LocalPropertiesChangedSignal(
+                    member=self, local_object=obj, local_meta=dbus_meta
+                )
         else:
-            return self
+            assert obj_class is not None
+            return DbusClassMember[I, DbusSignal[DBUS_PROPERTIES_CHANGED_TYPING]](
+                local_object_cls=obj_class, member=self
+            )
 
 
-class BoundPropertiesChangedSignal(DbusBoundSignal[DBUS_PROPERTIES_CHANGED_TYPING]):
+class BoundPropertiesChangedSignal[I: DbusInterface](
+    DbusBoundSignal[I, DBUS_PROPERTIES_CHANGED_TYPING]
+):
     def emit_property_changed(self, prop: DbusBoundProperty):
         raise NotImplementedError
 
@@ -77,28 +85,28 @@ class BoundPropertiesChangedSignal(DbusBoundSignal[DBUS_PROPERTIES_CHANGED_TYPIN
         raise NotImplementedError
 
 
-class LocalPropertiesChangedSignal(
-    BoundPropertiesChangedSignal, DbusLocalSignal[DBUS_PROPERTIES_CHANGED_TYPING]
+class LocalPropertiesChangedSignal[I: DbusInterface](
+    BoundPropertiesChangedSignal[I], DbusLocalSignal[I, DBUS_PROPERTIES_CHANGED_TYPING]
 ):
     def emit_properties_changed_to_callbacks(self, changes: set[DbusBoundProperty]):
-        if not self.dbus_signal.local_callbacks:
+        if not self.member.local_callbacks:
             return
 
         for prop in changes:
             assert isinstance(prop, DbusLocalProperty)
             value = prop._get_value()
             signal_value: DBUS_PROPERTIES_CHANGED_TYPING = (
-                prop.dbus_property.interface_name,
+                prop.member.interface_name,
                 {
-                    prop.dbus_property.name: (
-                        prop.dbus_property.signature,
+                    prop.member.name: (
+                        prop.member.signature,
                         value,
                     ),
                 },
                 [],
             )
 
-            for callback in self.dbus_signal.local_callbacks:
+            for callback in self.member.local_callbacks:
                 try:
                     callback(signal_value)
                 except Exception:
@@ -113,12 +121,12 @@ class LocalPropertiesChangedSignal(
 
         try:
             changes = self._pending_grouped_changes.get()
-            changes[prop.dbus_property.interface_name].add(prop)
+            changes[prop.member.interface_name].add(prop)
         except LookupError:
             dbus.emit_properties_changed(
                 path=path,
-                interface=prop.dbus_property.interface_name,
-                properties=[prop.dbus_property.name],
+                interface=prop.member.interface_name,
+                properties=[prop.member.name],
             )
             self.emit_properties_changed_to_callbacks({prop})
 
@@ -135,21 +143,88 @@ class LocalPropertiesChangedSignal(
             yield
         finally:
             self._pending_grouped_changes.reset(token)
-            bus, path = self.local_meta.attached_bus, self.local_meta.serving_object_path
+            bus, path = (
+                self.local_meta.attached_bus,
+                self.local_meta.serving_object_path,
+            )
             for interface, changed_properties in changes.items():
                 if bus is not None and path is not None:
                     bus.emit_properties_changed(
                         path,
                         interface,
-                        [prop.dbus_property.name for prop in changed_properties],
+                        [prop.member.name for prop in changed_properties],
                     )
                 self.emit_properties_changed_to_callbacks(changed_properties)
 
 
-class ProxyPropertiesChangedSignal(
-    BoundPropertiesChangedSignal, DbusProxySignal[DBUS_PROPERTIES_CHANGED_TYPING]
+class ProxyPropertiesChangedSignal[I: DbusInterface](
+    BoundPropertiesChangedSignal[I], DbusProxySignal[I, DBUS_PROPERTIES_CHANGED_TYPING]
 ):
     pass
+
+
+@dataclass(frozen=True)
+class PropertiesChangedData[I: DbusInterface]:
+    interface: str
+    changed: PropertiesDict[I]
+    invalidated: List[str]
+
+
+def parse_properties_changed(
+    data: DBUS_PROPERTIES_CHANGED_TYPING,
+) -> PropertiesChangedData:
+    interface_name, changed_raw, invalidated = data
+
+    changed = PropertiesDict()
+    for member_name, variant in changed_raw.items():
+        changed[(interface_name, member_name)] = variant[1]
+
+    return PropertiesChangedData(
+        interface=interface_name,
+        changed=changed,
+        invalidated=invalidated,
+    )
+
+
+class PropertiesDict[I: DbusInterface](dict[tuple[str, str], Any]):
+    """
+    Dictionary of properties of some D-Bus Object.
+    Keys are (interface_name, property_name) tuples.
+    """
+
+    @overload
+    def __getitem__(self, key: tuple[str, str]) -> Any: ...
+
+    @overload
+    def __getitem__[T](self, key: DbusBoundProperty[I, T]) -> T: ...
+
+    @overload
+    def __getitem__[T](self, key: DbusClassMember[I, DbusProperty[T]]) -> T: ...
+
+    def __getitem__[T](
+        self,
+        key: Union[tuple[str, str], DbusBoundProperty[I, T], DbusClassMember[I, DbusProperty[T]]],
+    ):
+        if isinstance(key, DbusBoundProperty):
+            property = key.member
+            return self[(property.interface_name, property.name)]
+        elif isinstance(key, DbusClassMember):
+            property = key.member
+            return self[(property.interface_name, property.name)]
+        else:
+            return super().__getitem__(key)
+
+    def update_with_properties_changed(self, data: PropertiesChangedData[I]) -> None:
+        self.update(data.changed)
+        for invalidated_property in data.invalidated:
+            try:
+                del self[(data.interface, invalidated_property)]
+            except KeyError:
+                pass
+
+    @override
+    def copy(self) -> PropertiesDict[I]:
+        return PropertiesDict(self)
 
 
 class DbusPropertiesInterface(
@@ -163,56 +238,21 @@ class DbusPropertiesInterface(
     async def _properties_get_all(self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
         raise NotImplementedError
 
-    async def properties_get_all_dict(
+    async def properties_get_all(
         self,
-        on_unknown_member: Literal["error", "ignore", "reuse"] = "error",
-    ) -> Dict[str, Any]:
+        interfaces: Optional[Iterable[str]] = None,
+    ) -> PropertiesDict[Self]:
+        properties = PropertiesDict[Self]()
+        interfaces = [
+            interface
+            for interface, interface_cls in self.dbus_interfaces.items()
+            if interface_cls.dbus_meta is not None and interface_cls.dbus_meta.serving_enabled
+        ]
 
-        properties: Dict[str, Any] = {}
-
-        for interface_name, interface_cls in self.dbus_interfaces.items():
-            meta = interface_cls.dbus_meta
-
-            if meta is None:
-                continue
-
-            if not meta.serving_enabled:
-                continue
-
+        for interface_name in interfaces:
             dbus_properties_data = await self._properties_get_all(interface_name)
 
-            properties.update(
-                _parse_properties_vardict(
-                    meta.member_to_attr,
-                    dbus_properties_data,
-                    on_unknown_member,
-                )
-            )
+            for dbus_name, variant in dbus_properties_data.items():
+                properties[(interface_name, dbus_name)] = variant[1]
 
         return properties
-
-
-def _parse_properties_vardict(
-    properties_name_map: Mapping[str, str],
-    properties_vardict: Dict[str, Tuple[str, Any]],
-    on_unknown_member: Literal["error", "ignore", "reuse"],
-) -> Dict[str, Any]:
-
-    properties_translated: Dict[str, Any] = {}
-
-    for member_name, variant in properties_vardict.items():
-        try:
-            python_name = properties_name_map[member_name]
-        except KeyError:
-            if on_unknown_member == "error":
-                raise
-            elif on_unknown_member == "ignore":
-                continue
-            elif on_unknown_member == "reuse":
-                python_name = member_name
-            else:
-                raise ValueError
-
-        properties_translated[python_name] = variant[1]
-
-    return properties_translated

@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import ABC, abstractmethod
 from contextlib import ExitStack
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 from _sdbus import is_member_name_valid
 from aiodbus.bus import DbusInterfaceBuilder
@@ -35,9 +35,9 @@ class DbusMember:
     @staticmethod
     def ensure_name_valid(name: str):
         try:
-            assert is_member_name_valid(name), (
-                f'Invalid name: "{name}"; ' f"{DbusMember.name_requirements}"
-            )
+            assert is_member_name_valid(
+                name
+            ), f'Invalid name: "{name}"; {DbusMember.name_requirements}'
         except NotImplementedError:
             ...
 
@@ -62,37 +62,59 @@ class DbusMember:
         self._name = name
 
 
-class DbusBoundMember(ABC):
+class DbusClassMember[I: DbusInterface, M: DbusMember]:
+    """
+    Member bound to an interface class.
+    """
+
+    def __init__(self, local_object_cls: Type[I], member: M, **kwargs):
+        self.__local_object_cls = local_object_cls
+        self.__member = member
+        self.__doc__ = member.__doc__
+        super().__init__(**kwargs)
+
+    @property
+    def local_object_cls(self) -> Type[I]:
+        return self.__local_object_cls
+
+    @property
+    def member(self) -> M:
+        return self.__member
+
+
+class DbusBoundMember[I: DbusInterface, M: DbusMember](ABC):
     """
     Member of an interface that has been bound to a local object or proxy to a remote object.
     """
 
-    @property
-    @abstractmethod
-    def member(self) -> DbusMember: ...
-
-
-class DbusLocalMember(DbusBoundMember):
-    """
-    Base class identifying members bound to local objects.
-    """
-
-    def __init__(self, local_object: DbusInterface, **kwargs):
+    def __init__(self, local_object: I, member: M, **kwargs):
+        self.__local_object_ref = weakref.ref(local_object)
+        self.__member = member
+        self.__doc__ = member.__doc__
         super().__init__(**kwargs)
-        self.local_object_ref = weakref.ref(local_object)
 
     @property
-    def local_object(self) -> DbusInterface:
-        local_object = self.local_object_ref()
+    def local_object(self) -> I:
+        local_object = self.__local_object_ref()
         if local_object is None:
             raise RuntimeError("Local object no longer exists")
         return local_object
+
+    @property
+    def member(self) -> M:
+        return self.__member
+
+
+class DbusLocalMember[I: DbusInterface, M: DbusMember](DbusBoundMember[I, M]):
+    """
+    Base class identifying members bound to local objects.
+    """
 
     @abstractmethod
     def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack) -> None: ...
 
 
-class DbusProxyMember(DbusBoundMember):
+class DbusProxyMember[I: DbusInterface, M: DbusMember](DbusBoundMember[I, M]):
     """
     Base class identifying members bound to remote objects.
     """

@@ -43,6 +43,7 @@ from typing import (
 from aiodbus.bus import DbusInterfaceBuilder, PropertyFlags
 from aiodbus.member.base import (
     DbusBoundMember,
+    DbusClassMember,
     DbusLocalMember,
     DbusMember,
     DbusProxyMember,
@@ -80,32 +81,33 @@ class DbusProperty[T](DbusMember):
         self.__doc__ = getter.__doc__
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
         obj: None,
-        obj_class: Type[DbusInterface],
-    ) -> DbusProperty[T]: ...
+        obj_class: Type[I],
+    ) -> DbusClassMember[I, DbusProperty[T]]: ...
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: DbusInterface,
-        obj_class: Type[DbusInterface],
-    ) -> DbusBoundProperty[T]: ...
+        obj: I,
+        obj_class: Type[I],
+    ) -> DbusBoundProperty[I, T]: ...
 
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: Optional[DbusInterface],
-        obj_class: Optional[Type[DbusInterface]] = None,
-    ) -> Union[DbusBoundProperty[T], DbusProperty[T]]:
+        obj: Optional[I],
+        obj_class: Optional[Type[I]] = None,
+    ) -> Union[DbusBoundProperty[I, T], DbusClassMember[I, DbusProperty[T]]]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return DbusProxyProperty(self, dbus_meta)
+                return DbusProxyProperty[I, T](member=self, local_object=obj, proxy_meta=dbus_meta)
             else:
-                return DbusLocalProperty(self, obj)
+                return DbusLocalProperty[I, T](member=self, local_object=obj)
         else:
-            return self
+            assert obj_class is not None
+            return DbusClassMember[I, DbusProperty[T]](local_object_cls=obj_class, member=self)
 
     def setter(
         self,
@@ -116,15 +118,7 @@ class DbusProperty[T](DbusMember):
         self.property_setter = new_set_function
 
 
-class DbusBoundProperty[T](DbusBoundMember, ABC):
-    def __init__(self, dbus_property: DbusProperty[T], **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.dbus_property = dbus_property
-
-    @property
-    def member(self) -> DbusMember:
-        return self.dbus_property
-
+class DbusBoundProperty[I: DbusInterface, T](DbusBoundMember[I, DbusProperty[T]], ABC):
     def __await__(self) -> Generator[Any, None, T]:
         return self.get().__await__()
 
@@ -135,25 +129,20 @@ class DbusBoundProperty[T](DbusBoundMember, ABC):
     async def set(self, new_value: T) -> None: ...
 
 
-class DbusProxyProperty(DbusBoundProperty[T], DbusProxyMember):
-    def __init__(
-        self,
-        dbus_property: DbusProperty[T],
-        proxy_meta: DbusRemoteObjectMeta,
-        **kwargs,
-    ):
-        super().__init__(dbus_property=dbus_property, **kwargs)
+class DbusProxyProperty[I: DbusInterface, T](
+    DbusBoundProperty[I, T], DbusProxyMember[I, DbusProperty[T]]
+):
+    def __init__(self, proxy_meta: DbusRemoteObjectMeta, **kwargs):
+        super().__init__(**kwargs)
         self.proxy_meta = proxy_meta
-
-        self.__doc__ = dbus_property.__doc__
 
     async def get(self) -> T:
         bus = self.proxy_meta.attached_bus
         response = await bus.get_property(
             destination=self.proxy_meta.service_name,
             path=self.proxy_meta.object_path,
-            interface=self.dbus_property.interface_name,
-            member=self.dbus_property.name,
+            interface=self.member.interface_name,
+            member=self.member.name,
         )
         return cast(T, response[1])
 
@@ -162,22 +151,20 @@ class DbusProxyProperty(DbusBoundProperty[T], DbusProxyMember):
         await bus.set_property(
             destination=self.proxy_meta.service_name,
             path=self.proxy_meta.object_path,
-            interface=self.dbus_property.interface_name,
-            member=self.dbus_property.name,
-            signature=self.dbus_property.signature,
+            interface=self.member.interface_name,
+            member=self.member.name,
+            signature=self.member.signature,
             args=(new_value,),
         )
 
 
-class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
-    def __init__(self, dbus_property: DbusProperty[T], local_object: DbusInterface):
-        super().__init__(dbus_property=dbus_property, local_object=local_object)
-        self.__doc__ = dbus_property.__doc__
-
+class DbusLocalProperty[I: DbusInterface, T](
+    DbusBoundProperty[I, T], DbusLocalMember[I, DbusProperty[T]]
+):
     @override
     def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         getter = self._dbus_reply_get
-        dbus_property = self.dbus_property
+        dbus_property = self.member
 
         if dbus_property.property_setter is not None:
             setter = self._dbus_reply_set
@@ -193,7 +180,7 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         )
 
     def _get_value(self) -> T:
-        getter = self.dbus_property.property_getter
+        getter = self.member.property_getter
         if getter is None:
             raise RuntimeError("Property has no getter available")
         return getter(self.local_object)
@@ -202,11 +189,11 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         return self._get_value()
 
     async def set(self, new_value: T) -> None:
-        if self.dbus_property.property_setter is None:
+        if self.member.property_setter is None:
             raise RuntimeError("Property has no setter")
 
         local_object = self.local_object
-        self.dbus_property.property_setter(local_object, new_value)
+        self.member.property_setter(local_object, new_value)
         self._emit_property_changed(local_object, new_value)
 
     def _dbus_reply_get(self) -> Tuple[DbusCompleteType, ...]:
@@ -214,15 +201,15 @@ class DbusLocalProperty(DbusBoundProperty[T], DbusLocalMember):
         return cast(Tuple["DbusCompleteType", ...], result)
 
     def _dbus_reply_set(self, data_to_set_to: Tuple[DbusCompleteType, ...]) -> None:
-        assert self.dbus_property.property_setter is not None
+        assert self.member.property_setter is not None
 
         local_object = self.local_object
         new_value = cast(T, data_to_set_to)
-        self.dbus_property.property_setter(local_object, new_value)
+        self.member.property_setter(local_object, new_value)
         self._emit_property_changed(local_object, new_value)
 
     def _emit_property_changed(self, local_object: Any, new_value: T) -> None:
-        if not self.dbus_property.emits_on_property_change:
+        if not self.member.emits_on_property_change:
             return
         try:
             properties_changed: BoundPropertiesChangedSignal = getattr(

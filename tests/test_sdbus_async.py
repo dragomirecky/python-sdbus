@@ -636,7 +636,7 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertEqual(
             await test_object.test_property,
-            (await test_object_connection.properties_get_all_dict())["test_property"],
+            (await test_object_connection.properties_get_all())[test_object.test_property],
         )
 
     async def test_empty_signal(self) -> None:

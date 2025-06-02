@@ -45,6 +45,7 @@ from typing import (
 from aiodbus.bus import DbusInterfaceBuilder, MethodFlags
 from aiodbus.member.base import (
     DbusBoundMember,
+    DbusClassMember,
     DbusLocalMember,
     DbusMember,
     DbusProxyMember,
@@ -126,63 +127,55 @@ class DbusMethod[**P, R](DbusMember):
         return self.method_name
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
         obj: None,
-        obj_class: Type[DbusInterface],
-    ) -> DbusMethod[P, R]: ...
+        obj_class: Type[I],
+    ) -> DbusClassMember[I, DbusMethod[P, R]]: ...
 
     @overload
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: DbusInterface,
-        obj_class: Type[DbusInterface],
-    ) -> DbusBoundMethod[P, R]: ...
+        obj: I,
+        obj_class: Type[I],
+    ) -> DbusBoundMethod[I, P, R]: ...
 
-    def __get__(
+    def __get__[I: DbusInterface](
         self,
-        obj: Optional[DbusInterface],
-        obj_class: Optional[Type[DbusInterface]] = None,
-    ) -> Union[DbusBoundMethod[P, R], DbusMethod[P, R]]:
+        obj: Optional[I],
+        obj_class: Optional[Type[I]] = None,
+    ) -> Union[DbusBoundMethod[I, P, R], DbusClassMember[I, DbusMethod[P, R]]]:
         if obj is not None:
             dbus_meta = obj._dbus
             if isinstance(dbus_meta, DbusRemoteObjectMeta):
-                return DbusProxyMethod(self, dbus_meta)
+                return DbusProxyMethod(member=self, local_object=obj, proxy_meta=dbus_meta)
             else:
-                return DbusLocalMethod(self, obj)
+                return DbusLocalMethod(member=self, local_object=obj)
         else:
-            return self
+            assert obj_class is not None
+            return DbusClassMember(local_object_cls=obj_class, member=self)
 
 
-class DbusBoundMethod[**P, R](DbusBoundMember, ABC):
-    def __init__(self, dbus_method: DbusMethod[P, R], **kwargs):
-        super().__init__(**kwargs)
-        self.dbus_method = dbus_method
-
-    @property
-    def member(self) -> DbusMember:
-        return self.dbus_method
-
+class DbusBoundMethod[I: DbusInterface, **P, R](DbusBoundMember[I, DbusMethod[P, R]], ABC):
     @abstractmethod
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
 
 
-class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
+class DbusProxyMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusProxyMember):
     """
     Method bound to a remote dbus object.
     """
 
     def __init__(
         self,
-        dbus_method: DbusMethod[P, R],
         proxy_meta: DbusRemoteObjectMeta,
+        **kwargs,
     ):
-        super().__init__(dbus_method)
+        super().__init__(**kwargs)
         self.proxy_meta = proxy_meta
-        self.__doc__ = dbus_method.__doc__
 
     def _flatten_args(self, *args: P.args, **kwargs: P.kwargs) -> List[Any]:
-        signature = inspect.signature(self.dbus_method.unbound_method)
+        signature = inspect.signature(self.member.unbound_method)
         bound_args = signature.bind(None, *args, **kwargs)  # None for the first "self" arg
         bound_args.apply_defaults()
         return list(bound_args.arguments.values())[1:]  # drop "self" arg
@@ -192,11 +185,11 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
         result = await bus.call_method(
             destination=self.proxy_meta.service_name,
             path=self.proxy_meta.object_path,
-            interface=self.dbus_method.interface_name,
-            member=self.dbus_method.method_name,
-            signature=self.dbus_method.input_signature,
+            interface=self.member.interface_name,
+            member=self.member.method_name,
+            signature=self.member.input_signature,
             args=self._flatten_args(*args, **kwargs),
-            no_reply=self.dbus_method.flags.get("no_reply", False),
+            no_reply=self.member.flags.get("no_reply", False),
         )
         return cast(R, result)  # we have to hope it's correct
 
@@ -206,46 +199,38 @@ class DbusProxyMethod[**P, R](DbusBoundMethod[P, R], DbusProxyMember):
         """
         return await call_with_middlewares(
             self._make_dbus_call,
-            self.dbus_method.to_dbus_middlewares.copy(),
+            self.member.to_dbus_middlewares.copy(),
             *args,
             **kwargs,
         )
 
 
-class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
+class DbusLocalMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusLocalMember):
     """
     Method bound to a local dbus object.
     """
 
-    def __init__(
-        self,
-        dbus_method: DbusMethod[P, R],
-        local_object: DbusInterface,
-    ):
-        super().__init__(dbus_method=dbus_method, local_object=local_object)
-        self.__doc__ = dbus_method.__doc__
-
     @override
     def export_to_dbus(self, interface: DbusInterfaceBuilder, exit_stack: ExitStack):
         interface.add_method(
-            self.dbus_method.method_name,
-            self.dbus_method.input_signature,
-            self.dbus_method.input_args_names,
-            self.dbus_method.result_signature,
-            self.dbus_method.result_args_names,
+            self.member.method_name,
+            self.member.input_signature,
+            self.member.input_args_names,
+            self.member.result_signature,
+            self.member.result_args_names,
             self._handle_dbus_call,
-            **self.dbus_method.flags,
+            **self.member.flags,
         )
 
     async def _handle_dbus_call(self, *args: DbusCompleteType):
         """
         Handle incoming dbus call to the method (from dbus).
         """
-        bound_method = self.dbus_method.unbound_method.__get__(self.local_object, None)
+        bound_method = self.member.unbound_method.__get__(self.local_object, None)
 
         return await call_with_middlewares(
             bound_method,
-            self.dbus_method.from_dbus_middlewares.copy(),
+            self.member.from_dbus_middlewares.copy(),
             *args,  # type: ignore
         )
 
@@ -254,7 +239,7 @@ class DbusLocalMethod[**P, R](DbusBoundMethod[P, R], DbusLocalMember):
         Call the method (locally).
         """
         # no middlewares for local-only calls
-        return await self.dbus_method.unbound_method(self.local_object, *args, **kwargs)
+        return await self.member.unbound_method(self.local_object, *args, **kwargs)
 
 
 def dbus_method[**P, R](
