@@ -127,7 +127,12 @@ class SdBusServingInterface(DbusInterfaceBuilder):
                 error = exc
             else:
 
-                logger.exception("Unhandled exception when handling a method call")
+                logger.exception(
+                    "Exception in method handler for %s.%s (%s)",
+                    message.path,
+                    message.member,
+                    message.path,
+                )
                 error = CallFailedError()
 
             if not message.expect_reply:
@@ -218,8 +223,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
                     message.append_data(signature, data)
             except Exception as exc:
                 if not isinstance(exc, MethodCallError):
-                    pass
-                    logger.exception("Unhandled exception when handling a property get")
+                    logger.exception("Exception in getter %s (%s)", name, self.name)
                 raise
 
         def setter(message: SdBusMessage):
@@ -229,8 +233,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
                     set_function(message.get_contents())
             except Exception as exc:
                 if not isinstance(exc, MethodCallError):
-                    pass
-                    logger.exception("Unhandled exception when handling a property set")
+                    logger.exception("Exception in setter %s (%s)", name, self.name)
                 raise
 
         self._interface.add_property(
@@ -385,7 +388,7 @@ class SdBus(Dbus[SdBusServingInterface]):
             with set_current_message(message):
                 callback(message)
         except Exception:
-            logger.exception("Unhandled exception when handling a signal")
+            logger.exception("Failure in signal handler for path %s", message.path)
 
     async def subscribe_signals(
         self,
