@@ -57,6 +57,7 @@ from aiodbus.member.base import (
     DbusProxyMember,
 )
 from aiodbus.meta import DbusLocalObjectMeta, DbusRemoteObjectMeta
+from aiodbus.signature import NoGenericsTypingAvailable, SignalMapping
 
 if TYPE_CHECKING:
     from aiodbus.interface.base import DbusInterface
@@ -65,16 +66,44 @@ if TYPE_CHECKING:
 class DbusSignal[T](DbusMember):
     def __init__(
         self,
-        signature: str = "",
+        signature: str | None = None,
         name: Optional[str] = None,
         args_names: Sequence[str] = (),
         **flags: Unpack[MemberFlags],
     ):
         super().__init__(name=name)
-        self.signature = signature
+
+        if signature is not None:
+            self._mapping = SignalMapping.from_manual_input(signature)
+        else:
+            # defered mapping initialization
+            # we are gonna wait for the __set_name__ call
+            pass
+
         self.args_names = args_names
         self.flags = flags
         self.local_callbacks: WeakSet[Callable[[T], Any]] = WeakSet()
+
+    @property
+    def signature(self) -> str:
+        return self.mapping.conversion.signature
+
+    @property
+    def mapping(self) -> SignalMapping:
+        try:
+            return self._mapping
+        except AttributeError:
+            raise RuntimeError("Property not fully initialized yet")
+
+    def __set_name__(self, owner: object, name: str) -> None:
+        super().__set_name__(owner, name)
+        if not hasattr(self, "_mapping"):
+            try:
+                self._mapping = SignalMapping.from_generics(self, argument_idx=0)
+            except NoGenericsTypingAvailable:
+                raise RuntimeError(
+                    f"Signal {self} failed to initialize: has no signature source available"
+                ) from None
 
     @overload
     def __get__[I: DbusInterface](
@@ -124,17 +153,21 @@ class DbusClassSignal[I: DbusInterface, T](DbusClassMember[I, DbusSignal[T]]):
         self,
         service_name: str,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
+    ) -> AsyncGenerator[Signals[tuple[DbusMessage, T]], None]:
         if bus is None:
             bus = get_default_bus()
 
-        message_queue: Queue[DbusMessage[T]] = Queue()
+        message_queue: Queue[tuple[DbusMessage, T]] = Queue()
+
+        def on_signal(message: DbusMessage) -> None:
+            value = self.member.mapping.conversion.from_dbus(message.get_contents())
+            message_queue.put_nowait((message, value))
 
         match_slot = await bus.subscribe_signals(
             sender_filter=service_name,
             interface_filter=self.member.interface_name,
             member_filter=self.member.name,
-            callback=message_queue.put_nowait,
+            callback=on_signal,
         )
 
         with closing(match_slot):
@@ -150,7 +183,7 @@ class DbusBoundSignal[I: DbusInterface, T](DbusBoundMember[I, DbusSignal[T]], AB
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AbstractAsyncContextManager[Signals[DbusMessage[T]]]: ...
+    ) -> AbstractAsyncContextManager[Signals[tuple[DbusMessage, T]]]: ...
 
     @abstractmethod
     def emit(self, args: T) -> None: ...
@@ -191,24 +224,28 @@ class DbusProxySignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusProxyMembe
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
+    ) -> AsyncGenerator[Signals[tuple[DbusMessage, T]], None]:
         if bus is None:
             bus = self.proxy_meta.attached_bus
 
         if service_name is None:
             service_name = self.proxy_meta.service_name
 
-        message_queue: Queue[DbusMessage[T]] = Queue()
+        def on_signal(message: DbusMessage) -> None:
+            value = self.member.mapping.conversion.from_dbus(message.get_contents())
+            message_queue.put_nowait((message, value))
+
+        message_queue: Queue[tuple[DbusMessage, T]] = Queue()
 
         handle = await bus.subscribe_signals(
             sender_filter=service_name,
             interface_filter=self.member.interface_name,
             member_filter=self.member.name,
-            callback=message_queue.put_nowait,
+            callback=on_signal,
         )
 
         with closing(handle):
-            yield Signals[DbusMessage[T]](message_queue)
+            yield Signals[tuple[DbusMessage, T]](message_queue)
 
     def emit(self, args: T):
         raise RuntimeError("Cannot emit signal from D-Bus proxy.")
@@ -244,7 +281,7 @@ class DbusLocalSignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusLocalMembe
         self,
         service_name: Optional[str] = None,
         bus: Optional[Dbus] = None,
-    ) -> AsyncGenerator[Signals[DbusMessage[T]], None]:
+    ) -> AsyncGenerator[Signals[tuple[DbusMessage, T]], None]:
         raise NotImplementedError()
 
     def _emit_dbus_signal(self, args: T) -> None:
@@ -256,12 +293,13 @@ class DbusLocalSignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusLocalMembe
         if serving_object_path is None:
             return
 
+        dbus_args = self.member.mapping.conversion.to_dbus(args)
         attached_bus.emit_signal(
             path=serving_object_path,
             interface=self.member.interface_name,
             member=self.member.name,
             signature=self.member.signature,
-            args=args,  # type: ignore
+            args=dbus_args,
         )
 
     def emit(self, args: T) -> None:
@@ -272,7 +310,7 @@ class DbusLocalSignal[I: DbusInterface, T](DbusBoundSignal[I, T], DbusLocalMembe
 
 
 def dbus_signal[T](
-    signature: str = "",
+    signature: str | None = "",
     arg_names: Sequence[str] = (),
     name: Optional[str] = None,
     **flags: Unpack[MemberFlags],

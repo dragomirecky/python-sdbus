@@ -39,6 +39,7 @@ from _sdbus import (
     sd_bus_open_system_remote,
     sd_bus_open_user,
 )
+from aiodbus.basic_types import DbusCompleteType, DbusCompleteTypes
 from aiodbus.bus.any import (
     Dbus,
     DbusInterfaceBuilder,
@@ -60,9 +61,6 @@ from aiodbus.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from _sdbus import DbusCompleteType, DbusCompleteTypes
 
 
 class SdBusAnyServingInterface(Protocol):
@@ -113,13 +111,14 @@ class SdBusServingInterface(DbusInterfaceBuilder):
 
             reply = message.create_reply()
             if isinstance(reply_data, tuple):
-                try:
-                    reply.append_data(result_signature, *reply_data)
-                except TypeError:
-                    # In case of single struct result type
-                    # We can't figure out if return is multiple values
-                    # or a tuple
-                    reply.append_data(result_signature, reply_data)
+                if reply_data:
+                    try:
+                        reply.append_data(result_signature, *reply_data)
+                    except TypeError:
+                        # In case of single struct result type
+                        # We can't figure out if return is multiple values
+                        # or a tuple
+                        reply.append_data(result_signature, reply_data)
             elif reply_data is not None:
                 reply.append_data(result_signature, reply_data)
         except Exception as exc:
@@ -303,7 +302,7 @@ class SdBus(Dbus[SdBusServingInterface]):
         else:
             reply = await self._sdbus.call_async(message)
             self._raise_on_error(reply)
-            return reply.get_contents()
+            return reply.parse_to_tuple()
 
     async def get_property(
         self,

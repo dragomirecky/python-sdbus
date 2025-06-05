@@ -25,7 +25,8 @@ from asyncio import Event, get_running_loop
 from asyncio import run as asyncio_run
 from asyncio import sleep, wait_for
 from asyncio.subprocess import create_subprocess_exec
-from typing import Tuple
+from os import sched_getscheduler
+from typing import Annotated, Tuple
 from unittest import SkipTest
 
 from _sdbus import SdBusError
@@ -45,6 +46,9 @@ from aiodbus.exceptions import (
     NoReplyError,
     UnknownObjectError,
 )
+from aiodbus.member.property import DbusProperty
+from aiodbus.member.signal import DbusSignal
+from aiodbus.signature import WithConversion
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.parse import parse_properties_changed
 
@@ -88,6 +92,16 @@ class TestRequestName(IsolatedDbusTestCase):
 TEST_INTERFACE_NAME = "org.test.test"
 
 
+class IntAsString:
+    signature = "s"
+
+    def to_dbus(self, value: int) -> str:
+        return str(value)
+
+    def from_dbus(self, value: str) -> int:
+        return int(value)
+
+
 class SomeTestInterface(
     DbusInterfaceCommon,
     interface_name=TEST_INTERFACE_NAME,
@@ -100,6 +114,7 @@ class SomeTestInterface(
         self.test_no_reply_string = "no"
         self.property_private = 100
         self.no_reply_sync = Event()
+        self.mapped_property_value = 42
 
     @dbus_method("s", "s")
     async def upper(self, string: str) -> str:
@@ -126,6 +141,22 @@ class SomeTestInterface(
     def test_property(self) -> str:
         """Test property"""
         return self.test_string
+
+    @dbus_property(emits_change=True)
+    def test_property_with_auto_signature(self) -> str:
+        """Test property with auto signature"""
+        return self.test_string
+
+    @dbus_property()
+    def mapped_property(self) -> Annotated[int, WithConversion(IntAsString())]:
+        return self.mapped_property_value
+
+    @mapped_property.setter
+    def mapped_property_set(self, new_value: int) -> None:
+        """Set the mapped property value"""
+        self.mapped_property_value = new_value
+
+    mapped_signal = DbusSignal[Annotated[int, WithConversion(IntAsString())]]()
 
     @dbus_property("s", emits_invalidation=True)
     def test_property_invalidation(self) -> str:
@@ -222,6 +253,12 @@ class SomeTestInterface(
         return len(input_str)
 
 
+class InterfaceWithAutoSignatures(DbusInterfaceCommon, interface_name="org.example.auto"):
+    test_property = DbusProperty[tuple[str, int]]()
+
+    test_signal = DbusSignal[tuple[str, int]]()
+
+
 class DbusErrorTest(MethodCallError, name="org.example.Error"): ...
 
 
@@ -238,6 +275,91 @@ def initialize_object() -> Tuple[SomeTestInterface, SomeTestInterface]:
     test_object_connection = SomeTestInterface.new_proxy(TEST_SERVICE_NAME, "/")
 
     return test_object, test_object_connection
+
+
+class TestAutoSignatures(IsolatedDbusTestCase):
+    def test_property_with_generics_signature(self):
+        prop = InterfaceWithAutoSignatures.test_property
+        self.assertEqual(prop.member.signature, "(si)")
+
+    def test_signal_with_generics_signature(self):
+        signal = InterfaceWithAutoSignatures.test_signal
+        self.assertEqual(signal.member.signature, "(si)")
+
+    def test_error_when_no_signature_is_available_on_property(self):
+        with self.assertRaisesRegex(RuntimeError, "has no signature"):
+
+            class ShouldFailInterface(DbusInterfaceCommon, interface_name="org.example.fail"):
+                test_property = DbusProperty()
+
+    def test_error_when_no_signature_is_available_on_signal(self):
+        with self.assertRaisesRegex(RuntimeError, "has no signature"):
+
+            class ShouldFailInterface2(DbusInterfaceCommon, interface_name="org.example.fail2"):
+                test_signal = DbusSignal()
+
+
+class TestMappedProperty(IsolatedDbusTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        await self.bus.request_name(TEST_SERVICE_NAME)
+
+    async def test_mapped_property_get(self):
+        test_object, test_object_connection = initialize_object()
+        assert test_object.mapped_property.member.signature == "s"
+
+        value_on_dbus = await self.bus.get_property(
+            destination=TEST_SERVICE_NAME,
+            path="/",
+            interface=TEST_INTERFACE_NAME,
+            member="MappedProperty",
+        )
+        assert value_on_dbus == ("s", "42")
+
+        value_through_proxy = await test_object_connection.mapped_property.get()
+        assert isinstance(value_through_proxy, int)
+
+    async def test_mapped_property_set(self):
+        test_object, test_object_connection = initialize_object()
+        assert test_object.mapped_property.member.signature == "s"
+
+        await test_object_connection.mapped_property.set(100)
+
+        value_on_dbus = await self.bus.get_property(
+            destination=TEST_SERVICE_NAME,
+            path="/",
+            interface=TEST_INTERFACE_NAME,
+            member="MappedProperty",
+        )
+        assert value_on_dbus == ("s", "100")
+
+        value_through_proxy = await test_object_connection.mapped_property.get()
+        assert isinstance(value_through_proxy, int)
+        assert value_through_proxy == 100
+
+
+class TestMappedSignal(IsolatedDbusTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        await self.bus.request_name(TEST_SERVICE_NAME)
+
+    async def test_mapped_signal_local(self) -> None:
+        test_object, test_object_connection = initialize_object()
+
+        async with self.assertDbusSignalEmits(test_object.mapped_signal) as local_signals_record:
+            test_object.mapped_signal.emit(100)
+
+        self.assertEqual(local_signals_record.output, [100])
+
+    async def test_mapped_signal_remote(self) -> None:
+        test_object, test_object_connection = initialize_object()
+
+        async with self.assertDbusSignalEmits(
+            test_object_connection.mapped_signal
+        ) as remote_signals_record:
+            test_object.mapped_signal.emit(100)
+
+        self.assertEqual(remote_signals_record.output, ["100"])
 
 
 class TestProxy(IsolatedDbusTestCase):
@@ -333,6 +455,11 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertEqual(new_string, await wait_for(test_object_connection.test_property, 0.5))
 
+    async def test_property_with_auto_signature(self) -> None:
+        test_object, test_object_connection = initialize_object()
+
+        self.assertEqual("s", test_object.test_property_with_auto_signature.member.signature)
+
     async def test_signal(self) -> None:
         test_object, test_object_connection = initialize_object()
 
@@ -364,9 +491,9 @@ class TestProxy(IsolatedDbusTestCase):
 
             async def catch_anywhere_oneshot_dbus() -> Tuple[str, Tuple[str, str]]:
                 async with test_object_connection.test_signal.catch_anywhere() as signals:
-                    async for message in signals:
+                    async for message, value in signals:
                         assert message.path is not None
-                        return message.path, message.get_contents()
+                        return message.path, value
 
                     raise RuntimeError
 
@@ -387,8 +514,8 @@ class TestProxy(IsolatedDbusTestCase):
                 async with SomeTestInterface.test_signal.catch_anywhere(
                     TEST_SERVICE_NAME, self.bus
                 ) as subscription:
-                    async for x in subscription:
-                        return x
+                    async for message, value in subscription:
+                        return message
 
                 raise RuntimeError
 
@@ -406,8 +533,8 @@ class TestProxy(IsolatedDbusTestCase):
 
             async def catch_anywhere_oneshot_local() -> Tuple[str, Tuple[str, str]]:
                 async with test_object.test_signal.catch_anywhere() as signals:
-                    async for message in signals:
-                        return str(message.path), message.get_contents()
+                    async for message, value in signals:
+                        return str(message.path), value
 
                 raise RuntimeError
 

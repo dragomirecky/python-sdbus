@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Iterable,
@@ -13,11 +12,9 @@ from typing import (
     Unpack,
 )
 
+from aiodbus.basic_types import DbusCompleteType, DbusCompleteTypes
 from aiodbus.bus.message import DbusMessage
 from aiodbus.closeable import Closeable
-
-if TYPE_CHECKING:
-    from _sdbus import DbusCompleteType, DbusCompleteTypes
 
 
 class MemberFlags(TypedDict, total=False):

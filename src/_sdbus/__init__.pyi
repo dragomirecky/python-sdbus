@@ -30,18 +30,9 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    Union,
 )
 
-DbusBasicType = Union[str, int, bytes, float, Any]
-DbusStructType = Tuple[DbusBasicType, ...]
-DbusDictType = Dict[DbusBasicType, DbusBasicType]
-DbusVariantType = Tuple[str, DbusStructType]
-DbusArrayType = List[DbusBasicType]
-DbusCompleteType = Union[
-    DbusBasicType, DbusStructType, DbusDictType, DbusVariantType, DbusArrayType
-]
-DbusCompleteTypes = Tuple[DbusCompleteType, ...]
+from aiodbus.basic_types import DbusCompleteType
 
 class SdBusSlot:
     """Holds reference to SdBus slot"""

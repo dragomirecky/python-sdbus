@@ -20,13 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from aiodbus import DbusInterfaceCommon, dbus_method, dbus_property, dbus_signal
-
-if TYPE_CHECKING:
-    from typing import List
-
 
 # These functions are not meant to be executed
 # but exist to be type checked.
@@ -38,15 +32,15 @@ class InterfaceTestTyping(
 ):
 
     @dbus_method(result_signature="as")
-    async def get_str_list_method(self) -> List[str]:
+    async def get_str_list_method(self) -> list[str]:
         raise NotImplementedError
 
     @dbus_property("as")
-    def str_list_property(self) -> List[str]:
+    def str_list_property(self) -> list[str]:
         raise NotImplementedError
 
     @dbus_signal("as")
-    def str_list_signal(self) -> List[str]:
+    def str_list_signal(self) -> list[str]:
         raise NotImplementedError
 
 
@@ -91,14 +85,14 @@ async def check_async_interface_signal_typing(
                 x.capitalize()
 
     async with test_interface.str_list_signal.catch_anywhere() as signals:
-        async for message in signals:
+        async for message, value in signals:
             ls2 = message.get_contents()
             ls2.append("test")
             for x2 in ls2:
                 x2.capitalize()
 
     async with test_interface.str_list_signal.catch_anywhere() as signals:
-        async for message in signals:
+        async for message, value in signals:
             p1 = message.path
             assert p1 is not None
             ls3 = message.get_contents()
@@ -109,7 +103,7 @@ async def check_async_interface_signal_typing(
                 x3.capitalize()
 
     async with test_interface.str_list_signal.catch_anywhere("org.example") as signals:
-        async for message in signals:
+        async for message, value in signals:
             p2 = message.path
             assert p2 is not None
             ls4 = message.get_contents()
@@ -123,11 +117,11 @@ async def check_async_interface_signal_typing(
 
 async def check_async_element_class_access_typing() -> None:
 
-    test_list: List[str] = []
+    test_list: list[str] = []
 
     # TODO: Fix dbus async method typing
     # test_list.append(
     #     TestTypingAsync.get_str_list_method.method_name
     # )
-    test_list.append(InterfaceTestTyping.str_list_property.name)
-    test_list.append(InterfaceTestTyping.str_list_signal.name)
+    test_list.append(InterfaceTestTyping.str_list_property.member.name)
+    test_list.append(InterfaceTestTyping.str_list_signal.member.name)

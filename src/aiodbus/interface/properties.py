@@ -16,6 +16,8 @@ from typing import (
     Tuple,
     Type,
     Union,
+    assert_never,
+    cast,
     overload,
     override,
 )
@@ -30,7 +32,7 @@ from aiodbus.member.signal import (
     DbusProxySignal,
     DbusSignal,
 )
-from aiodbus.meta import DbusRemoteObjectMeta
+from aiodbus.meta import DbusClassMeta, DbusRemoteObjectMeta
 
 DBUS_PROPERTIES_CHANGED_TYPING = Tuple[
     str,
@@ -164,36 +166,46 @@ class ProxyPropertiesChangedSignal[I: DbusInterface](
 
 
 @dataclass(frozen=True)
-class PropertiesChangedData[I: DbusInterface]:
-    interface: str
+class PropertiesChangedData[I: DbusPropertiesInterface]:
+    interface: Type[DbusPropertiesInterface]
     changed: PropertiesDict[I]
-    invalidated: List[str]
+    invalidated: List[DbusProperty]
 
 
-def parse_properties_changed(
-    data: DBUS_PROPERTIES_CHANGED_TYPING,
+def parse_properties_changed[T: DbusPropertiesInterface](
+    data: DBUS_PROPERTIES_CHANGED_TYPING, interface: Type[T]
 ) -> PropertiesChangedData:
     interface_name, changed_raw, invalidated = data
 
-    changed = PropertiesDict()
+    changed = PropertiesDict[T]()
+    property_interface = interface.dbus_interfaces[interface_name]
+    interface_meta = cast(DbusClassMeta, property_interface.dbus_meta)
+
     for member_name, variant in changed_raw.items():
-        changed[(interface_name, member_name)] = variant[1]
+        attr = interface_meta.member_to_attr[member_name]
+        member = cast(DbusClassMember, getattr(property_interface, attr)).member
+        value = member.mapping.conversion.to_dbus(variant[1])
+        changed[member] = value
+
+    invalidated_props = []
+    for invalidated_property_name in invalidated:
+        attr = interface_meta.member_to_attr[invalidated_property_name]
+        member = cast(DbusClassMember, getattr(property_interface, attr)).member
+        value = member.mapping.conversion.to_dbus(None)
+        invalidated_props.append(value)
 
     return PropertiesChangedData(
-        interface=interface_name,
+        interface=cast(Type[DbusPropertiesInterface], property_interface),
         changed=changed,
-        invalidated=invalidated,
+        invalidated=invalidated_props,
     )
 
 
-class PropertiesDict[I: DbusInterface](dict[tuple[str, str], Any]):
+class PropertiesDict[I: DbusPropertiesInterface](dict[DbusProperty, Any]):
     """
     Dictionary of properties of some D-Bus Object.
     Keys are (interface_name, property_name) tuples.
     """
-
-    @overload
-    def __getitem__(self, key: tuple[str, str]) -> Any: ...
 
     @overload
     def __getitem__[T](self, key: DbusBoundProperty[I, T]) -> T: ...
@@ -201,24 +213,28 @@ class PropertiesDict[I: DbusInterface](dict[tuple[str, str], Any]):
     @overload
     def __getitem__[T](self, key: DbusClassMember[I, DbusProperty[T]]) -> T: ...
 
+    @overload
+    def __getitem__[T](self, key: DbusProperty[T]) -> T: ...
+
     def __getitem__[T](
         self,
-        key: Union[tuple[str, str], DbusBoundProperty[I, T], DbusClassMember[I, DbusProperty[T]]],
+        key: DbusProperty[T]
+        | DbusBoundProperty[I, T]
+        | DbusClassMember[I, DbusProperty[T]],
     ):
-        if isinstance(key, DbusBoundProperty):
-            property = key.member
-            return self[(property.interface_name, property.name)]
-        elif isinstance(key, DbusClassMember):
-            property = key.member
-            return self[(property.interface_name, property.name)]
-        else:
-            return super().__getitem__(key)
+        match key:
+            case DbusBoundProperty() | DbusClassMember():
+                return super().__getitem__(key.member)
+            case DbusProperty():
+                return super().__getitem__(key)
+            case _:
+                assert_never(key)
 
     def update_with_properties_changed(self, data: PropertiesChangedData[I]) -> None:
         self.update(data.changed)
         for invalidated_property in data.invalidated:
             try:
-                del self[(data.interface, invalidated_property)]
+                del self[invalidated_property]
             except KeyError:
                 pass
 
@@ -235,24 +251,48 @@ class DbusPropertiesInterface(
     properties_changed = PropertiesChangedSignal(signature="sa{sv}as")
 
     @dbus_method("s", "a{sv}", name="GetAll")
-    async def _properties_get_all(self, interface_name: str) -> Dict[str, Tuple[str, Any]]:
-        raise NotImplementedError
+    async def _properties_get_all(
+        self, interface_name: str
+    ) -> Dict[str, Tuple[str, Any]]:
+        properties: Dict[str, Tuple[str, Any]] = {}
+        try:
+            interface = self.dbus_interfaces[interface_name]
+        except KeyError:
+            raise ValueError(
+                f"Interface {interface_name!r} not found in {self.__class__.__name__}"
+            )
+
+        interface_meta = cast(DbusClassMeta, interface.dbus_meta)
+        for member_attr, member in interface_meta.members.items():
+            if isinstance(member, DbusProperty):
+                bound_member = cast(DbusBoundProperty, getattr(self, member_attr))
+                value = await bound_member.get()
+                dbus_value = member.mapping.conversion.to_dbus(value)
+                properties[member.name] = (member.signature, dbus_value)
+        return properties
 
     async def properties_get_all(
         self,
-        interfaces: Optional[Iterable[str]] = None,
+        interfaces: Optional[Iterable[Type[DbusPropertiesInterface]]] = None,
     ) -> PropertiesDict[Self]:
         properties = PropertiesDict[Self]()
-        interfaces = [
-            interface
-            for interface, interface_cls in self.dbus_interfaces.items()
-            if interface_cls.dbus_meta is not None and interface_cls.dbus_meta.serving_enabled
-        ]
 
-        for interface_name in interfaces:
-            dbus_properties_data = await self._properties_get_all(interface_name)
+        if interfaces is None:
+            interfaces = [
+                cast(Type[DbusPropertiesInterface], interface_cls)
+                for interface_cls in self.dbus_interfaces.values()
+                if interface_cls.dbus_meta is not None
+                and interface_cls.dbus_meta.serving_enabled
+            ]
 
-            for dbus_name, variant in dbus_properties_data.items():
-                properties[(interface_name, dbus_name)] = variant[1]
+        for interface in interfaces:
+            dbus_meta = cast(DbusClassMeta, interface.dbus_meta)
+            dbus_properties_data = await self._properties_get_all(
+                dbus_meta.interface_name
+            )
+            for member_name, variant in dbus_properties_data.items():
+                attr_name = dbus_meta.member_to_attr[member_name]
+                member = cast(DbusClassMember, getattr(interface, attr_name)).member
+                properties[member] = member.mapping.conversion.from_dbus(variant[1])
 
         return properties

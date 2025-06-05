@@ -23,7 +23,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import ExitStack
-from inspect import getfullargspec, iscoroutinefunction
+from inspect import iscoroutinefunction
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -51,9 +51,10 @@ from aiodbus.member.base import (
     DbusProxyMember,
 )
 from aiodbus.meta import DbusRemoteObjectMeta
+from aiodbus.signature import MethodMapping
 
 if TYPE_CHECKING:
-    from _sdbus import DbusCompleteType
+    from aiodbus.basic_types import DbusCompleteType
     from aiodbus.interface.base import DbusInterface
 
 
@@ -73,10 +74,10 @@ class DbusMethod[**P, R](DbusMember):
     def __init__(
         self,
         name: Optional[str],
-        input_signature: str,
-        input_args_names: Optional[Sequence[str]],
-        result_signature: str,
-        result_args_names: Optional[Sequence[str]],
+        input_signature: str | None,
+        input_args_names: Sequence[str] | None,
+        result_signature: str | None,
+        result_args_names: Sequence[str] | None,
         unbound_method: AnyAsyncMethod[P, R],
         **flags: Unpack[MethodFlags],
     ):
@@ -91,29 +92,26 @@ class DbusMethod[**P, R](DbusMember):
 
         super().__init__(name)
         self.unbound_method = unbound_method
-        self.args_spec = getfullargspec(unbound_method)
-        self.args_names = self.args_spec.args[1:]  # 1: because of self
+
+        if (
+            input_signature is not None
+            or result_signature is not None
+            or input_args_names is not None
+            or result_args_names is not None
+        ):
+            self.mapping = MethodMapping.from_manual_input(
+                input_signature=input_signature or "",
+                input_names=input_args_names,
+                result_signature=result_signature or "",
+                result_names=result_args_names,
+                callable=unbound_method,
+            )
+        else:
+            self.mapping = MethodMapping.from_callable(unbound_method)
 
         self.method_name = name
-        self.input_signature = input_signature
-        self.input_args_names: Sequence[str] = ()
-        if input_args_names is not None:
-            assert not any(" " in x for x in input_args_names), (
-                "Can't have spaces in argument input names" f"Args: {input_args_names}"
-            )
-
-            self.input_args_names = input_args_names
-        elif result_args_names is not None:
-            self.input_args_names = self.args_names
-
-        self.result_signature = result_signature
-        self.result_args_names: Sequence[str] = ()
-        if result_args_names is not None:
-            assert not any(" " in x for x in result_args_names), (
-                "Can't have spaces in argument result names." f"Args: {result_args_names}"
-            )
-
-            self.result_args_names = result_args_names
+        self.input_signature = self.mapping.input_conversion.signature
+        self.result_signature = self.mapping.result_conversion.signature
 
         self.flags = flags
 
@@ -188,10 +186,10 @@ class DbusProxyMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusPr
             interface=self.member.interface_name,
             member=self.member.method_name,
             signature=self.member.input_signature,
-            args=self._flatten_args(*args, **kwargs),
+            args=self.member.mapping.input_conversion.to_dbus(self._flatten_args(*args, **kwargs)),
             no_reply=self.member.flags.get("no_reply", False),
         )
-        return cast(R, result)  # we have to hope it's correct
+        return self.member.mapping.result_conversion.from_dbus(result)
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """
@@ -215,9 +213,9 @@ class DbusLocalMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusLo
         interface.add_method(
             self.member.method_name,
             self.member.input_signature,
-            self.member.input_args_names,
+            tuple(p.name for p in self.member.mapping.input_params),
             self.member.result_signature,
-            self.member.result_args_names,
+            tuple(p.name for p in self.member.mapping.result_params),
             self._handle_dbus_call,
             **self.member.flags,
         )
@@ -228,11 +226,12 @@ class DbusLocalMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusLo
         """
         bound_method = self.member.unbound_method.__get__(self.local_object, None)
 
-        return await call_with_middlewares(
+        result = await call_with_middlewares(
             bound_method,
             self.member.from_dbus_middlewares.copy(),
-            *args,  # type: ignore
+            *self.member.mapping.input_conversion.from_dbus(args),
         )
+        return self.member.mapping.result_conversion.to_dbus(result)
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """
@@ -243,10 +242,10 @@ class DbusLocalMethod[I: DbusInterface, **P, R](DbusBoundMethod[I, P, R], DbusLo
 
 
 def dbus_method[**P, R](
-    input_signature: str = "",
-    result_signature: str = "",
-    result_args_names: Optional[Sequence[str]] = None,
-    input_args_names: Optional[Sequence[str]] = None,
+    input_signature: str | None = None,
+    result_signature: str | None = None,
+    result_args_names: Sequence[str] | None = None,
+    input_args_names: Sequence[str] | None = None,
     name: Optional[str] = None,
     **flags: Unpack[MethodFlags],
 ) -> Callable[[AnyAsyncMethod[P, R]], DbusMethod[P, R]]:
