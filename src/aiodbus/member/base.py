@@ -29,6 +29,8 @@ class DbusMember:
         Convert Python variable name to D-Bus member name.
         snake_case -> PascalCase
         """
+        if name.startswith("_"):
+            name = name[1:]
         components = name.split("_")
         return "".join(x.capitalize() for x in components)
 
