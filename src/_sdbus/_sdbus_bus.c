@@ -258,20 +258,26 @@ static int SdBus_call_callback(sd_bus_message * m,
     PyObject * is_cancelled CLEANUP_PY_OBJECT = PyObject_CallMethod(py_future, "cancelled", "");
     if (Py_True == is_cancelled) {
         // A bit unpythonic but SdBus_process does not error out
+        // Decrement reference count added when call_async was called
+        Py_DECREF(py_future);
         return 0;
     }
 
     SdBusMessageObject * reply_message_object CLEANUP_SD_BUS_MESSAGE = (SdBusMessageObject *)SD_BUS_PY_CLASS_DUNDER_NEW(SdBusMessage_class);
     if (reply_message_object == NULL) {
+        Py_DECREF(py_future);
         return -1;
     }
 
     _SdBusMessage_set_messsage(reply_message_object, reply_message);
     PyObject * return_object CLEANUP_PY_OBJECT = PyObject_CallMethod(py_future, "set_result", "O", reply_message_object);
     if (return_object == NULL) {
+        Py_DECREF(py_future);
         return -1;
     }
 
+    // Decrement reference count added when call_async was called
+    Py_DECREF(py_future);
     return 0;
 }
 
@@ -292,10 +298,18 @@ static PyObject * SdBus_call_async(SdBusObject * self, PyObject * args) {
 
     SdBusSlotObject * new_slot_object CLEANUP_SD_BUS_SLOT = (SdBusSlotObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBusSlot_class));
 
-    CALL_SD_BUS_AND_CHECK(
-        sd_bus_call_async(self->sd_bus_ref, &new_slot_object->slot_ref, call_message->message_ref, SdBus_call_callback, new_future, (uint64_t)0));
+    // Increment reference count on future before passing to sd_bus callback.
+    // The callback will decrement it when done.
+    Py_INCREF(new_future);
+    int return_int = sd_bus_call_async(self->sd_bus_ref, &new_slot_object->slot_ref, call_message->message_ref, SdBus_call_callback, new_future, (uint64_t)0);
+    if (return_int < 0) {
+        Py_DECREF(new_future);  // Undo the INCREF since callback won't be called
+        SDBUS_LIBRARY_ERROR_FORMAT(sd_bus_call_async);
+        return NULL;
+    }
 
     if (PyObject_SetAttrString(new_future, "_sd_bus_py_slot", (PyObject *)new_slot_object) < 0) {
+        // Note: callback may still be called, so don't DECREF here
         return NULL;
     }
     CHECK_ASYNCIO_WATCHERS;
