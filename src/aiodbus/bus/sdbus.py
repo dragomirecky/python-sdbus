@@ -4,6 +4,7 @@ import asyncio
 import contextvars
 import errno
 import logging
+from asyncio import CancelledError
 from collections import defaultdict
 from functools import partial, wraps
 from typing import (
@@ -121,11 +122,19 @@ class SdBusServingInterface(DbusInterfaceBuilder):
                         reply.append_data(result_signature, reply_data)
             elif reply_data is not None:
                 reply.append_data(result_signature, reply_data)
+        except CancelledError:
+            # Task was cancelled - send error reply if expected, then re-raise
+            if message.expect_reply:
+                reply = message.create_error_reply(
+                    "org.freedesktop.DBus.Error.Failed",
+                    "Method call was cancelled",
+                )
+                reply.send()
+            raise
         except Exception as exc:
             if isinstance(exc, MethodCallError):
                 error = exc
             else:
-
                 logger.exception(
                     "Exception in method handler for %s.%s (%s)",
                     message.path,
