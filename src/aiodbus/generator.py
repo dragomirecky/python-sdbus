@@ -558,6 +558,7 @@ INTERFACE_TEMPLATES: Dict[str, str] = {
 """,
     "generic_method_flags": (
         """\
+name="{{ method.method_name }}",
 {% if method.dbus_input_signature %}
 input_signature="{{ method.dbus_input_signature }}",
 {% endif %}
@@ -574,6 +575,7 @@ result_args_names={{method.result_args_names_repr}},
     ),
     "generic_property_flags": (
         """\
+name="{{ a_property.method_name }}",
 {% if a_property.dbus_signature %}
 signature="{{ a_property.dbus_signature }}",
 {% endif %}
