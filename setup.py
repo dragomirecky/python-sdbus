@@ -113,8 +113,10 @@ def _configure_from_pkgconfig() -> None:
 
 
 try:
+    # AttributeError guards against an importable-but-stale basu wheel that
+    # predates the get_include()/get_library_dir() locator API.
     _configure_basu_from_wheel()
-except ImportError:
+except (ImportError, AttributeError):
     _configure_from_pkgconfig()
 
 link_arguments.append("-flto")
