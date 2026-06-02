@@ -37,9 +37,15 @@ static PyObject * SdBusMessage_seal(SdBusMessageObject * self, PyObject * Py_UNU
 }
 
 static PyObject * SdBusMessage_dump(SdBusMessageObject * self, PyObject * Py_UNUSED(args)) {
+#ifdef LIBSYSTEMD_NO_MESSAGE_DUMP
+    PyErr_SetString(PyExc_NotImplementedError,
+                    "sd_bus_message_dump is not available in this sd-bus implementation (basu)");
+    return NULL;
+#else
     CALL_SD_BUS_AND_CHECK(sd_bus_message_dump(self->message_ref, 0, SD_BUS_MESSAGE_DUMP_WITH_HEADER));
     CALL_SD_BUS_AND_CHECK(sd_bus_message_rewind(self->message_ref, 1));
     Py_RETURN_NONE;
+#endif
 }
 
 typedef struct {

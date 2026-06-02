@@ -21,7 +21,9 @@
 */
 #include <errno.h>
 #include <poll.h>
+#ifndef __APPLE__
 #include <sys/timerfd.h>
+#endif
 #include <time.h>
 #include "_sdbus.h"
 
@@ -31,9 +33,14 @@ static void SdBus_dealloc(SdBusObject * self) {
         Py_XDECREF(PyObject_CallMethodObjArgs(self->loop, remove_writer_str, self->bus_fd, NULL));
     }
     if (NULL != self->timer_fd) {
+#ifdef __APPLE__
+        Py_XDECREF(PyObject_CallMethodObjArgs(self->timer_fd, cancel_str, NULL));
+        Py_DECREF(self->timer_fd);
+#else
         Py_XDECREF(PyObject_CallMethodObjArgs(self->loop, remove_reader_str, self->timer_fd, NULL));
         Py_DECREF(self->timer_fd);
         close(self->timer_fd_int);
+#endif
     }
     sd_bus_unref(self->sd_bus_ref);
     Py_XDECREF(self->bus_fd);
@@ -562,8 +569,13 @@ static PyObject * SdBus_close(SdBusObject * self, PyObject * Py_UNUSED(args)) {
         Py_XDECREF(CALL_PYTHON_AND_CHECK(PyObject_CallMethodObjArgs(self->loop, remove_writer_str, self->bus_fd, NULL)));
     }
     if (NULL != self->timer_fd) {
+#ifdef __APPLE__
+        Py_XDECREF(PyObject_CallMethodObjArgs(self->timer_fd, cancel_str, NULL));
+        Py_CLEAR(self->timer_fd);
+#else
         Py_XDECREF(PyObject_CallMethodObjArgs(self->loop, remove_reader_str, self->timer_fd, NULL));
         // TODO: Close timerfd
+#endif
     }
     Py_RETURN_NONE;
 }
@@ -594,6 +606,29 @@ static PyObject * SdBus_asyncio_update_fd_watchers(SdBusObject * self) {
     PyObject * running_loop = CALL_PYTHON_AND_CHECK(_get_or_bind_loop(self));
     PyObject * drive_method CLEANUP_PY_OBJECT = CALL_PYTHON_AND_CHECK(PyObject_GetAttrString((PyObject *)self, "process"));
 
+#ifdef __APPLE__
+    // macOS has no timerfd; drive the bus's next timeout via the asyncio loop's
+    // own timer (call_later), storing the returned TimerHandle in timer_fd.
+    uint64_t timeout_usec = UINT64_MAX;
+    CALL_SD_BUS_AND_CHECK(sd_bus_get_timeout_uint_max_on_closed(self, &timeout_usec));
+
+    if (NULL != self->timer_fd) {
+        Py_XDECREF(CALL_PYTHON_AND_CHECK(PyObject_CallMethodObjArgs(self->timer_fd, cancel_str, NULL)));
+        Py_CLEAR(self->timer_fd);
+    }
+
+    if (timeout_usec == 0) {
+        Py_XDECREF(CALL_PYTHON_AND_CHECK(PyObject_CallMethodObjArgs(running_loop, call_soon_str, drive_method, NULL)));
+    } else if (timeout_usec != UINT64_MAX) {
+        struct timespec now_ts;
+        clock_gettime(CLOCK_MONOTONIC, &now_ts);
+        uint64_t now_usec = (uint64_t)now_ts.tv_sec * 1000000 + (uint64_t)now_ts.tv_nsec / 1000;
+        double delay_sec = timeout_usec > now_usec ? (double)(timeout_usec - now_usec) / 1000000.0 : 0.0;
+        PyObject * delay_obj CLEANUP_PY_OBJECT = PyFloat_FromDouble(delay_sec);
+        self->timer_fd = CALL_PYTHON_AND_CHECK(
+            PyObject_CallMethodObjArgs(running_loop, call_later_str, delay_obj, drive_method, NULL));
+    }
+#else
     if (NULL == self->timer_fd) {
         self->timer_fd_int = CALL_SD_BUS_AND_CHECK(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC));
         if (self->timer_fd_int < 0) {
@@ -619,6 +654,7 @@ static PyObject * SdBus_asyncio_update_fd_watchers(SdBusObject * self) {
     }
 
     CALL_SD_BUS_AND_CHECK(timerfd_settime(self->timer_fd_int, TFD_TIMER_ABSTIME, &bus_timer, NULL));
+#endif
 
     int events_to_watch = CALL_SD_BUS_AND_CHECK(sd_bus_get_events_zero_on_closed(self));
     if (events_to_watch == self->asyncio_watchers_last_state) {

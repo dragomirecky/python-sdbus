@@ -36,6 +36,8 @@ PyObject * null_str = NULL;
 PyObject * extend_str = NULL;
 PyObject * append_str = NULL;
 PyObject * call_soon_str = NULL;
+PyObject * call_later_str = NULL;
+PyObject * cancel_str = NULL;
 PyObject * create_task_str = NULL;
 // Exceptions
 PyObject * sdbus_exception = NULL;
@@ -131,6 +133,8 @@ PyMODINIT_FUNC PyInit__sdbus(void) {
     set_result_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("set_result"));
     set_exception_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("set_exception"));
     call_soon_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("call_soon"));
+    call_later_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("call_later"));
+    cancel_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("cancel"));
     create_task_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("create_task"));
     remove_reader_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("remove_reader"));
     add_reader_str = CALL_PYTHON_AND_CHECK(PyUnicode_FromString("add_reader"));

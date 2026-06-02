@@ -23,7 +23,25 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <structmember.h>
+#ifdef PYTHON_SDBUS_USE_BASU
+#include <basu/sd-bus.h>
+/* basu predates some sd-bus vtable flags; bit 8 is unused there. */
+#ifndef SD_BUS_VTABLE_SENSITIVE
+#define SD_BUS_VTABLE_SENSITIVE (1ULL << 8)
+#endif
+/* basu lacks the *_WITH_NAMES vtable helpers (argument-name introspection
+ * metadata); fall back to the unnamed variants. */
+#ifndef SD_BUS_METHOD_WITH_NAMES_OFFSET
+#define SD_BUS_METHOD_WITH_NAMES_OFFSET(_member, _signature, _in_names, _result, _out_names, _handler, _offset, _flags) \
+    SD_BUS_METHOD_WITH_OFFSET(_member, _signature, _result, _handler, _offset, _flags)
+#endif
+#ifndef SD_BUS_SIGNAL_WITH_NAMES
+#define SD_BUS_SIGNAL_WITH_NAMES(_member, _signature, _names, _flags) \
+    SD_BUS_SIGNAL(_member, _signature, _flags)
+#endif
+#else
 #include <systemd/sd-bus.h>
+#endif
 // Macros
 
 #define SD_BUS_PY_CHECK_ARGS_NUMBER(number_args)                                             \
@@ -285,6 +303,8 @@ extern PyObject * null_str;
 extern PyObject * extend_str;
 extern PyObject * append_str;
 extern PyObject * call_soon_str;
+extern PyObject * call_later_str;
+extern PyObject * cancel_str;
 extern PyObject * create_task_str;
 // Exceptions
 extern PyObject * sdbus_exception;

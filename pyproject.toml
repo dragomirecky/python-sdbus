@@ -1,5 +1,7 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+# basu (the sd-bus implementation) is only needed where libsystemd is absent;
+# on macOS the extension is built against the basu wheel (see setup.py).
+requires = ["setuptools>=61.0", "basu; sys_platform == 'darwin'"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -14,7 +16,7 @@ authors = [
 ]
 keywords = ["dbus", "ipc", "linux", "freedesktop"]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["basu; sys_platform == 'darwin'"]
 
 [project.scripts]
 aiodbus = "aiodbus.__main__:generator_main"
@@ -41,6 +43,8 @@ line-length = 100
 cache-keys = [
     "src/_sdbus/*.c",
     "src/_sdbus/*.h",
+    "setup.py",
+    "pyproject.toml",
 ]
 
 [tool.pytest.ini_options]
