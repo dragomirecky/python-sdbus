@@ -28,63 +28,96 @@ from typing import List, Optional, Tuple
 from setuptools import Extension, setup
 
 c_macros: List[Tuple[str, Optional[str]]] = []
+compile_arguments: List[str] = ["-flto"]
 
 
-def get_libsystemd_version() -> int:
+def _pkg_config(pkg: str, *args: str) -> str:
     process = subprocess_run(
-        args=("pkg-config", "--modversion", "libsystemd"),
+        args=("pkg-config", *args, pkg),
         stderr=DEVNULL,
         stdout=PIPE,
         check=True,
         text=True,
     )
-
-    result_str = process.stdout
-    # Version can either be like 250 or 250.10
-    first_component = result_str.split(".")[0]
-
-    return int(first_component)
+    return process.stdout.strip()
 
 
-if not environ.get("PYTHON_SDBUS_USE_IGNORE_SYSTEMD_VERSION"):
-    systemd_version = get_libsystemd_version()
-
-    if systemd_version < 246:
-        c_macros.append(("LIBSYSTEMD_NO_VALIDATION_FUNCS", None))
-
-    if systemd_version < 248:
-        c_macros.append(("LIBSYSTEMD_NO_OPEN_USER_MACHINE", None))
-
-
-def get_link_arguments() -> List[str]:
-    process = subprocess_run(
-        args=("pkg-config", "--libs-only-l", "libsystemd"),
-        stderr=DEVNULL,
-        stdout=PIPE,
-        check=True,
+def _pkg_config_exists(pkg: str) -> bool:
+    return (
+        subprocess_run(
+            args=("pkg-config", "--exists", pkg),
+            stderr=DEVNULL,
+            stdout=DEVNULL,
+        ).returncode
+        == 0
     )
 
-    result_str = process.stdout.decode("utf-8")
 
-    return result_str.rstrip(" \n").split(" ")
+link_arguments: List[str] = []
 
 
-link_arguments: List[str] = get_link_arguments()
+def _configure_basu_from_wheel() -> None:
+    """Build against the ``basu`` wheel: ``import basu`` for paths, no pkg-config.
 
-if environ.get("PYTHON_SDBUS_USE_STATIC_LINK"):
-    # Link statically against libsystemd and libcap
-    link_arguments = [
-        "-Wl,-Bstatic",
-        *link_arguments,
-        "-lcap",
-        "-Wl,-Bdynamic",
-        "-lrt",
-        "-lpthread",
-    ]
+    basu (a standalone sd-bus) ships its headers and ``libbasu`` inside the
+    installed Python package, so projects can build sd-bus extensions on macOS
+    without a system install. basu predates several newer sd-bus APIs, so the
+    corresponding fallback macros are always defined.
+    """
+    import basu
+
+    c_macros.append(("PYTHON_SDBUS_USE_BASU", None))
+    c_macros.append(("LIBSYSTEMD_NO_MESSAGE_DUMP", None))
+    c_macros.append(("LIBSYSTEMD_NO_VALIDATION_FUNCS", None))
+    c_macros.append(("LIBSYSTEMD_NO_OPEN_USER_MACHINE", None))
+
+    libdir = basu.get_library_dir()
+    compile_arguments.append("-I" + basu.get_include())
+    link_arguments.extend(["-L" + libdir, "-lbasu"])
+    # Two rpaths so libbasu (install_name @rpath/libbasu.dylib) resolves either way:
+    #  - non-editable install: _sdbus*.so sits in <site-packages> next to the
+    #    basu package, so this relative path is stable across environments;
+    #  - editable install: _sdbus*.so stays in the source tree, so fall back to
+    #    the absolute path of the basu package this was built against.
+    link_arguments.append("-Wl,-rpath,@loader_path/basu/lib")
+    link_arguments.append("-Wl,-rpath," + libdir)
+
+
+def _configure_from_pkgconfig() -> None:
+    """Fallback: locate sd-bus via pkg-config (libsystemd on Linux, else basu)."""
+    if _pkg_config_exists("libsystemd"):
+        pkg = "libsystemd"
+    elif _pkg_config_exists("basu"):
+        pkg = "basu"
+    else:
+        raise RuntimeError(
+            "No sd-bus implementation found. Install the 'basu' wheel "
+            "(macOS) or libsystemd/basu discoverable via pkg-config."
+        )
+
+    if pkg == "basu":
+        c_macros.append(("PYTHON_SDBUS_USE_BASU", None))
+        c_macros.append(("LIBSYSTEMD_NO_MESSAGE_DUMP", None))
+        cflags = _pkg_config(pkg, "--cflags")
+        if cflags:
+            compile_arguments.extend(cflags.split())
+
+    if not environ.get("PYTHON_SDBUS_USE_IGNORE_SYSTEMD_VERSION"):
+        version = int(_pkg_config(pkg, "--modversion").split(".")[0])
+        if version < 246:
+            c_macros.append(("LIBSYSTEMD_NO_VALIDATION_FUNCS", None))
+        if version < 248:
+            c_macros.append(("LIBSYSTEMD_NO_OPEN_USER_MACHINE", None))
+
+    link_arguments.extend(_pkg_config(pkg, "--libs").split())
+
+
+try:
+    _configure_basu_from_wheel()
+except ImportError:
+    _configure_from_pkgconfig()
 
 link_arguments.append("-flto")
-
-compile_arguments: List[str] = ["-flto"]
 
 use_limited_api = False
 

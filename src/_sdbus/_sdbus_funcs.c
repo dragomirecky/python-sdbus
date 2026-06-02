@@ -40,21 +40,31 @@ static SdBusObject * sd_bus_py_open_system(PyObject * Py_UNUSED(self), PyObject 
 }
 
 static SdBusObject * sd_bus_py_open_system_remote(PyObject * Py_UNUSED(self), PyObject * args) {
+#ifndef LIBSYSTEMD_NO_OPEN_USER_MACHINE
     const char * remote_host_char_ptr = NULL;
     CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "s", &remote_host_char_ptr, NULL));
 
     SdBusObject * new_sd_bus = (SdBusObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBus_class));
     CALL_SD_BUS_AND_CHECK(sd_bus_open_system_remote(&(new_sd_bus->sd_bus_ref), remote_host_char_ptr));
     return new_sd_bus;
+#else
+    PyErr_SetString(PyExc_NotImplementedError, "this sd-bus implementation does not support opening a remote system bus");
+    return NULL;
+#endif
 }
 
 static SdBusObject * sd_bus_py_open_system_machine(PyObject * Py_UNUSED(self), PyObject * args) {
+#ifndef LIBSYSTEMD_NO_OPEN_USER_MACHINE
     const char * remote_host_char_ptr = NULL;
     CALL_PYTHON_BOOL_CHECK(PyArg_ParseTuple(args, "s", &remote_host_char_ptr, NULL));
 
     SdBusObject * new_sd_bus = (SdBusObject *)CALL_PYTHON_AND_CHECK(SD_BUS_PY_CLASS_DUNDER_NEW(SdBus_class));
     CALL_SD_BUS_AND_CHECK(sd_bus_open_system_machine(&(new_sd_bus->sd_bus_ref), remote_host_char_ptr));
     return new_sd_bus;
+#else
+    PyErr_SetString(PyExc_NotImplementedError, "this sd-bus implementation does not support opening a machine system bus");
+    return NULL;
+#endif
 }
 
 static SdBusObject * sd_bus_py_open_user_machine(PyObject * Py_UNUSED(self), PyObject * args) {
