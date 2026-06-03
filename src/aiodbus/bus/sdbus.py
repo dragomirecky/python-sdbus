@@ -87,15 +87,25 @@ def translate_sdbus_error[**P, R](func: Callable[P, R]) -> Callable[P, R]:
 
 
 class SdBusServingInterface(DbusInterfaceBuilder):
-    def __init__(self, interface: SdBusInterface, name: str, path: str) -> None:
+    def __init__(
+        self, interface: SdBusInterface, name: str, path: str, connection: _SdBus
+    ) -> None:
         self._interface = interface
         self.name = name
         self.path = path
         self.object_manager_advertised = False
+        # Replies are sent from the async handler task (outside sd_bus_process), so
+        # a reply larger than the socket buffer leaves a partial write queued with
+        # no POLLOUT watcher armed -> caller sees NoReply. process() flushes and
+        # re-arms, mirroring what call_async already does for outgoing calls.
+        self._connection = connection
 
     @staticmethod
     async def _method_handler(
-        result_signature: str, callback: MethodCallable, message: SdBusMessage
+        connection: _SdBus,
+        result_signature: str,
+        callback: MethodCallable,
+        message: SdBusMessage,
     ) -> None:
         try:
 
@@ -130,6 +140,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
                     "Method call was cancelled",
                 )
                 reply.send()
+                connection.process()
             raise
         except Exception as exc:
             if isinstance(exc, MethodCallError):
@@ -152,6 +163,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
             )
 
         reply.send()
+        connection.process()
 
     _property_flags_mask = (
         DbusPropertyConstFlag
@@ -201,7 +213,7 @@ class SdBusServingInterface(DbusInterfaceBuilder):
             result_signature,
             result_args_names,
             flags_int,
-            partial(self._method_handler, result_signature, callback),
+            partial(self._method_handler, self._connection, result_signature, callback),
         )
 
     @staticmethod
@@ -416,7 +428,7 @@ class SdBus(Dbus[SdBusServingInterface]):
         )
 
     def create_interface(self, name: str, path: str) -> SdBusServingInterface:
-        return SdBusServingInterface(SdBusInterface(), name, path)
+        return SdBusServingInterface(SdBusInterface(), name, path, self._sdbus)
 
     def export_interface(self, interface: SdBusServingInterface) -> Closeable:
         assert (
