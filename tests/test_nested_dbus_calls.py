@@ -93,7 +93,7 @@ class ServiceBInterface(
 
 # Worker script for ServiceC (terminal service)
 SERVICE_C_SCRIPT = textwrap.dedent(
-    f'''
+    f"""
     import asyncio
     import random
     import sys
@@ -131,12 +131,12 @@ SERVICE_C_SCRIPT = textwrap.dedent(
 
     if __name__ == "__main__":
         asyncio.run(main())
-    '''
+    """
 )
 
 # Worker script for ServiceB (middle service that calls ServiceC)
 SERVICE_B_SCRIPT = textwrap.dedent(
-    f'''
+    f"""
     import asyncio
     import sys
     sys.path.insert(0, "{SRC_PATH}")
@@ -188,7 +188,7 @@ SERVICE_B_SCRIPT = textwrap.dedent(
 
     if __name__ == "__main__":
         asyncio.run(main())
-    '''
+    """
 )
 
 
@@ -210,6 +210,7 @@ class WorkerProcess:
             stderr=subprocess.PIPE,
             env=os.environ.copy(),
         )
+        assert self.proc.stdout is not None
 
         # Wait for READY signal with timeout
         import select
@@ -217,9 +218,7 @@ class WorkerProcess:
         ready = select.select([self.proc.stdout], [], [], timeout)
         if not ready[0]:
             self.terminate()
-            raise RuntimeError(
-                f"Worker {self.name} did not become ready within {timeout}s"
-            )
+            raise RuntimeError(f"Worker {self.name} did not become ready within {timeout}s")
 
         line = self.proc.stdout.readline().decode().strip()
         self.stdout_lines.append(line)
@@ -304,13 +303,9 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
         proxy_b = ServiceBInterface.new_proxy(SERVICE_B_NAME, "/")
 
         for i in range(20):
-            result = await asyncio.wait_for(
-                proxy_b.call_c(i, "x" * (i * 10 + 1)), timeout=10.0
-            )
+            result = await asyncio.wait_for(proxy_b.call_c(i, "x" * (i * 10 + 1)), timeout=10.0)
             expected = f"B:{i}:C:{i}:{i * 10 + 1}"
-            self.assertEqual(
-                result, expected, f"Call {i}: expected {expected!r}, got {result!r}"
-            )
+            self.assertEqual(result, expected, f"Call {i}: expected {expected!r}, got {result!r}")
 
     async def test_nested_calls_stress_light(self) -> None:
         """Light stress test: 10 concurrent calls, 3 rounds."""
@@ -328,9 +323,7 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
         """Extreme stress test: 100 concurrent calls, 3 rounds."""
         await self._run_stress_test(concurrent=100, rounds=3, payload_size=100)
 
-    async def _run_stress_test(
-        self, concurrent: int, rounds: int, payload_size: int
-    ) -> None:
+    async def _run_stress_test(self, concurrent: int, rounds: int, payload_size: int) -> None:
         """
         Run stress test with given parameters.
 
@@ -351,7 +344,7 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
         self.assertEqual(pong, "pong", "ServiceB not responding")
 
         # Track results
-        errors: List[Exception] = []
+        errors: List[BaseException] = []
         timeouts = 0
         completed = 0
 
@@ -375,26 +368,20 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
                     tasks.append((call_id, task))
 
                 # Gather results
-                results = await asyncio.gather(
-                    *[t for _, t in tasks], return_exceptions=True
-                )
+                results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
 
                 for (call_id, _), result in zip(tasks, results):
                     if isinstance(result, asyncio.TimeoutError):
                         timeouts += 1
-                        errors.append(
-                            Exception(f"Timeout on call {call_id} in round {round_num}")
-                        )
-                    elif isinstance(result, Exception):
+                        errors.append(Exception(f"Timeout on call {call_id} in round {round_num}"))
+                    elif isinstance(result, BaseException):
                         errors.append(result)
                     else:
                         # Verify result format
                         expected_prefix = f"B:{call_id}:C:{call_id}:"
                         if not result.startswith(expected_prefix):
                             errors.append(
-                                Exception(
-                                    f"Unexpected result for call {call_id}: {result!r}"
-                                )
+                                Exception(f"Unexpected result for call {call_id}: {result!r}")
                             )
                         else:
                             completed += 1
@@ -403,8 +390,7 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
             task_warnings = [
                 w
                 for w in warning_list
-                if "Task was destroyed" in str(w.message)
-                or "GeneratorExit" in str(w.message)
+                if "Task was destroyed" in str(w.message) or "GeneratorExit" in str(w.message)
             ]
 
         # Check worker health
@@ -443,6 +429,4 @@ class TestNestedDbusCallsStress(IsolatedDbusTestCase):
             f"Details:\n" + "\n".join(f"  - {d}" for d in failure_details),
         )
 
-        self.assertEqual(
-            completed, total_calls, f"Only {completed}/{total_calls} calls completed"
-        )
+        self.assertEqual(completed, total_calls, f"Only {completed}/{total_calls} calls completed")

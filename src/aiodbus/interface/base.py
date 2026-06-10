@@ -39,6 +39,7 @@ from typing import (
 from _sdbus import is_interface_name_valid
 from aiodbus.bus import Dbus, get_default_bus
 from aiodbus.member.base import DbusLocalMember, DbusMember
+from aiodbus.member.method import DbusMethod
 from aiodbus.meta import DbusClassMeta, DbusLocalObjectMeta, DbusRemoteObjectMeta
 
 if TYPE_CHECKING:
@@ -72,6 +73,7 @@ class DbusInterfaceMeta(type):
         namespace: Dict[str, Any],
         interface_name: Optional[str] = None,
         serving_enabled: bool = True,
+        default_unprivileged: bool = False,
     ) -> DbusInterfaceMeta:
         # get parent interfaces
         parent_interfaces: OrderedDict[str, DbusInterfaceMeta] = OrderedDict(
@@ -110,6 +112,8 @@ class DbusInterfaceMeta(type):
             for member in new_members.values():
                 member.interface_name = interface_name
                 member.serving_enabled = serving_enabled
+                if default_unprivileged and isinstance(member, DbusMethod):
+                    member.flags.setdefault("unprivileged", True)
 
             meta = DbusClassMeta(interface_name, serving_enabled, new_members)
             meta.attr_to_member = {attr: member.name for attr, member in new_members.items()}
@@ -169,7 +173,9 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
             interface_member_list.append(value)
 
         with ExitStack() as exit_stack:
-            exit_stack.callback(lambda: self) # just store reference to exported interface, to avoid garbage collection
+            exit_stack.callback(
+                lambda: self
+            )  # just store reference to exported interface, to avoid garbage collection
             exported_interfaces = list[str]()
 
             for interface_name, member_list in interface_map.items():
@@ -183,7 +189,9 @@ class DbusInterface(metaclass=DbusInterfaceMeta):
 
             if manager is not None:
                 bus.emit_interfaces_added(object_path, exported_interfaces)
-                exit_stack.callback(lambda: bus.emit_interfaces_removed(object_path, exported_interfaces))
+                exit_stack.callback(
+                    lambda: bus.emit_interfaces_removed(object_path, exported_interfaces)
+                )
 
             return exit_stack.pop_all()
 
