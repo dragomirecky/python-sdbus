@@ -52,9 +52,14 @@ static int SdBusInterface_traverse(SdBusInterfaceObject * self, visitproc visit,
 }
 
 static int SdBusInterface_clear(SdBusInterfaceObject * self) {
-    // Drop the slot first: it detaches the vtable from sd-bus, so no callback can
-    // run against the members cleared below.
-    Py_CLEAR(self->interface_slot);
+    // sd_bus_add_object_vtable() stores a borrowed pointer to this object as the
+    // vtable's userdata, so the vtable has to be gone before the object is. Unref the
+    // slot itself rather than only dropping our reference to it: another reference to
+    // the slot would otherwise leave the vtable registered against freed memory.
+    if (NULL != self->interface_slot) {
+        self->interface_slot->slot_ref = sd_bus_slot_unref(self->interface_slot->slot_ref);
+        Py_CLEAR(self->interface_slot);
+    }
     Py_CLEAR(self->method_list);
     Py_CLEAR(self->method_dict);
     Py_CLEAR(self->property_list);
