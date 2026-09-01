@@ -21,9 +21,12 @@
 from __future__ import annotations
 
 from asyncio import get_running_loop
+from gc import collect
 from unittest import SkipTest, TestCase, main
+from weakref import ref as weak_ref
 
 from _sdbus import (
+    SdBusInterface,
     _SdBus,
     is_interface_name_valid,
     is_member_name_valid,
@@ -90,6 +93,21 @@ class TestLowLeveApi(TestCase):
 
         with self.assertRaises(ValueError):
             del bus.method_call_timeout_usec
+
+    def test_interface_in_reference_cycle_is_collected(self) -> None:
+        """A callback handed to an interface normally captures the object owning that
+        interface. The resulting cycle is only collectable if SdBusInterface can be
+        traversed by the garbage collector."""
+
+        class Owner:
+            def __init__(self) -> None:
+                self.interface = SdBusInterface()
+                self.interface.add_property("Prop", "s", lambda message: self, None, 0)
+
+        owner = weak_ref(Owner())
+        collect()
+
+        self.assertIsNone(owner(), "interface kept its owner alive")
 
 
 if __name__ == "__main__":
