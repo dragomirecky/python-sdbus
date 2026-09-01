@@ -35,14 +35,38 @@ static int SdBusInterface_init(SdBusInterfaceObject * self, PyObject * Py_UNUSED
     return 0;
 }
 
+// The callbacks stored below almost always close a reference cycle back to this
+// interface: a bound method or a closure over the object that owns it. Without GC
+// support that cycle is unreachable for the collector and leaks the whole graph
+// hanging off the callbacks, so the type is traversable and clearable.
+static int SdBusInterface_traverse(SdBusInterfaceObject * self, visitproc visit, void * arg) {
+    Py_VISIT(Py_TYPE(self));
+    Py_VISIT(self->interface_slot);
+    Py_VISIT(self->method_list);
+    Py_VISIT(self->method_dict);
+    Py_VISIT(self->property_list);
+    Py_VISIT(self->property_get_dict);
+    Py_VISIT(self->property_set_dict);
+    Py_VISIT(self->signal_list);
+    return 0;
+}
+
+static int SdBusInterface_clear(SdBusInterfaceObject * self) {
+    // Drop the slot first: it detaches the vtable from sd-bus, so no callback can
+    // run against the members cleared below.
+    Py_CLEAR(self->interface_slot);
+    Py_CLEAR(self->method_list);
+    Py_CLEAR(self->method_dict);
+    Py_CLEAR(self->property_list);
+    Py_CLEAR(self->property_get_dict);
+    Py_CLEAR(self->property_set_dict);
+    Py_CLEAR(self->signal_list);
+    return 0;
+}
+
 static void SdBusInterface_dealloc(SdBusInterfaceObject * self) {
-    Py_XDECREF(self->interface_slot);
-    Py_XDECREF(self->method_list);
-    Py_XDECREF(self->method_dict);
-    Py_XDECREF(self->property_list);
-    Py_XDECREF(self->property_get_dict);
-    Py_XDECREF(self->property_set_dict);
-    Py_XDECREF(self->signal_list);
+    PyObject_GC_UnTrack(self);
+    SdBusInterface_clear(self);
     if (self->vtable) {
         free(self->vtable);
     }
@@ -344,11 +368,13 @@ PyType_Spec SdBusInterfaceType = {
     .name = "sd_bus_internals.SdBusInterface",
     .basicsize = sizeof(SdBusInterfaceObject),
     .itemsize = 0,
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = (PyType_Slot[]) {
         { Py_tp_new, PyType_GenericNew },
         { Py_tp_init, (initproc)SdBusInterface_init },
         { Py_tp_dealloc, (destructor)SdBusInterface_dealloc },
+        { Py_tp_traverse, (traverseproc)SdBusInterface_traverse },
+        { Py_tp_clear, (inquiry)SdBusInterface_clear },
         { Py_tp_methods, SdBusInterface_methods },
         { Py_tp_members, SdBusInterface_members },
         { 0, NULL },

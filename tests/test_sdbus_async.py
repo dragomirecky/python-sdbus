@@ -48,6 +48,7 @@ from aiodbus.exceptions import (
 )
 from aiodbus.member.property import DbusProperty
 from aiodbus.member.signal import DbusSignal
+from aiodbus.meta import DbusLocalObjectMeta
 from aiodbus.signature import WithConversion
 from aiodbus.unittest import IsolatedDbusTestCase
 from aiodbus.utils.parse import parse_properties_changed
@@ -624,6 +625,25 @@ class TestProxy(IsolatedDbusTestCase):
 
         self.assertIsNone(test_object_ref())
         await wait_for(test_object_connection.dbus_introspect(), timeout=0.2)
+
+    async def test_closed_export_releases_the_interfaces(self) -> None:
+        """The callbacks an interface serves point back at that same interface, so an
+        export that has been closed and dropped is only reclaimed if those cycles are
+        collectable -- otherwise every export leaks for the life of the process."""
+        from gc import collect
+
+        test_object = SomeTestInterface()
+        export = test_object.export_to_dbus("/")
+        meta = test_object._dbus
+        assert isinstance(meta, DbusLocalObjectMeta)
+        interfaces = [weakref.ref(i) for i in meta.activated_interfaces]
+        self.assertTrue(interfaces)
+
+        export.close()
+        del test_object, export, meta
+        collect()
+
+        self.assertEqual([i() for i in interfaces], [None] * len(interfaces))
 
     def test_docstring(self) -> None:
         test_object, test_object_connection = initialize_object()
